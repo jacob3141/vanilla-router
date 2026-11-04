@@ -46,6 +46,8 @@ type Applier struct {
 	HealthTimeout time.Duration
 	// Sleep zwischen zwei Versuchen der Gesundheitsprüfung (in Tests ersetzt).
 	Sleep func(time.Duration)
+	// SkipHealth lässt die Gesundheitsprüfung aus (Probelauf der Testinstanz, dort wird nichts geladen).
+	SkipHealth bool
 }
 
 // Options für Apply.
@@ -141,7 +143,7 @@ func (a *Applier) Apply(c *config.Config, sec gen.Secrets, opt Options) (*Result
 	if err != nil {
 		return nil, err
 	}
-	files = append(files, gen.File{Path: config.Path, Mode: 0o640, Group: GroupConfig, Content: cj})
+	files = append(files, gen.File{Path: config.Path, Mode: config.FileMode, Group: GroupConfig, Content: cj})
 
 	changes, err := a.Plan(files)
 	if err != nil {
@@ -175,7 +177,7 @@ func (a *Applier) Apply(c *config.Config, sec gen.Secrets, opt Options) (*Result
 	groups := changedGroups(changes)
 	res.RebootNeeded = groups[gen.GroupLink]
 	res.Reloaded, err = a.reload(groups, c)
-	if err == nil {
+	if err == nil && !a.SkipHealth {
 		err = a.health(groups, c)
 	}
 	if err != nil {

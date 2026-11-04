@@ -91,7 +91,7 @@ func (a *Applier) Setup(dryRun bool, offline string) ([]string, error) {
 		"iscsid.socket", "open-iscsi.service", "NetworkManager.service"))
 	step("Netzwerkdienste einschalten: systemd-networkd, vr-firewall, vr-dnsmasq, Gesundheitsprüfung", hard("enable",
 		"systemd-networkd.service", "vr-firewall.service", "vr-firewall-reload.timer", "vr-dnsmasq.service",
-		"vr-health.service"))
+		"vr-health.service", "vr-webui-helper.service", "vr-webui.service"))
 	step("SSH ab Werk aus (F-SEC-04)", soft("disable", "--now", "ssh.socket", "ssh.service"))
 	return steps, errors.Join(errs...)
 }

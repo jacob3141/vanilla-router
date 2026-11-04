@@ -38,6 +38,7 @@ var (
 	hhmmRe    = regexp.MustCompile(`^([01][0-9]|2[0-3]):[0-5][0-9]$`)
 	pppUserRe = regexp.MustCompile(`^[\x21-\x7e]{1,128}$`)
 	sshKeyRe  = regexp.MustCompile(`^(ssh-ed25519|ecdsa-sha2-nistp(256|384|521)|ssh-rsa|sk-ssh-ed25519@openssh\.com) [A-Za-z0-9+/=]{16,} ?[\x20-\x7e]{0,128}$`)
+	idRe      = regexp.MustCompile(`^[a-z0-9]{8,32}$`)
 	ula       = netip.MustParsePrefix("fd00::/8")
 )
 
@@ -302,6 +303,9 @@ func (c *Config) validateDHCP(v *validator, lanNet netip.Prefix, router netip.Ad
 			}
 			macs[m] = true
 		}
+		if len(r.Comment) > 200 || strings.ContainsAny(r.Comment, "\n\r\"\\#;{}") {
+			v.add(f+".comment", "Kommentar zu lang oder mit unerlaubten Zeichen")
+		}
 		if a := inLAN(f+".ip", r.IP); a.IsValid() {
 			if ips[a] {
 				v.add(f+".ip", "%s ist schon reserviert", a)
@@ -352,8 +356,15 @@ func (c *Config) validateFirewall(v *validator, lanNet netip.Prefix, router neti
 		}
 		return false
 	}
+	ids := map[string]bool{}
 	for i, pf := range c.Firewall.PortForwards {
 		f := fmt.Sprintf("firewall.port_forwards[%d]", i)
+		if pf.ID != "" {
+			if !idRe.MatchString(pf.ID) || ids[pf.ID] {
+				v.add(f+".id", "Kennung ungültig oder doppelt")
+			}
+			ids[pf.ID] = true
+		}
 		v.proto(f+".proto", pf.Proto, true)
 		v.port(f+".ext_port", pf.ExtPort)
 		v.port(f+".int_port", pf.IntPort)

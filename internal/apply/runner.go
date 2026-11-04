@@ -25,6 +25,24 @@ func (ExecRunner) Run(env []string, name string, args ...string) ([]byte, error)
 	return out.Bytes(), err
 }
 
+// DryRunner ist für die Testinstanz der Oberfläche: Prüfungen (nft -c, dnsmasq --test) laufen echt,
+// alles, was das System ändert oder neu lädt, wird nur protokolliert und gilt als erfolgreich.
+type DryRunner struct {
+	Log func(cmd string)
+}
+
+// Run führt nur prüfende Befehle aus.
+func (d DryRunner) Run(env []string, name string, args ...string) ([]byte, error) {
+	check := (name == "nft" && len(args) > 0 && args[0] == "-c") || (name == "dnsmasq" && len(args) > 0 && args[0] == "--test")
+	if check && os.Geteuid() == 0 { // ohne root kann nft -c nicht prüfen, dann nur protokollieren
+		return ExecRunner{}.Run(env, name, args...)
+	}
+	if d.Log != nil {
+		d.Log(name + " " + strings.Join(args, " "))
+	}
+	return nil, nil
+}
+
 // DirSecrets liest Geheimnisse aus einem Ordner, eine Datei je Verweis (/etc/vanilla-router/secrets).
 type DirSecrets struct{ Dir string }
 

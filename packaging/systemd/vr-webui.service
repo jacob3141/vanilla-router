@@ -1,0 +1,46 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Weboberfläche (M4). Läuft ohne Root, nur mit CAP_NET_BIND_SERVICE (Port 443/80). Alles
+# Privilegierte geht über vr-webui-helper (D-04). Ping läuft nativ, ohne Programme mit Datei-
+# Capabilities, die die Härtung verhindern würde (L-09).
+[Unit]
+Description=vanilla-router Weboberfläche
+After=network.target vr-webui-helper.service
+Wants=vr-webui-helper.service
+ConditionPathExists=/etc/vanilla-router/config.json
+
+[Service]
+Type=simple
+User=vr-webui
+Group=vr-webui
+# „+“: als root vor dem Start (TLS-Zertifikat, Einrichtungscode vom Installer)
+ExecStartPre=+/usr/sbin/vr-webui prepare
+ExecStart=/usr/sbin/vr-webui serve
+Restart=on-failure
+RestartSec=3
+
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+CapabilityBoundingSet=CAP_NET_BIND_SERVICE
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ReadWritePaths=/var/lib/vanilla-router/webui
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

@@ -15,7 +15,7 @@ trap 'rm -rf "$STAGE"' EXIT
 
 echo "baue Programme …"
 mkdir -p "$STAGE/usr/sbin"
-for cmd in vrctl vr-detect vr-install; do
+for cmd in vrctl vr-detect vr-install vr-webui; do
 	[ -d "cmd/$cmd" ] || continue
 	CGO_ENABLED=0 GOFLAGS=-buildvcs=false go build -trimpath -ldflags "-s -w -X main.version=$VERSION" \
 		-o "$STAGE/usr/sbin/$cmd" "./cmd/$cmd"

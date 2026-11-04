@@ -20,6 +20,10 @@ const SchemaVersion = 1
 // Path ist der Ort der Konfiguration auf dem Zielsystem.
 const Path = "/etc/vanilla-router/config.json"
 
+// FileMode: lesbar für alle, damit die Weboberfläche ohne Root sie lesen kann. Geheimnisse stehen nie
+// in config.json, sondern unter secrets/ (0600).
+const FileMode = 0o644
+
 // Config ist der gewünschte Zustand des Routers.
 type Config struct {
 	Schema   int      `json:"schema"`
@@ -103,9 +107,10 @@ type DHCP struct {
 
 // Reservation ist eine feste Adresse für ein Gerät. Der Name wird auch im DNS eingetragen.
 type Reservation struct {
-	Name string `json:"name"`
-	MAC  string `json:"mac"`
-	IP   string `json:"ip"`
+	Name    string `json:"name"`
+	MAC     string `json:"mac"`
+	IP      string `json:"ip"`
+	Comment string `json:"comment,omitempty"`
 }
 
 // DNS im Heimnetz.
@@ -130,7 +135,8 @@ type Firewall struct {
 
 // PortForward leitet einen Port von außen an ein Gerät im Heimnetz weiter (IPv4).
 type PortForward struct {
-	Proto    string `json:"proto"` // tcp, udp, both
+	ID       string `json:"id,omitempty"` // feste Kennung für die Oberfläche
+	Proto    string `json:"proto"`        // tcp, udp, both
 	ExtPort  int    `json:"ext_port"`
 	ExtEnd   int    `json:"ext_end,omitempty"` // Bereich ext_port–ext_end, 0 = einzelner Port
 	IntIP    string `json:"int_ip"`
@@ -234,7 +240,7 @@ func (c *Config) Save(path string) error {
 	if err != nil {
 		return err
 	}
-	return WriteFileAtomic(path, b, 0o640)
+	return WriteFileAtomic(path, b, FileMode)
 }
 
 // WriteFileAtomic schreibt eine Datei so, dass Leser immer die alte oder die neue Fassung sehen.

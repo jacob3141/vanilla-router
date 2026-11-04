@@ -17,6 +17,8 @@ var (
 	lanMAC = []string{"02:00:00:00:00:02", "02:00:00:00:00:03"}
 )
 
+func res(name, mac, ip string) Reservation { return Reservation{Name: name, MAC: mac, IP: ip} }
+
 func testConfig(t *testing.T) *Config {
 	t.Helper()
 	c, err := Default(DefaultInput{WANMAC: wanMAC, LANMACs: lanMAC, Rand: bytes.NewReader([]byte{1, 2, 3, 4, 5})})
@@ -74,7 +76,7 @@ func TestRundreise(t *testing.T) {
 	if !bytes.Equal(a, b) {
 		t.Errorf("Rundreise verändert die Datei:\n%s\n%s", a, b)
 	}
-	if fi, _ := os.Stat(path); fi.Mode().Perm() != 0o640 {
+	if fi, _ := os.Stat(path); fi.Mode().Perm() != FileMode {
 		t.Errorf("Rechte %v", fi.Mode().Perm())
 	}
 }
@@ -138,16 +140,16 @@ func TestValidateFehler(t *testing.T) {
 	}, "wan.static.address")
 	expectErr(t, "Prefix 40", func(c *Config) { c.WAN.IPv6.RequestPrefix = 40 }, "wan.ipv6.request_prefix")
 	expectErr(t, "Reservierung doppelt", func(c *Config) {
-		c.DHCP.Reservations = []Reservation{{"a", "02:00:00:00:00:10", "192.168.42.20"}, {"b", "02:00:00:00:00:11", "192.168.42.20"}}
+		c.DHCP.Reservations = []Reservation{res("a", "02:00:00:00:00:10", "192.168.42.20"), res("b", "02:00:00:00:00:11", "192.168.42.20")}
 	}, "dhcp.reservations[1].ip")
 	expectErr(t, "Reservierung = Router", func(c *Config) {
-		c.DHCP.Reservations = []Reservation{{"a", "02:00:00:00:00:10", "192.168.42.1"}}
+		c.DHCP.Reservations = []Reservation{res("a", "02:00:00:00:00:10", "192.168.42.1")}
 	}, "dhcp.reservations[0].ip")
 	expectErr(t, "Name = Hostname", func(c *Config) {
-		c.DHCP.Reservations = []Reservation{{"router", "02:00:00:00:00:10", "192.168.42.20"}}
+		c.DHCP.Reservations = []Reservation{res("router", "02:00:00:00:00:10", "192.168.42.20")}
 	}, "dhcp.reservations[0].name")
 	expectErr(t, "DNS-Name doppelt", func(c *Config) {
-		c.DHCP.Reservations = []Reservation{{"nas", "02:00:00:00:00:10", "192.168.42.20"}}
+		c.DHCP.Reservations = []Reservation{res("nas", "02:00:00:00:00:10", "192.168.42.20")}
 		c.DNS.Records = []Record{{"nas", "192.168.42.21"}}
 	}, "dns.records[0].name")
 	expectErr(t, "Upstream kein IP", func(c *Config) { c.DNS.Upstreams = []string{"dns.example.org"} }, "dns.upstreams[0]")
@@ -178,7 +180,7 @@ func TestValidateFehler(t *testing.T) {
 func TestValidateGutfaelle(t *testing.T) {
 	c := testConfig(t)
 	c.WAN.Type, c.WAN.PPPoE = WANPPPoE, &PPPoE{User: "000123456789551234567890#0001@t-online.de", PasswordRef: "pppoe", VLAN: 7}
-	c.DHCP.Reservations = []Reservation{{"drucker", "02:00:00:00:00:10", "192.168.42.20"}}
+	c.DHCP.Reservations = []Reservation{res("drucker", "02:00:00:00:00:10", "192.168.42.20")}
 	c.DNS.Records = []Record{{"nas", "192.168.42.21"}, {"nas6", "fd01:203:405:1::21"}}
 	c.DNS.Upstreams = []string{"9.9.9.9", "2620:fe::fe"}
 	c.Firewall.PortForwards = []PortForward{{Proto: "both", ExtPort: 51820, IntIP: "192.168.42.20", IntPort: 51820, Comment: "WireGuard (Büro)"}}

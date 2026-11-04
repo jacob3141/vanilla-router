@@ -1,0 +1,6 @@
+# Einheitlich LF, auch beim Arbeiten unter Windows (Skripte laufen auf Linux)
+* text=auto eol=lf
+*.png binary
+*.jpg binary
+*.img binary
+*.qcow2 binary

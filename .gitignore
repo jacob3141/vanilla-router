@@ -1,0 +1,24 @@
+# Lokale, umgebungsspezifische Hinweise für Agenten (nie committen)
+CLAUDE.local.md
+.claude/settings.local.json
+
+# Zugangsdaten von Testinstanzen, Backups, Audit-Ergebnisse
+dev/
+backups/
+audits/
+*.local.json
+
+# Build und Tests
+/dist/
+/out/
+*.img
+*.iso
+*.qcow2
+test/vm/work/
+
+# Editor und System
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db

@@ -82,7 +82,7 @@ func (s *Server) commit(ctx context.Context, prev, next conf.State, _ parts) err
 	if err := nc.Validate(); err != nil {
 		return userConfigError(err)
 	}
-	_, err = s.applier().Apply(nc, apply.DirSecrets{Dir: s.cfg.SecretsDir}, apply.Options{})
+	_, err = s.applier().Apply(nc, s.secrets(), apply.Options{})
 	if err != nil {
 		return &UserError{Msg: "Die Änderung wurde nicht übernommen: " + firstLine(err.Error())}
 	}

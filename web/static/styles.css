@@ -222,6 +222,20 @@ td.actions { text-align: right; white-space: nowrap; }
 .cell-main { font-weight: 560; }
 .small-badge { margin-left: 8px; font-size: 11px; padding: 1px 7px; }
 ul.list { margin: 0; padding-left: 18px; display: grid; gap: 6px; }
+ol.list { margin: 8px 0 0; padding-left: 20px; display: grid; gap: 6px; }
+
+/* Auswahl als Karten (Anschlussart) */
+.choice-list { display: grid; gap: 8px; margin-bottom: 14px; }
+.choice {
+  display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; cursor: pointer;
+  border: 1px solid var(--border); border-radius: var(--radius-s);
+}
+.choice:hover { border-color: var(--border-strong); }
+.choice.active { border-color: var(--accent); background: var(--accent-soft); }
+.choice input { margin-top: 3px; }
+.card.hero { border-color: var(--accent); margin-bottom: 16px; }
+.grid.tight { gap: 10px; }
+details > summary { cursor: pointer; color: var(--muted, inherit); margin-bottom: 8px; }
 .banner.pending { align-items: center; }
 details.rules { border: 1px solid var(--border); border-radius: var(--radius-s); margin-bottom: 8px; background: var(--surface-2); }
 details.rules summary { cursor: pointer; padding: 9px 12px; font-weight: 550; }

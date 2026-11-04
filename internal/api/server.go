@@ -75,6 +75,7 @@ func New(cfg Config) *Server {
 	s.registerDeviceExtras()
 	s.registerNetstat()
 	s.registerAdmin()
+	s.registerSettings()
 	return s
 }
 

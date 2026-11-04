@@ -1,7 +1,7 @@
 ---
 document: vanilla-router-plan
 title: "vanilla-router: Planpapier"
-version: 0.8
+version: 0.9
 status: entwurf
 license: AGPL-3.0-or-later
 updated: 2026-11-04
@@ -617,7 +617,7 @@ Spalten: ID · Priorität · Anforderung · Status. „Prototyp“ bedeutet: im 
 | F-INST-12 | MUSS | Stick erkennt eine vorhandene Installation und bietet Rettungsaktionen an (3.9.5) | offen |
 | F-INST-13 | MUSS | Passwort der Oberfläche vom Stick aus zurücksetzen | offen |
 | F-INST-14 | SOLL | Diagnose-Bericht auf den Stick schreiben (ohne Geheimnisse) | offen |
-| F-INST-15 | MUSS | Anschlussart erkennen (DHCP, PPPoE ohne und mit VLAN, keine Antwort) und in `config.json` vermerken, damit die Oberfläche weiß, ob sie nach Zugangsdaten fragen muss | offen |
+| F-INST-15 | MUSS | Anschlussart erkennen (DHCP, PPPoE ohne und mit VLAN, keine Antwort) und in `config.json` vermerken (`wan.detected`), damit die Oberfläche weiß, ob sie nach Zugangsdaten fragen muss | Schema und Oberfläche fertig, Assistent schreibt es noch nicht (T-M4-05) |
 | F-INST-16 | MUSS | Bedienung nur mit Pfeiltasten und Enter, keine Texteingabe (P-11) | offen |
 | F-INST-17 | MUSS | Solange die Oberfläche nicht eingerichtet ist, zeigt der Router nach jedem Start Adresse und Einrichtungscode auf dem Bildschirm (Text und QR) | offen |
 | F-INST-18 | MUSS | Schritte ohne Problem werden nicht angezeigt (S2), im Normalfall nur S3, S6, S10 mit einer Handlung (3.9.2) | offen |
@@ -662,13 +662,13 @@ Spalten: ID · Priorität · Anforderung · Status. „Prototyp“ bedeutet: im 
 |---|---|---|---|
 | F-UI-01 | MUSS | Alle Funktionen aus 2.3 auf Basis von `config.json` | Prototyp (auf state.json) |
 | F-UI-02 | MUSS | Einrichtungsmodus nach der Installation | offen |
-| F-UI-03 | MUSS | WAN-Einstellungen (Art, Zugangsdaten, IPv6) über die Oberfläche ändern, mit Rücknahme bei Verbindungsverlust | offen |
+| F-UI-03 | MUSS | WAN-Einstellungen (Art, Zugangsdaten, IPv6) über die Oberfläche ändern, mit Rücknahme bei Verbindungsverlust | erledigt (T-M4-03), Hardware-Test offen |
 | F-UI-04 | SOLL | Mobilgerätetauglich | Prototyp (Grundlagen) |
 | F-UI-05 | SOLL | Englische Übersetzung | offen |
 | F-UI-06 | KANN | Benachrichtigungen (E-Mail, Push) bei Ausfällen, neuen Geräten, Updates | offen |
 | F-UI-07 | MUSS | Seite „Über“ mit Version, Lizenz (AGPL-3.0-or-later) und Link zum Quelltext genau dieser Version (AGPL §13, D-11). Der Link ist ein Build-Parameter, damit veränderte Fassungen auf ihren eigenen Quelltext zeigen | erledigt |
-| F-UI-08 | MUSS | Einrichtungsschritt „Internetzugang“ nach der ersten Anmeldung, wenn der Assistent PPPoE oder keine Antwort erkannt hat: Zugangsdaten mit Anbieter-Vorlagen (F-NET-13), VLAN, Prüfung der Verbindung (3.8) | offen |
-| F-UI-09 | MUSS | Name des Routers, Heimnetz (Adresse, DHCP-Bereich), Zeitzone und Sprache in der Oberfläche ändern, mit Rücknahme bei Verbindungsverlust (wie F-UI-03) | offen |
+| F-UI-08 | MUSS | Einrichtungsschritt „Internetzugang“ nach der ersten Anmeldung, wenn der Assistent PPPoE oder keine Antwort erkannt hat: Zugangsdaten mit Anbieter-Vorlagen (F-NET-13), VLAN, Prüfung der Verbindung (3.8) | erledigt (T-M4-04) |
+| F-UI-09 | MUSS | Name des Routers, Heimnetz (Adresse, DHCP-Bereich), Zeitzone und Sprache in der Oberfläche ändern, mit Rücknahme bei Verbindungsverlust (wie F-UI-03) | erledigt bis auf die Sprache (F-UI-05) |
 
 ### 4.5 Updates (F-UPD)
 
@@ -821,8 +821,8 @@ verify`. Das Paket `vanilla-router_*.deb` baut, alle 391 Pakete der Images komme
 | T-M3-04 | Images | `image/target`, `image/stick`, `image/build.sh` (mkosi) | **ungetestet**, siehe `image/README.md` |
 | T-M4-01 | Weboberfläche aus dem Prototyp übernehmen, auf `config.json` umstellen (3.11) | `cmd/vr-webui` mit Helper; `internal/conf` übersetzt nur noch zwischen API-Formen und `config.json`, Prüfung per `config.Validate`, Einspielen per `apply` (Sicherung, Rücknahme). dnsmasq-Leases, Adressen und Namen aus der Konfiguration, eigenes TLS-Zertifikat, Einrichtungscode vom Installer, Erweiterungen (Container, Dateiablage, Audit) nur sichtbar, wenn installiert. Im Browser gegen eine lokale Testinstanz geprüft (alle Seiten, Reservierung, DNS, Weiterleitung mit Bestätigung, Sperre, Fehlermeldungen) | erledigt (ungetestet auf Hardware) |
 | T-M4-02 | Seite „Über“ mit Lizenz und Quelltext-Link (F-UI-07) | Seitenleiste und Anmeldeseite, `/api/about`, Link per Build-Parameter | erledigt |
-| T-M4-03 | Einstellungen für WAN-Art, PPPoE-Zugangsdaten, Hostname und Heimnetz in der Oberfläche (F-UI-03, F-UI-09). Seit D-15 Voraussetzung für die erste Version | – | offen |
-| T-M4-04 | Einrichtungsschritt „Internetzugang“ nach dem ersten Passwort (F-UI-08), Anbieter-Vorlagen als Datendatei (Q-14) | – | offen |
+| T-M4-03 | Einstellungen für WAN-Art, PPPoE-Zugangsdaten, Hostname und Heimnetz in der Oberfläche (F-UI-03, F-UI-09). Seit D-15 Voraussetzung für die erste Version | Seite „Internet & Heimnetz“ (`web/static/views/internet.js`), Helper-Aktionen `settings.*`. Netzwerk-Änderungen über die Bestätigung von apply (systemd-Timer: WAN 2 min, Heimnetz 5 min), Prüfung „Internet erreichbar“. Heimnetz-Umzug verschiebt Pool, Reservierungen, DNS-Einträge und Weiterleitungen (`config.MoveLAN`), prüft Überschneidung mit dem WAN-Netz. Neues PPPoE-Passwort unter neuem Verweis, damit eine Rücknahme zum alten passt. apply übernimmt Hostname und Zeitzone (`hostnamectl`, `timedatectl`) und startet die Oberfläche bei neuem Namen, neuer Adresse oder Wechsel DHCP/PPPoE neu. Im Browser gegen die Testinstanz geprüft: Telekom-Maske mit Fehlermeldung, Bestätigen, Ablauf der Frist mit Rücknahme, Heimnetz-Umzug, Name und Zeitzone | erledigt (ungetestet auf Hardware) |
+| T-M4-04 | Einrichtungsschritt „Internetzugang“ nach dem ersten Passwort (F-UI-08), Anbieter-Vorlagen als Datendatei (Q-14) | `wan.detected` in config.json (F-INST-15), nach der Anmeldung automatisch `#/internet?setup=1` mit erkanntem PPPoE/VLAN vorbelegt, „Später“ für einen Tag, Hinweis auf der Übersicht. Anbieter-Vorlagen bisher nur Telekom (fest im Code), Datendatei offen | erledigt bis auf die Datendatei |
 | T-M4-05 | Assistent kürzen (3.9.2): S1 nur ohne `stick.json`, S2 nur bei Problem, S4 ohne Eingabe, S5 und S7 weg, nur Pfeiltasten und Enter (F-INST-15 bis 18) | `cmd/vr-install` | offen |
 | T-M4-06 | Anzeige von Adresse und Einrichtungscode auf tty1 nach jedem Start, bis die Oberfläche eingerichtet ist (F-INST-17) | – | offen |
 | T-M4-07 | Abbild mit reservierter `vr/stick.json` und signiertem Manifest (3.9.1, 3.12) | `image/build.sh`, Werkzeug zum Signieren | offen |
@@ -843,6 +843,10 @@ Reihenfolge so gewählt, dass jeder Schritt nur das Ergebnis des vorigen braucht
 5. **Installation** auf die interne SSD, Neustart ohne Stick → bootet, `lan0` hat 192.168.42.1, ein Gerät
    im Heimnetz bekommt Adresse, DNS und Internet, IPv6 falls der Anbieter ein Präfix gibt.
 6. **vrctl apply --confirm 60s** mit einer Portweiterleitung, nicht bestätigen → nach 60 s zurück.
+   In der Oberfläche: Heimnetz auf eine andere Adresse umstellen, Gerät neu verbinden, unter der neuen
+   Adresse bestätigen. Zweiter Durchgang ohne Bestätigung → altes Netz kommt zurück, die Oberfläche
+   startet unter der alten Adresse neu. Dabei prüfen, ob `networkctl reload` die alte Adresse von `lan0`
+   entfernt. Name ändern → neues Zertifikat, Oberfläche unter dem neuen Namen erreichbar.
 7. **Rücknahme nach Update**: `vrctl snapshot pre-update`, dann absichtlich `vr-dnsmasq` kaputt machen
    (z. B. `systemctl mask vr-dnsmasq`), neu starten → vr-health startet neu, GRUB nimmt den Snapshot,
    danach läuft der alte Stand und bleibt nach einem weiteren Neustart.
@@ -957,3 +961,4 @@ Recherche vom 2026-11-04. Foren sind als solche gekennzeichnet und müssen vor e
 | 0.6 | 2026-11-04 | M2 (Konfigurations-Kern), M3 (Installer, Images) und M5 (Snapshots, Rücknahme) im Code fertig, ungetestet auf Hardware (7.2). Q-03 und Q-04 umgesetzt, D-13. Testplan für Hardware (7.3). M4 (Weboberfläche) offen |
 | 0.7 | 2026-11-04 | M4: Weboberfläche übernommen und auf `config.json` umgestellt (T-M4-01, T-M4-02), F-UI-07 erledigt, WAN-Einstellungen in der Oberfläche offen (T-M4-03). L-18 |
 | 0.8 | 2026-11-04 | Ablauf aus Sicht des Nutzers (Abschnitt 1, D-15) und Grundsatz P-11: Stick-Ersteller für Windows (3.12, F-STICK, D-14), Assistent auf Physisches gekürzt (3.9.2, F-INST-04 verworfen, F-INST-15 bis 18), `vr/stick.json`, Zugangsdaten und Einstellungen in der Oberfläche (3.8, F-UI-08/09). M4 erweitert (T-M4-04 bis 08), Q-17 bis Q-19, R-07 bis R-09 |
+| 0.9 | 2026-11-04 | T-M4-03 und T-M4-04 erledigt: Seite „Internet & Heimnetz“, Einrichtungsschritt Internetzugang, `wan.detected`. F-UI-03, F-UI-08, F-UI-09 erledigt (ohne Hardware-Test), Testplan 7.3 ergänzt |

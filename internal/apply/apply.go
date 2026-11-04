@@ -165,6 +165,7 @@ func (a *Applier) Apply(c *config.Config, sec gen.Secrets, opt Options) (*Result
 		return res, nil
 	}
 
+	old := a.current()
 	genID, err := a.backup(changes)
 	if err != nil {
 		return nil, fmt.Errorf("Sicherung der alten Fassung: %w", err)
@@ -176,7 +177,9 @@ func (a *Applier) Apply(c *config.Config, sec gen.Secrets, opt Options) (*Result
 	}
 	groups := changedGroups(changes)
 	res.RebootNeeded = groups[gen.GroupLink]
+	sysErr := a.system(old, c, groups)
 	res.Reloaded, err = a.reload(groups, c)
+	err = errors.Join(err, sysErr)
 	if err == nil && !a.SkipHealth {
 		err = a.health(groups, c)
 	}
@@ -323,6 +326,7 @@ func (a *Applier) restore(id string) error {
 	}
 	var errs []error
 	groups := map[string]bool{}
+	before := a.current()
 	for _, e := range m.Entries {
 		groups[e.Group] = true
 		if !e.Existed {
@@ -340,9 +344,11 @@ func (a *Applier) restore(id string) error {
 		}
 	}
 	// Mit der zurückgespielten Konfiguration neu laden (Zeitzone für die Sperren).
-	c, cerr := config.Load(a.p(config.Path))
-	if cerr != nil {
-		c = nil
+	c := a.current()
+	if c != nil {
+		if err := a.system(before, c, groups); err != nil {
+			errs = append(errs, err)
+		}
 	}
 	if _, err := a.reload(groups, c); err != nil {
 		errs = append(errs, err)
@@ -404,6 +410,48 @@ func (a *Applier) reload(groups map[string]bool, c *config.Config) ([]string, er
 		}
 	}
 	return dedup(done), errors.Join(errs...)
+}
+
+// current liest die eingespielte config.json, nil wenn sie fehlt oder ungültig ist.
+func (a *Applier) current() *config.Config {
+	c, err := config.Load(a.p(config.Path))
+	if err != nil {
+		return nil
+	}
+	return c
+}
+
+// system übernimmt Einstellungen, die nicht in erzeugten Dateien stehen: Hostname und Zeitzone des
+// Systems. Ändern sich Name oder Adresse des Routers, startet die Weboberfläche kurz danach neu
+// (neues Zertifikat, neue Adresse). Eine geänderte Zeitzone lädt die Firewall neu, weil die
+// Zeitsperren in Ortszeit gelten. old darf nil sein (erste Einrichtung).
+func (a *Applier) system(old, c *config.Config, groups map[string]bool) error {
+	if old == nil {
+		return nil
+	}
+	var errs []error
+	run := func(name string, args ...string) {
+		if out, err := a.Run.Run(nil, name, args...); err != nil {
+			errs = append(errs, fmt.Errorf("%s: %v %s", name, err, strings.TrimSpace(string(out))))
+		}
+	}
+	if old.System.Hostname != c.System.Hostname {
+		run("hostnamectl", "set-hostname", c.System.Hostname)
+	}
+	if old.System.Timezone != c.System.Timezone {
+		run("timedatectl", "set-timezone", c.System.Timezone)
+		groups[gen.GroupFirewall] = true
+	}
+	pppoe := func(x *config.Config) bool { return x.WAN.Type == config.WANPPPoE }
+	if old.System.Hostname != c.System.Hostname || old.DNS.Domain != c.DNS.Domain || old.LAN.IPv4 != c.LAN.IPv4 ||
+		pppoe(old) != pppoe(c) {
+		// Neues Zertifikat, neue Adresse oder anderes Uplink-Interface (wan0/ppp0) für die Statistik.
+		// Verzögert, damit die Antwort an den Browser noch rausgeht. try-restart: läuft die
+		// Oberfläche nicht, bleibt sie aus.
+		run("systemd-run", "--on-active=3s", "--timer-property=AccuracySec=1s",
+			"systemctl", "try-restart", "vr-webui.service")
+	}
+	return errors.Join(errs...)
 }
 
 func dedup(s []string) []string {

@@ -62,6 +62,24 @@ type WAN struct {
 	Static   *StaticWAN `json:"static,omitempty"`
 	IPv6     WANIPv6    `json:"ipv6"`
 	MTU      int        `json:"mtu,omitempty"` // 0 = Vorgabe (1500, bei PPPoE 1492)
+	// Detected ist das Ergebnis der Erkennung im Assistenten, solange der Anschluss noch nicht in der
+	// Oberfläche eingerichtet wurde (F-INST-15, F-UI-08). Der Assistent fragt keine Zugangsdaten
+	// (P-11): Bei PPPoE läuft der Router bis dahin mit Type dhcp, das schadet nicht.
+	Detected *Detected `json:"detected,omitempty"`
+}
+
+// Erkannte Anschlussarten. DetectedNone: Das Modem hat nicht geantwortet.
+const DetectedNone = "none"
+
+// Detected beschreibt, was der Assistent am Internet-Anschluss gefunden hat.
+type Detected struct {
+	Method string `json:"method"`         // dhcp, pppoe oder none
+	VLAN   int    `json:"vlan,omitempty"` // bei PPPoE: VLAN der Antwort (Telekom: 7)
+}
+
+// NeedsSetup sagt, ob die Oberfläche nach dem Internetzugang fragen muss.
+func (w WAN) NeedsSetup() bool {
+	return w.Detected != nil && w.Detected.Method != WANDHCP
 }
 
 // PPPoE-Zugang. Das Passwort steht nicht hier, sondern unter secrets/<PasswordRef> (0600).

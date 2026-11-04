@@ -17,6 +17,7 @@ import device from './views/device.js';
 import connections from './views/connections.js';
 import network from './views/network.js';
 import logs from './views/logs.js';
+import internet, { SETUP_LATER_KEY } from './views/internet.js';
 import { setupPalette } from './palette.js';
 
 // Navigation: Bereich → Ansichten. Jede Ansicht exportiert { title, subtitle, render(container) }
@@ -24,6 +25,7 @@ import { setupPalette } from './palette.js';
 const NAV = [
   { section: null, items: [{ path: 'dashboard', label: 'Übersicht', icon: 'dashboard', view: dashboard }] },
   { section: 'Netzwerk', items: [
+    { path: 'internet', label: 'Internet & Heimnetz', icon: 'globe', view: internet },
     { path: 'devices', label: 'Geräte', icon: 'devices', view: devices },
     { path: 'monitor', label: 'Online-Monitor', icon: 'activity', view: monitor },
     { path: 'dns', label: 'DNS', icon: 'dns', view: dns },
@@ -131,6 +133,19 @@ function renderShell(state) {
   shell.addEventListener('click', (e) => { if (e.target === shell) shell.classList.remove('nav-open'); });
   clear(app).append(shell);
   route();
+  offerInternetSetup();
+}
+
+// Einrichtungsschritt „Internetzugang“ (F-UI-08): Hat der Assistent PPPoE oder keine Antwort erkannt,
+// führt die Oberfläche nach der Anmeldung einmal dorthin. „Später“ gilt einen Tag lang, die Übersicht
+// erinnert weiter.
+async function offerInternetSetup() {
+  let s;
+  try { s = await get('/api/settings'); } catch { return; }
+  if (!s.needs_setup || location.hash.startsWith('#/internet')) return;
+  let later = 0;
+  try { later = +localStorage.getItem(SETUP_LATER_KEY) || 0; } catch { /* privater Modus */ }
+  if (Date.now() - later > 24 * 3600 * 1000) location.hash = '#/internet?setup=1';
 }
 
 async function logout() {

@@ -23,6 +23,9 @@ export function setupPalette(pages) {
       { label: 'Feste Adresse vergeben', sub: 'Aktion', icon: 'pin', href: '#/devices', text: 'reservierung dhcp fest ip' },
       { label: 'Portweiterleitung anlegen', sub: 'Aktion', icon: 'arrowRight', href: '#/firewall', text: 'port forward weiterleitung nat' },
       { label: 'Passwort ändern', sub: 'Aktion', icon: 'lock', href: '#/settings', text: 'passwort kennwort' },
+      { label: 'Zugangsdaten des Anbieters', sub: 'Aktion', icon: 'globe', href: '#/internet', text: 'pppoe dsl telekom zugangsdaten wan internet anschluss' },
+      { label: 'Heimnetz-Adresse ändern', sub: 'Aktion', icon: 'devices', href: '#/internet', text: 'lan ip adresse subnetz netz dhcp bereich' },
+      { label: 'Name und Zeitzone', sub: 'Aktion', icon: 'router', href: '#/internet', text: 'hostname name zeitzone timezone' },
     );
     let sel = 0;
     let shown = [];

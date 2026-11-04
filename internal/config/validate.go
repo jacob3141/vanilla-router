@@ -258,6 +258,14 @@ func (c *Config) validateWAN(v *validator, lanNet netip.Prefix) {
 	if w.MTU != 0 && (w.MTU < 1280 || w.MTU > 9000) {
 		v.add("wan.mtu", "MTU %d nicht zwischen 1280 und 9000", w.MTU)
 	}
+	if d := w.Detected; d != nil {
+		if d.Method != WANDHCP && d.Method != WANPPPoE && d.Method != DetectedNone {
+			v.add("wan.detected.method", "dhcp, pppoe oder none erwartet")
+		}
+		if d.VLAN < 0 || d.VLAN > 4094 || (d.VLAN != 0 && d.Method != WANPPPoE) {
+			v.add("wan.detected.vlan", "VLAN nur bei pppoe, 1 bis 4094")
+		}
+	}
 }
 
 func (c *Config) validateDHCP(v *validator, lanNet netip.Prefix, router netip.Addr) {

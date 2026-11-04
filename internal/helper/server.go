@@ -223,4 +223,5 @@ func (s *Server) registerAll() {
 	s.registerNetstat()
 	s.registerSysinfo()
 	s.registerExtras()
+	s.registerSettings()
 }

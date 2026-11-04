@@ -77,6 +77,20 @@ func (s *Server) handleHints(w http.ResponseWriter, r *http.Request) {
 	if s.call(r, "health", nil, nil) != nil {
 		add("crit", "Helper nicht erreichbar", "Änderungen über die Oberfläche sind gerade nicht möglich.", "#/services")
 	}
+	var set struct {
+		NeedsSetup bool `json:"needs_setup"`
+		Pending    *struct {
+			Deadline time.Time `json:"deadline"`
+		} `json:"pending"`
+	}
+	if s.call(r, "settings.get", nil, &set) == nil {
+		if set.Pending != nil {
+			add("crit", "Änderung wartet auf Bestätigung", "Ohne Bestätigung wird sie automatisch zurückgenommen.", "#/internet")
+		}
+		if set.NeedsSetup {
+			add("warn", "Internetzugang einrichten", "Ihr Anschluss braucht noch Zugangsdaten oder die Anschlussart.", "#/internet?setup=1")
+		}
+	}
 	if s.cfg.Monitor != nil {
 		if n, down := s.cfg.Monitor.OutagesSince(time.Now().Add(-24 * time.Hour)); down {
 			add("crit", "Internet ausgefallen", "Weder 8.8.8.8 noch 1.1.1.1 antworten.", "#/monitor")

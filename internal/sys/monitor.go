@@ -75,6 +75,30 @@ func systemPing(ctx context.Context, addr string) (float64, bool) {
 	return icmpPing(ctx, addr, 2*time.Second)
 }
 
+// InternetOK prüft sofort, ob das Internet erreichbar ist (dieselben Ziele wie der Monitor, einer reicht).
+// Für die Prüfung nach einer Änderung am Internet-Anschluss (F-UI-08).
+func (m *Monitor) InternetOK(ctx context.Context) bool {
+	m.mu.Lock()
+	var addrs []string
+	for _, t := range m.Targets {
+		if t.Internet {
+			addrs = append(addrs, t.Addr)
+		}
+	}
+	ping := m.ping
+	m.mu.Unlock()
+	ok := make(chan bool, len(addrs))
+	for _, a := range addrs {
+		go func() { _, r := ping(ctx, a); ok <- r }()
+	}
+	for range addrs {
+		if <-ok {
+			return true
+		}
+	}
+	return false
+}
+
 func (m *Monitor) Run(stop <-chan struct{}) {
 	m.round()
 	t := time.NewTicker(probeEvery)

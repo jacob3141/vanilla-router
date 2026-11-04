@@ -42,6 +42,18 @@ Sicherheit** (P-10).
   - Zeit- und Kalenderlogik immer mit Tests (L-16).
   - Die Testumgebung hat dieselbe systemd-Härtung wie der Betrieb (NF-05).
 
+## Prüfen vor jedem Commit
+
+```
+gofmt -l .                      # muss leer sein
+go vet ./... && go test ./...
+test/check-main.sh              # SPDX-Zeilen (NF-08) und Pakete nur aus main (NF-09), ohne Root
+sudo test/lab/netns-lab.sh test # WAN-Erkennung im Namespace-Labor (Root, siehe Kopf des Skripts)
+```
+
+Werkzeugausgaben (apt, ip, …) nur mit `LC_ALL=C` auswerten, Prüfungen schlagen bei fehlenden Daten
+fehl (L-17).
+
 ## Sprache und Texte
 
 - Oberfläche, Doku und Kommentare derzeit auf Deutsch (Q-07 offen). Texte für Laien ohne Fachbegriffe:

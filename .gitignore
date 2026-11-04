@@ -15,6 +15,7 @@ audits/
 *.iso
 *.qcow2
 test/vm/work/
+test/lab/work/
 
 # Editor und System
 .vscode/

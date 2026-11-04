@@ -1,7 +1,7 @@
 ---
 document: vanilla-router-plan
 title: "vanilla-router: Planpapier"
-version: 0.4
+version: 0.5
 status: entwurf
 license: AGPL-3.0-or-later
 updated: 2026-11-04
@@ -173,6 +173,7 @@ vanilla-router (Verweis in der letzten Spalte).
 | L-14 | Die per DHCP verteilte Suchdomain war ein Fantasiename statt der lokalen Domain, deshalb funktionierten kurze Namen nicht. | Suchdomain `home.arpa` als Vorgabe (F-NET-05) |
 | L-15 | Ohne Backup lag die gesamte NAS-Ablage auf einer einzigen SSD. | Backup-Funktion für Nebenrollen einplanen (F-ADD-03) |
 | L-16 | Bei Sperren über Mitternacht war die Zuordnung der Wochentage zuerst falsch (Morgen gehört zum Folgetag). | Zeitlogik mit Tests absichern (umgesetzt, beibehalten) |
+| L-17 | Die Paketprüfung (T-M1-08) fand auf dem deutschsprachigen Prototyp nichts, weil apt „Hängt ab von:“ statt „Depends:“ schreibt. Auf einem System ohne *universe* in den Quellen rutschten universe-Pakete als „unbekannt“ durch. | Ausgaben von Werkzeugen nur mit `LC_ALL=C` auswerten. Prüfungen müssen bei fehlenden Daten fehlschlagen, nicht bestehen |
 
 ### 2.5 Was am Prototyp noch Handarbeit ist
 
@@ -213,9 +214,20 @@ Das ist die Liste dessen, was der Installer automatisieren muss:
 
 ### 3.2 Grundsystem
 
-- **Distribution:** **Ubuntu LTS** (zuerst 26.04), Server-Minimalinstallation (D-10, entschieden
-  am 2026-11-04, P-10). Gründe: Der Prototyp läuft darauf, Ubuntu ist die bekannteste Distribution,
-  hat die meisten Anleitungen und unterstützt neue Hardware früh (HWE-Kernel).
+- **Distribution:** **Ubuntu Server LTS** (zuerst 26.04) mit dem Standard-Paketumfang des Metapakets
+  `ubuntu-server` (D-10, D-12, entschieden am 2026-11-04, P-10). Gründe: Der Prototyp läuft darauf,
+  Ubuntu ist die bekannteste Distribution, hat die meisten Anleitungen und unterstützt neue Hardware früh
+  (HWE-Kernel). Wer Ubuntu Server kennt, findet sich sofort zurecht, jede Anleitung für Ubuntu Server gilt.
+  - **Was Ubuntu Server mitbringt und wie damit umgegangen wird** (D-12): Pakete werden nicht entfernt,
+    weil `ubuntu-server-minimal` sie als feste Abhängigkeiten hat. Angepasst wird nur per Konfiguration:
+    | Bestandteil | Problem für einen Router | Umgang |
+    |---|---|---|
+    | `systemd-resolved` | Stub-Listener belegt Port 53, den dnsmasq braucht (im Prototyp maskiert) | `DNSStubListener=no` per Drop-in, resolved bleibt aktiv und zeigt auf dnsmasq |
+    | `cloud-init` | bei jedem Start Suche nach Cloud-Datenquellen, kann Netzwerk umkonfigurieren | `/etc/cloud/cloud-init.disabled` |
+    | `netplan` | zweite Netzwerk-Konfiguration neben networkd | leere Konfiguration, networkd-Dateien kommen von vrctl (D-06) |
+    | `snapd` | Dienst ohne Aufgabe, keine Snaps installiert | bleibt installiert, Dienst und Socket deaktiviert (Erweiterungen dürfen ihn einschalten) |
+    | `multipath-tools`, `open-iscsi`, `lxd-installer` | unnötige Dienste (Audit-Befund im Prototyp) | Dienste deaktiviert |
+    | `chrony` | keins, ist der Zeitdienst von Ubuntu Server | bleibt, später auch NTP-Server fürs Heimnetz |
   - **Sicherheitsupdates nur aus *main*** (Stand 26.04, auf dem Prototyp geprüft [S-15]):
     | Paket | Archiv | Folgerung |
     |---|---|---|
@@ -228,13 +240,13 @@ Das ist die Liste dessen, was der Installer automatisieren muss:
   - Regel für das Paket vanilla-router: **Abhängigkeiten nur aus *main***. Ausnahmen aus *universe* nur
     mit Begründung in einer D-NN und nur für Erweiterungen (F-ADD). Eine CI-Prüfung erzwingt das (T-M1-08).
   - Ubuntu Pro (für Privatleute kostenlos, deckt *universe* ab) wird angeboten, aber **nicht vorausgesetzt**.
-  - **snapd** wird nicht installiert, das Grundsystem kommt ohne Snaps aus.
+  - Es werden keine Snaps installiert, snapd ist aus (siehe Tabelle oben).
   - Support: 5 Jahre Standard-Support pro LTS, alle zwei Jahre eine neue LTS mit geführtem Upgrade (F-UPD-05).
 - **Netzwerk-Stack:** systemd-networkd direkt, ohne netplan als Zwischenschicht (siehe D-06). networkd
   kann DHCPv4/v6-Client, Prefix Delegation, Router Advertisements und Bridges.
-- **Paketumfang Grundinstallation:**
+- **Paketumfang Grundinstallation:** `ubuntu-server` und zusätzlich:
   - Netzwerk: `systemd-networkd`, `nftables`, `dnsmasq-base`, `ppp` (PPPoE über das rp-pppoe-Plugin von pppd)
-  - Zeit: `systemd-timesyncd` (Teil von systemd, reicht als Client; NTP-Server fürs LAN später mit chrony)
+  - Zeit: `chrony` (kommt mit Ubuntu Server)
   - Sicherheit: `unattended-upgrades`, `apparmor`, `openssh-server` (installiert, aber aus). Kein fail2ban (siehe oben)
   - Werkzeuge: `ethtool`, `iproute2`
   - Snapshots: `btrfs-progs` + Snapshot-Werkzeug (siehe F-UPD)
@@ -626,6 +638,7 @@ Spalten: ID · Priorität · Anforderung · Status. „Prototyp“ bedeutet: im 
 | D-09 | **Eine `inet`-Tabelle für den Filter** (IPv4 und IPv6 gemeinsam), NAT getrennt in `ip vr_nat` | Gemeinsame Regeln können nicht auseinanderlaufen. Der Prototyp hatte IPv6 vergessen, weil es eine eigene Tabelle brauchte (L-01). | offen (Vorschlag) |
 | D-10 | **Ubuntu LTS** als Basis | Entscheidung des Projektinhabers nach P-10: Ubuntu ist bekannter, hat mehr Anleitungen und bessere Unterstützung neuer Hardware, und der Prototyp läuft schon darauf. Das *universe*-Problem aus D-08 wird gelöst, indem Abhängigkeiten nur aus *main* kommen: `dnsmasq-base` statt `dnsmasq`, keine fail2ban-Pflicht, für snapper entscheidet Q-03 (3.2) [S-15]. | erledigt (2026-11-04) |
 | D-11 | Lizenz **AGPL-3.0-or-later** | Entscheidung des Projektinhabers am 2026-11-04: die neueste AGPL-Fassung (Version 3), mit „oder später“ für künftige Fassungen. Die AGPL verlangt zusätzlich zur GPL, dass Nutzer einer veränderten Fassung, die über das Netz bedient wird, den Quelltext bekommen. Für die Weboberfläche bedeutet das F-UI-07. Text in `LICENSE`, jede Quelldatei bekommt eine SPDX-Zeile (NF-08). | erledigt (2026-11-04) |
+| D-12 | **Ubuntu Server** mit dem Paketumfang von `ubuntu-server`, nichts entfernen, nur per Konfiguration anpassen (3.2) | Wunsch des Projektinhabers (P-10). Ein System, das genau wie ein normales Ubuntu Server aussieht, ist für Helfer und Anleitungen am einfachsten. Pakete zu entfernen bricht die Metapakete und damit Release-Upgrades. Die Kosten (einige hundert MB, ein paar deaktivierte Dienste) sind auf PC-Hardware unerheblich. | erledigt (2026-11-04) |
 
 ---
 
@@ -657,25 +670,29 @@ Spalten: ID · Priorität · Anforderung · Status. „Prototyp“ bedeutet: im 
 | ID | Meilenstein | Ergebnis | Abnahme |
 |---|---|---|---|
 | M0 | Projektstart | Repo, Planpapier, Agenten-Anleitung | dieses Dokument liegt vor |
-| M1 | Port-Erkennung | Go-Prototyp der WAN-Erkennung (3.9.3), läuft in einer VM mit 3 virtuellen NICs | Kabel „stecken“ (Link per `virsh domif-setlink`) wird zuverlässig erkannt, DHCP-Bestätigung klappt |
+| M1 | Port-Erkennung | Go-Prototyp der WAN-Erkennung (3.9.3), läuft im Namespace-Labor mit 3 veth-Ports (geändert von VM auf Namespaces, siehe T-M1-01) | Kabel „stecken“ wird zuverlässig erkannt, DHCP- und PPPoE-Bestätigung (mit VLAN 7) klappen: `sudo test/lab/netns-lab.sh test` besteht |
 | M2 | Konfigurations-Kern | `vrctl` + Schema `config.json` + Generatoren für networkd, nftables, dnsmasq; routerui-Code bereinigt übernommen | Golden-File-Tests, VM mit erzeugter Konfiguration routet IPv4/IPv6 |
 | M3 | Installer-Image | mkosi-Image mit Assistent, installiert eine VM von Grund auf | VM bootet nach Installation, LAN-Client bekommt IP, DNS und Internet |
 | M4 | Laien-Ablauf | vollständiger Assistent (S1–S10), Einrichtungsmodus der Oberfläche | Testperson ohne Linux-Kenntnisse schafft die Installation ohne Hilfe |
 | M5 | Updates und Rücknahme | Snapshots, Gesundheitsprüfung, automatische Rücknahme | absichtlich kaputtes Update wird automatisch zurückgenommen |
 | M6 | Hardware und Beta | Testmatrix echter Geräte, Dokumentation, erste öffentliche Version | ≥ 5 Gerätemodelle getestet, Doku für Laien vorhanden |
 
-### 7.1 Aufgaben für M1 (nächster Schritt)
+### 7.1 Aufgaben für M1
 
-| ID | Aufgabe | Ergebnis |
-|---|---|---|
-| T-M1-01 | Testumgebung: Skript, das mit QEMU/KVM eine Router-VM (3 virtio-NICs) und eine Provider-VM (DHCPv4/v6-PD, später PPPoE) startet | `test/vm/` mit Startskript und Anleitung |
-| T-M1-02 | Go-Paket `internal/netdetect`: Ports finden (sysfs), Eigenschaften lesen (MAC, Treiber, Bus, Geschwindigkeit, Link) | Unit-Tests mit nachgebautem sysfs-Baum (wie im Prototyp für `/proc`) |
-| T-M1-03 | Link-Ereignisse per Netlink (`RTMGRP_LINK`, nur Standardbibliothek) | Ereignis „Link hoch an Port X“ innerhalb von 2 s |
-| T-M1-04 | Ablauf „alle Kabel ab → Modem-Kabel ein“ mit Mehrdeutigkeit und Zeitüberschreitung als Zustandsautomat | Tests für jeden Übergang |
-| T-M1-05 | Bestätigung per DHCP-Discover auf dem Kandidaten-Port, ohne Adresse zu übernehmen (Rohsocket) | Antwort der Provider-VM erkannt, Ergebnis: DHCP ja/nein + angebotenes Netz |
-| T-M1-06 | PPPoE-Discovery (PADI senden, PADO erkennen), mit und ohne VLAN 7 | Erkennung gegen `pppoe-server` in der Provider-VM |
-| T-M1-07 | Kleine Textoberfläche als Vorführer: „Ziehen Sie alle Kabel ab …“ bis „Erkannt: Port 2, DHCP, Netz 192.0.2.0/24“ | Kabel „stecken“ per QEMU-Monitor (`set_link`) löst den Ablauf aus |
-| T-M1-08 | Prüfskript `test/check-main.sh`: alle Abhängigkeiten des Pakets vanilla-router auflösen und melden, was nicht aus Ubuntu *main* kommt (NF-09). Dazu Prüfung der SPDX-Zeilen (NF-08) | schlägt fehl bei `fail2ban` oder einer Datei ohne SPDX-Zeile |
+Stand 2026-11-04: Code und Unit-Tests fertig (`go test ./...` grün, gebaut mit Go 1.26 auf Ubuntu 26.04).
+`vr-detect -list` auf echter Hardware (Prototyp) erkennt beide Ports richtig. **Offen ist nur der
+Laborlauf**, er braucht Root-Rechte und die Pakete `golang-go dnsmasq-base pppoe`.
+
+| ID | Aufgabe | Ergebnis | Status |
+|---|---|---|---|
+| T-M1-01 | Testumgebung. **Geändert:** statt QEMU-VMs Network Namespaces mit veth-Paaren (startet in Sekunden, braucht keine Images, testet trotzdem echtes Netlink, AF_PACKET und VLAN 7). „Kabel stecken“ = Gegenseite einschalten. QEMU kommt erst für den Installer (M3) | `test/lab/netns-lab.sh` mit 5 Szenarien: DHCP, PPPoE über VLAN 7, erst abziehen, mehrdeutig, keine Antwort + Bestätigung | in-arbeit (Skript fertig, Lauf mit Root steht aus) |
+| T-M1-02 | Go-Paket `internal/netdetect`: Ports finden (sysfs), Eigenschaften lesen (MAC, Treiber, Bus, Geschwindigkeit, Link) | `ports.go`, Tests mit nachgebautem sysfs-Baum. Eingebaute Ports zuerst, USB-Adapter danach, Reihenfolge nach Bus-Position (PCI hexadezimal, USB natürlich sortiert) | erledigt |
+| T-M1-03 | Link-Ereignisse per Netlink (`RTMGRP_LINK`, nur Standardbibliothek) | `linkwatch.go`: Parser getestet mit nachgebauten Kernel-Nachrichten, Socket live getestet (ohne Rechte), `SetUp` per ioctl. Pufferüberlauf (`ENOBUFS`) → Zustand neu lesen | erledigt |
+| T-M1-04 | Ablauf „alle Kabel ab → Modem-Kabel ein“ mit Mehrdeutigkeit und Zeitüberschreitung als Zustandsautomat | `internal/wandetect`: reiner Automat (Zeit wird übergeben), 12 Tests, Laientexte ohne Fachbegriffe (geprüft) | erledigt |
+| T-M1-05 | Bestätigung per DHCP-Discover auf dem Kandidaten-Port, ohne Adresse zu übernehmen (Rohsocket) | `internal/probe`: Rahmen selbst gebaut (Prüfsummen getestet), Offer-Zerlegung, Ablauf mit nachgebautem Socket und künstlicher Uhr | erledigt (Labor offen) |
+| T-M1-06 | PPPoE-Discovery (PADI senden, PADO erkennen), mit und ohne VLAN 7 | ein AF_PACKET-Socket für alles, VLAN-Tag aus `PACKET_AUXDATA` wieder eingefügt (Treiber mit VLAN-Offload), Host-Uniq ordnet Antworten zu | erledigt (Labor offen) |
+| T-M1-07 | Kleine Textoberfläche als Vorführer | `cmd/vr-detect`: `-list` (ohne Rechte), Ablauf mit Eingaben (Nummer = Port von Hand, w = wiederholen, j = trotzdem), `-json` für die spätere `config.json` | erledigt |
+| T-M1-08 | Prüfskript `test/check-main.sh`: Abhängigkeiten auflösen und melden, was nicht aus Ubuntu *main* kommt (NF-09), dazu SPDX-Zeilen (NF-08) | Auflösung wie apt (nur erste Alternative, erster Anbieter virtueller Pakete): 325 Pakete, alle *main*. Gegenprobe: `fail2ban` und eine Datei ohne SPDX schlagen fehl. Unbekannte Pakete zählen als Fehler | erledigt |
 
 ---
 
@@ -726,7 +743,7 @@ vanilla-router/
   internal/            conf (Schema, Prüfregeln, Generatoren), helper, api, sys, auth, files
   web/                 Frontend
   image/               mkosi-Konfiguration für Stick und Zielsystem
-  test/                VM-Testumgebung (Provider-VM, Szenarien)
+  test/                Prüfskripte, Labor aus Namespaces (test/lab), später VM-Tests für den Installer
 ```
 
 ---
@@ -780,3 +797,4 @@ Recherche vom 2026-11-04. Foren sind als solche gekennzeichnet und müssen vor e
 | 0.2 | 2026-11-04 | Recherche eingearbeitet: Debian statt Ubuntu (D-08), networkd-PD-Beispiel, Anbieter-Details (Telekom, Vodafone), Stand Snapshots und Rücknahme, mkosi, Name; Q-14, Q-15, Quellen (S-NN) |
 | 0.3 | 2026-11-04 | Durchsicht: Widersprüche behoben (Distribution, Zeitdienst, Paketliste), ULA zufällig (F-NET-12), PPPoE-Vorlagen (F-NET-13), Firewall in einer `inet`-Tabelle (D-09), Datenträger und Boot (3.9.4), Wiederherstellung (3.9.5, F-INST-12–14), Code-Übernahme (3.11), Aufgaben für M1 (7.1), VM-Aufbau, Secure Boot (Q-16) |
 | 0.4 | 2026-11-04 | Entscheidungen des Projektinhabers: Ubuntu LTS (D-10, D-08 verworfen, Q-01 erledigt), Lizenz AGPL-3.0-or-later (D-11, Q-11 erledigt), Grundsatz Komfort vor Optimierung (P-10). Paketprüfung auf *main* [S-15]: dnsmasq-base statt dnsmasq, kein fail2ban, snapper offen (Q-03). Neu: F-UI-07, NF-08, NF-09, T-M1-08 |
+| 0.5 | 2026-11-04 | Ubuntu Server mit Paketumfang `ubuntu-server` (D-12, Tabelle in 3.2: resolved, cloud-init, snapd …), chrony statt timesyncd. M1 begonnen: T-M1-02 bis 08 erledigt, T-M1-01 auf Namespace-Labor umgestellt (Lauf steht aus). L-17 (Locale, Prüfungen ohne Daten) |

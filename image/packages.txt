@@ -1,0 +1,14 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Pakete des Zielsystems (PLAN.md 3.2, D-10, D-12). Eine Zeile pro Paket, # für Kommentare.
+# test/check-main.sh prüft, dass diese Pakete samt allen Abhängigkeiten aus Ubuntu main kommen (NF-09).
+ubuntu-server
+nftables
+dnsmasq-base
+ppp
+btrfs-progs
+chrony
+openssh-server
+unattended-upgrades
+apparmor
+ethtool
+iproute2

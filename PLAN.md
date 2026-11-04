@@ -1,7 +1,7 @@
 ---
 document: vanilla-router-plan
 title: "vanilla-router: Planpapier"
-version: 0.7
+version: 0.8
 status: entwurf
 license: AGPL-3.0-or-later
 updated: 2026-11-04
@@ -33,11 +33,21 @@ priority_values: [MUSS, SOLL, KANN]
 ## 1. Vision
 
 Ein **Router aus einem ganz normalen Linux** auf **beliebiger Standardhardware** mit mindestens zwei
-Netzwerkanschlüssen, eingerichtet von einem **Boot-Stick, der auch Laien Schritt für Schritt führt**:
+Netzwerkanschlüssen, eingerichtet von einem **Boot-Stick, der auch Laien Schritt für Schritt führt**.
 
-> „Stecken Sie jetzt das Kabel vom Modem in einen der Netzwerkanschlüsse.“
-> Der Assistent erkennt den Port, macht ihn zum Internet-Anschluss (WAN), alle anderen werden das
-> Heimnetz (LAN). Danach läuft alles von selbst und lässt sich über eine Weboberfläche bedienen.
+Der Ablauf aus Sicht des Nutzers (festgelegt vom Projektinhaber am 2026-11-04, D-15):
+
+1. **Stick erstellen:** Unter Windows ein Programm herunterladen und ohne Installation starten,
+   den USB-Stick auswählen, „Stick erstellen“. Es gibt keine Fragen und keine Vorab-Konfiguration (3.12).
+2. **Booten:** Stick abziehen, in den künftigen Router stecken, einschalten. Der Rechner startet ein
+   kleines Linux vom Stick.
+3. **Nur das Nötigste:** Der Assistent fragt nur, was sich nicht erkennen lässt, also was physisch ist:
+   > „Stecken Sie jetzt das Kabel vom Modem in einen der Netzwerkanschlüsse.“
+
+   Der Assistent erkennt den Port, macht ihn zum Internet-Anschluss (WAN), alle anderen werden das
+   Heimnetz (LAN). Dazu kommt die Bestätigung, welche Festplatte gelöscht wird. Mehr nicht.
+4. **Alles Weitere im Browser:** Zugangsdaten des Anbieters, Name, Netze und jede andere Einstellung
+   kommen über die Weboberfläche.
 
 ### 1.1 Warum
 
@@ -66,12 +76,13 @@ mit einem Assistenten für Laien davor gibt es nicht.** Diese Lücke soll vanill
 | P-08 | **Wenig Abhängigkeiten** | Eigener Code in Go nur mit der Standardbibliothek, Frontend ohne Frameworks und ohne CDN. Das hält die Angriffsfläche klein und das Projekt langlebig. |
 | P-09 | **Keine Telemetrie** | Der Router meldet nichts nach Hause. Prüfungen der Verbindung gehen nur an neutrale, dokumentierte Ziele. |
 | P-10 | **Komfort vor Optimierung** | Wenn Bequemlichkeit (bekannte Distribution, große Paketauswahl, verbreitete Anleitungen, vertraute Werkzeuge) und Optimierung (kleinstes System, wenigste Pakete, letzte Prozent Leistung) sich widersprechen, gewinnt der Komfort. Die Hardware hat Reserven genug. Sicherheit (P-03) ist davon ausgenommen und wird nie für Komfort geopfert. Festgelegt vom Projektinhaber am 2026-11-04. |
+| P-11 | **Nur fragen, was sich nicht erkennen lässt** | Der Assistent auf dem Stick fragt nur nach Physischem: welches Kabel ins Modem geht und welche Festplatte gelöscht werden darf. Alles andere bekommt eine sinnvolle Vorgabe und lässt sich später in der Weboberfläche ändern. Auf dem Stick gibt es keine Texteingabe, nur Pfeiltasten und Enter. Damit spielt auch die Tastaturbelegung keine Rolle. Festgelegt vom Projektinhaber am 2026-11-04. |
 
 ### 1.3 Zielgruppen
 
 | ID | Gruppe | Erwartung |
 |---|---|---|
-| Z-1 | **Laien** (Haushalt, Familie) | Stick rein, Fragen beantworten, fertig. Danach nur noch die Weboberfläche, nie eine Konsole. |
+| Z-1 | **Laien** (Haushalt, Familie) | Programm unter Windows starten, Stick wählen, Stick in den Router, Modem-Kabel einstecken, fertig. Danach nur noch die Weboberfläche, nie eine Konsole. |
 | Z-2 | **Bastler und Selbsthoster** | Volle Kontrolle über ein normales Linux, Docker, NAS und eigene Dienste auf demselben Gerät, ohne dass die Router-Funktion leidet. |
 | Z-3 | **Kleine Büros, Vereine** | Wie Z-1, dazu Gastnetz (später VLAN), Portweiterleitungen und Fernzugang (später VPN). |
 
@@ -196,6 +207,12 @@ Das ist die Liste dessen, was der Installer automatisieren muss:
 ### 3.1 Überblick
 
 ```
+┌──────────────── Stick-Ersteller (Windows, 3.12) ──────────────────┐
+│ eine .exe ohne Installation · lädt und prüft das Abbild · schreibt│
+│ den Stick · legt Sprache, Tastatur, Zeitzone aus Windows dazu     │
+└──────────────┬────────────────────────────────────────────────────┘
+               │ USB-Stick
+               ▼
 ┌───────────────────── Boot-Stick (Live-Image) ─────────────────────┐
 │ minimales Linux · Installations-Assistent · Image des Zielsystems │
 └──────────────┬────────────────────────────────────────────────────┘
@@ -357,9 +374,9 @@ festgelegt und versioniert):
 
 | Anbieter / Anschluss | Merkmale | Folge |
 |---|---|---|
-| Telekom DSL, VDSL, Glasfaser | PPPoE **über VLAN 7**. Benutzername = Anschlusskennung + Zugangsnummer + Mitbenutzernummer (meist `0001`) + `@t-online.de`. Das Glasfaser-Modem ist nur ein Medienkonverter, die Einwahl macht der Router. IPv6 per DHCPv6 über PPP, Präfix /56 [S-05] [S-06] | Eingabemaske im Assistenten mit Feldern genau wie im Telekom-Brief, Benutzername wird zusammengesetzt |
+| Telekom DSL, VDSL, Glasfaser | PPPoE **über VLAN 7**. Benutzername = Anschlusskennung + Zugangsnummer + Mitbenutzernummer (meist `0001`) + `@t-online.de`. Das Glasfaser-Modem ist nur ein Medienkonverter, die Einwahl macht der Router. IPv6 per DHCPv6 über PPP, Präfix /56 [S-05] [S-06] | Eingabemaske in der Weboberfläche (F-UI-08) mit Feldern genau wie im Telekom-Brief, Benutzername wird zusammengesetzt. Der Assistent erkennt nur PPPoE über VLAN 7 |
 | Vodafone Kabel | Router oder Station vom Anbieter. Im Bridge-Modus je nach Region und Zeitpunkt echtes Dual-Stack **oder DS-Lite**, das kann sich jederzeit ändern. Bridge-Modus nicht überall verfügbar [S-07] | Erkennen statt annehmen, später DS-Lite (F-NET-09). Häufigster Fall bleibt doppeltes NAT hinter der Station (wie im Prototyp) |
-| Glasfaser anderer Anbieter (Deutsche Glasfaser, o2, 1&1, Stadtwerke) | teils DHCP, teils PPPoE, teils mit VLAN-ID je Anbieter | Anbieterliste mit VLAN-IDs im Assistenten (Daten pflegen, Q-14) |
+| Glasfaser anderer Anbieter (Deutsche Glasfaser, o2, 1&1, Stadtwerke) | teils DHCP, teils PPPoE, teils mit VLAN-ID je Anbieter | Anbieterliste mit VLAN-IDs in der Weboberfläche (Daten pflegen, Q-14) |
 
 **Technik dahinter:** systemd-networkd kann selbst kein PPPoE. Dafür läuft `pppd` mit dem
 `rp-pppoe`-Plugin auf `wan0` bzw. `wan0.7` und erzeugt `ppp0`. networkd verwaltet dann `ppp0` für
@@ -405,8 +422,14 @@ des Anbieters. Ob networkd die AFTR-Option (DHCPv6 Option 64) auswertet, ist zu 
 ### 3.8 Weboberfläche
 
 - Basis ist routerui aus dem Prototyp (2.3), umgestellt auf `config.json` als Wahrheitsquelle.
-- Neuer **Einrichtungsmodus** direkt nach der Installation: Passwort festlegen (Code steht auf dem
-  Bildschirm und als QR-Code), Kurzrundgang, Prüfung der Verbindung.
+- Neuer **Einrichtungsmodus** direkt nach der Installation (F-UI-02, F-UI-08):
+  1. Passwort festlegen. Der Einrichtungscode steht auf dem Bildschirm des Routers, als Text und QR-Code.
+  2. **Internetzugang**, nur wenn nötig: Hat der Assistent PPPoE erkannt, fragt die Oberfläche nach den
+     Zugangsdaten, mit Anbieter-Vorlagen (Telekom-Brief, F-NET-13) und VLAN. Bei DHCP entfällt der Schritt.
+     Ohne Antwort vom Modem bietet sie DHCP, PPPoE und statische Adresse zur Wahl an.
+  3. Prüfung der Verbindung („Internet erreichbar“) und ein Kurzrundgang.
+- Was der Assistent nicht mehr fragt, lässt sich hier jederzeit ändern (F-UI-09): Name des Routers,
+  Heimnetz (Adresse, DHCP-Bereich), Zeitzone, Sprache.
 - Nebenrollen (NAS, Docker) als optionale Module, nur sichtbar, wenn installiert.
 
 ### 3.9 Installer
@@ -422,27 +445,40 @@ des Anbieters. Ob networkd die AFTR-Option (DHCPv6 Option 64) auswertet, ist zu 
   - ein fertiges **Image des Zielsystems** (komprimiert), damit die Installation offline und
     deterministisch ist (P-07, D-07).
 - Der Assistent startet automatisch auf `tty1`, keine Anmeldung nötig.
+- Geschrieben wird der Stick vom Stick-Ersteller (3.12). Andere Schreibprogramme (Rufus, Etcher, `dd`)
+  funktionieren auch, dann fehlen nur die Vorgaben aus Windows und der Assistent fragt nach der Sprache.
+- Im Abbild liegt auf der EFI-Partition eine reservierte Datei `vr/stick.json` fester Größe (aufgefüllt
+  mit Leerzeichen). Der Stick-Ersteller trägt dort beim Schreiben Sprache, Tastaturbelegung und Zeitzone
+  aus Windows ein. Die Lage der Datei im Abbild steht im Manifest des Abbilds (3.12), der Ersteller
+  muss also kein FAT verstehen.
 
 #### 3.9.2 Ablauf des Assistenten
 
-| Schritt | Was passiert | Laien-Text (Beispiel) |
-|---|---|---|
-| S1 Sprache | Deutsch/Englisch, Tastaturbelegung | „Willkommen! Wählen Sie Ihre Sprache.“ |
-| S2 Hardware-Check | Netzwerkkarten zählen (≥ 2 nötig), Speicher, Datenträger | „Gefunden: 3 Netzwerkanschlüsse, 1 Festplatte (256 GB). Passt.“ |
-| S3 WAN erkennen | alle Ports aktivieren, auf Link warten (siehe 3.9.3) | „Ziehen Sie alle Netzwerkkabel ab. Stecken Sie jetzt **nur** das Kabel vom Modem oder Internet-Router ein.“ |
-| S4 Internetzugang | DHCP versuchen, sonst PPPoE erkennen und Zugangsdaten erfragen | „Ihr Anschluss braucht Zugangsdaten. Sie stehen im Brief Ihres Anbieters.“ |
-| S5 LAN | übrige Ports werden Heimnetz, LAN-Netz automatisch | „Alle anderen Anschlüsse sind jetzt Ihr Heimnetz. Dort können Sie einen Switch oder WLAN-Access-Point anschließen.“ |
-| S6 Datenträger | Ziel auswählen, deutliche Warnung | „**Alle Daten auf dieser Festplatte werden gelöscht.**“ |
-| S7 Name und Zeitzone | Vorgaben aus S1 | „So heißt Ihr Router im Netz: router.home.arpa“ |
-| S8 Installation | Image schreiben, Konfiguration erzeugen, Bootloader | Fortschrittsbalken |
-| S9 Zusammenfassung | Einrichtungscode, Adresse der Oberfläche, QR-Code | „Öffnen Sie auf einem Gerät im Heimnetz: https://router.home.arpa, Code: XXXX-XXXX“ |
-| S10 Neustart | Stick abziehen, Neustart | „Ziehen Sie den Stick ab und drücken Sie Enter.“ |
+Geändert in 0.8 (P-11, D-15): Der Assistent fragt nur noch nach Physischem. Die Schrittnamen bleiben
+stehen, damit Verweise stimmen.
+
+| Schritt | Was passiert | Laien-Text (Beispiel) | Stand 0.8 |
+|---|---|---|---|
+| S1 Sprache | Sprache, Tastatur und Zeitzone aus `vr/stick.json` (3.9.1) | „Willkommen! Wählen Sie Ihre Sprache.“ | **nur ohne `stick.json`** (Stick mit fremdem Programm geschrieben), Zeitzone dann aus der Sprache |
+| S2 Hardware-Check | Netzwerkkarten zählen (≥ 2 nötig), Speicher, Datenträger | „Dieser Rechner hat nur einen Netzwerkanschluss. Für einen Router braucht es mindestens zwei, zum Beispiel mit einem USB-Netzwerkadapter.“ | **nur bei einem Problem** sichtbar, sonst still |
+| S3 WAN erkennen | alle Ports aktivieren, auf Link warten (siehe 3.9.3) | „Ziehen Sie alle Netzwerkkabel ab. Stecken Sie jetzt **nur** das Kabel vom Modem oder Internet-Router ein.“ | bleibt |
+| S4 Internetzugang | DHCP und PPPoE (ohne und mit VLAN 7) erkennen, Ergebnis in `config.json` vermerken | „Ihr Anschluss braucht Zugangsdaten. Die geben Sie gleich bequem im Browser ein.“ | **keine Eingabe mehr**, nur Anzeige. Zugangsdaten in der Oberfläche (F-UI-08) |
+| S5 LAN | übrige Ports werden Heimnetz, LAN-Netz automatisch | – | **entfällt** als eigener Schritt, steht in der Zusammenfassung |
+| S6 Datenträger | Ziel auswählen, deutliche Warnung | „**Alle Daten auf dieser Festplatte werden gelöscht.**“ | bleibt, auch bei nur einem Datenträger (bewusste Bestätigung) |
+| S7 Name und Zeitzone | Vorgaben | – | **entfällt**, Vorgabe `router.home.arpa`, änderbar in der Oberfläche (F-UI-09) |
+| S8 Installation | Image schreiben, Konfiguration erzeugen, Bootloader | Fortschrittsbalken | bleibt |
+| S9 Zusammenfassung | Einrichtungscode, Adresse der Oberfläche, QR-Code | „Verbinden Sie ein Gerät mit dem Heimnetz und öffnen Sie https://router.home.arpa, Code: XXXX-XXXX“ | bleibt, dazu F-INST-17 |
+| S10 Neustart | Stick abziehen, Neustart | „Ziehen Sie den Stick ab und drücken Sie Enter.“ | bleibt |
+
+Damit sieht ein Laie im Normalfall genau drei Bildschirme mit einer Handlung: Kabel einstecken (S3),
+Festplatte bestätigen (S6), Stick abziehen (S10).
 
 Grundsätze für den Assistenten:
+- Bedienung nur mit Pfeiltasten und Enter, keine Texteingabe (P-11, F-INST-16).
 - Jeder Schritt lässt sich wiederholen.
 - Vor S8 wird nichts auf die Festplatte geschrieben.
-- Alle Eingaben landen in einer `config.json`, die auch für eine unbeaufsichtigte Installation taugt
-  (F-INST-08).
+- Das Ergebnis landet in einer `config.json`. Eine vorbereitete `config.json` für eine unbeaufsichtigte
+  Installation gibt es nur noch für automatische Tests (F-INST-08), nicht im Stick-Ersteller.
 
 #### 3.9.3 Erkennung des WAN-Ports (Kernstück)
 
@@ -488,7 +524,10 @@ Siehe F-INST-12 bis F-INST-14.
 
 #### 3.9.6 Was der Assistent nicht macht
 
-- Er fragt nicht nach Dingen, die sich erkennen lassen (Anschlussart, LAN-Netz, Zeitzone aus der Sprache).
+- Er fragt nicht nach Dingen, die sich erkennen lassen (Anschlussart, LAN-Netz, Zeitzone aus Windows
+  oder der Sprache).
+- Er fragt nicht nach Zugangsdaten, Namen, Netzen oder Passwörtern. Das alles kommt in die
+  Weboberfläche, wo man bequem tippen und Hilfe lesen kann (P-11).
 - Er verlangt keine Linux-Begriffe. „WAN“ heißt im Text „Internet-Anschluss“, „LAN“ heißt „Heimnetz“.
 - Er schreibt nichts auf die Festplatte, bevor S8 bestätigt ist.
 
@@ -515,6 +554,45 @@ Der Code von routerui wird in M2 in dieses Repo übernommen. Dabei ändert sich:
 | Texte der Oberfläche (deutsch, fest im Code) | Werden in eine Übersetzungstabelle verschoben (F-UI-05) |
 | Daten und Namen aus dem Haushalt des Gründers | Werden entfernt, Beispiele nur mit Dokumentations-Adressen (RFC 5737, RFC 3849) |
 
+### 3.12 Stick-Ersteller für Windows
+
+Neu in 0.8 (D-14, D-15). Ein eigenes Programm statt eines fremden Schreibprogramms, damit Laien nichts
+über Abbilder, Prüfsummen oder Laufwerke wissen müssen.
+
+**Aus Sicht des Nutzers:**
+
+1. `vanilla-router-stick.exe` herunterladen und starten. Es gibt keine Installation. Windows fragt einmal
+   nach Administratorrechten, weil das Programm direkt auf den Stick schreibt.
+2. Ein Fenster mit einer Liste der eingesteckten USB-Sticks (Name, Größe). Ein Stick ist vorausgewählt,
+   wenn es nur einen gibt.
+3. „Stick erstellen“ → Warnung „Alle Daten auf *SanDisk Ultra (32 GB)* werden gelöscht“ → Fortschritt
+   (Herunterladen, Prüfen, Schreiben, Kontrolle) → „Fertig. Ziehen Sie den Stick ab und stecken Sie ihn in
+   den Rechner, der Ihr Router werden soll.“ Dazu ein Hinweis, wie man am Rechner vom USB-Stick startet
+   (Boot-Menü, typische Tasten F12, F11, Esc).
+
+**Technik:**
+
+- **Go, nur Standardbibliothek**, gebaut mit `GOOS=windows` (D-01, NF-03). Das Fenster nutzt die
+  Win32-Steuerelemente über `syscall` (Fenster, Liste, Knopf, Fortschrittsbalken), ohne WebView und ohne
+  fremde Bibliotheken. Eine einzige `.exe` mit eingebettetem Manifest (`requireAdministrator`,
+  DPI-Bewusstsein, Common Controls 6).
+- **Nur Wechseldatenträger:** Datenträger mit Bustyp USB (`IOCTL_STORAGE_QUERY_PROPERTY`), nie das
+  Systemlaufwerk, Datenträger über 256 GB nur nach zusätzlicher Bestätigung. Vor dem Schreiben werden alle
+  Volumes des Sticks gesperrt und ausgehängt (`FSCTL_LOCK_VOLUME`, `FSCTL_DISMOUNT_VOLUME`).
+- **Abbild:** Das Programm bleibt klein und lädt das aktuelle Abbild (ca. 1,5–2 GB) über HTTPS. Es
+  prüft ein **signiertes Manifest** (Ed25519, öffentlicher Schlüssel im Programm) mit Version, Größe,
+  SHA-256 und Lage von `vr/stick.json`. Das Abbild wird im Benutzerordner zwischengespeichert. Alternativ
+  lässt sich eine heruntergeladene Abbild-Datei auswählen (offline), auch sie muss zum Manifest passen.
+- **Vorgaben aus Windows:** Sprache (`GetUserDefaultLocaleName`), Tastaturbelegung und Zeitzone
+  (Windows-Name → IANA über die CLDR-Tabelle `windowsZones`) landen in `vr/stick.json` (3.9.1). Das ist
+  keine Konfiguration für den Nutzer, nur eine bessere Vorgabe.
+- **Kontrolle:** Nach dem Schreiben wird der Stick zurückgelesen und gegen die SHA-256 geprüft.
+- **Kein Hintergrunddienst**, keine Registry-Einträge außer dem, was Windows selbst anlegt, keine
+  Telemetrie (P-09). Der Download geht nur an die dokumentierte Adresse des Projekts.
+
+**Offen:** Code-Signierung gegen die SmartScreen-Warnung (Q-17), Fassungen für macOS und Linux (Q-18),
+Ort und Schlüsselverwaltung der Downloads (Q-19).
+
 ---
 
 ## 4. Anforderungen
@@ -528,17 +606,21 @@ Spalten: ID · Priorität · Anforderung · Status. „Prototyp“ bedeutet: im 
 | F-INST-01 | MUSS | UEFI-Boot von USB-Stick auf x86-64, Start des Assistenten ohne Eingabe | offen |
 | F-INST-02 | MUSS | Erkennung aller kabelgebundenen Netzwerkports inkl. USB-Adapter, Abbruch mit klarer Meldung bei < 2 | offen |
 | F-INST-03 | MUSS | WAN-Erkennung durch Einstecken des Kabels (3.9.3) mit Bestätigung per DHCP/PPPoE | offen |
-| F-INST-04 | MUSS | PPPoE mit optionalem VLAN, Zugangsdaten-Eingabe mit Hilfe zum Anbieter-Brief | offen |
+| F-INST-04 | MUSS | PPPoE mit optionalem VLAN, Zugangsdaten-Eingabe mit Hilfe zum Anbieter-Brief | verworfen am 2026-11-04 (P-11): Eingabe wandert in die Oberfläche (F-UI-08), der Assistent erkennt nur (F-INST-15) |
 | F-INST-05 | MUSS | Auswahl des Ziel-Datenträgers mit Größe und Modell, doppelte Bestätigung vor dem Löschen | offen |
 | F-INST-06 | MUSS | Offline-Installation aus einem Image auf dem Stick | offen |
 | F-INST-07 | MUSS | Einrichtungscode und Adresse der Oberfläche am Ende anzeigen (Text und QR) | offen |
-| F-INST-08 | SOLL | Unbeaufsichtigte Installation mit vorbereiteter `config.json` auf dem Stick | offen |
+| F-INST-08 | SOLL | Unbeaufsichtigte Installation mit vorbereiteter `config.json` auf dem Stick. Seit 0.8 nur für automatische Tests, nicht im Stick-Ersteller (D-15) | offen |
 | F-INST-09 | SOLL | Port-Identifikation per LED-Blinken (`ethtool --identify`) | offen |
-| F-INST-10 | SOLL | Deutsch und Englisch | offen |
+| F-INST-10 | SOLL | Deutsch und Englisch, Vorgabe aus `vr/stick.json` (3.9.1) | offen |
 | F-INST-11 | KANN | Installation auf vorhandenes Debian/Ubuntu („Umbau“-Modus) | offen |
 | F-INST-12 | MUSS | Stick erkennt eine vorhandene Installation und bietet Rettungsaktionen an (3.9.5) | offen |
 | F-INST-13 | MUSS | Passwort der Oberfläche vom Stick aus zurücksetzen | offen |
 | F-INST-14 | SOLL | Diagnose-Bericht auf den Stick schreiben (ohne Geheimnisse) | offen |
+| F-INST-15 | MUSS | Anschlussart erkennen (DHCP, PPPoE ohne und mit VLAN, keine Antwort) und in `config.json` vermerken, damit die Oberfläche weiß, ob sie nach Zugangsdaten fragen muss | offen |
+| F-INST-16 | MUSS | Bedienung nur mit Pfeiltasten und Enter, keine Texteingabe (P-11) | offen |
+| F-INST-17 | MUSS | Solange die Oberfläche nicht eingerichtet ist, zeigt der Router nach jedem Start Adresse und Einrichtungscode auf dem Bildschirm (Text und QR) | offen |
+| F-INST-18 | MUSS | Schritte ohne Problem werden nicht angezeigt (S2), im Normalfall nur S3, S6, S10 mit einer Handlung (3.9.2) | offen |
 
 ### 4.2 Netzwerk (F-NET)
 
@@ -584,7 +666,9 @@ Spalten: ID · Priorität · Anforderung · Status. „Prototyp“ bedeutet: im 
 | F-UI-04 | SOLL | Mobilgerätetauglich | Prototyp (Grundlagen) |
 | F-UI-05 | SOLL | Englische Übersetzung | offen |
 | F-UI-06 | KANN | Benachrichtigungen (E-Mail, Push) bei Ausfällen, neuen Geräten, Updates | offen |
-| F-UI-07 | MUSS | Seite „Über“ mit Version, Lizenz (AGPL-3.0-or-later) und Link zum Quelltext genau dieser Version (AGPL §13, D-11). Der Link ist ein Build-Parameter, damit veränderte Fassungen auf ihren eigenen Quelltext zeigen | offen |
+| F-UI-07 | MUSS | Seite „Über“ mit Version, Lizenz (AGPL-3.0-or-later) und Link zum Quelltext genau dieser Version (AGPL §13, D-11). Der Link ist ein Build-Parameter, damit veränderte Fassungen auf ihren eigenen Quelltext zeigen | erledigt |
+| F-UI-08 | MUSS | Einrichtungsschritt „Internetzugang“ nach der ersten Anmeldung, wenn der Assistent PPPoE oder keine Antwort erkannt hat: Zugangsdaten mit Anbieter-Vorlagen (F-NET-13), VLAN, Prüfung der Verbindung (3.8) | offen |
+| F-UI-09 | MUSS | Name des Routers, Heimnetz (Adresse, DHCP-Bereich), Zeitzone und Sprache in der Oberfläche ändern, mit Rücknahme bei Verbindungsverlust (wie F-UI-03) | offen |
 
 ### 4.5 Updates (F-UPD)
 
@@ -608,7 +692,23 @@ Spalten: ID · Priorität · Anforderung · Status. „Prototyp“ bedeutet: im 
 | F-ADD-04 | SOLL | VPN-Server (WireGuard) mit QR-Codes für Handys | offen |
 | F-ADD-05 | KANN | DNS-Filter mit Blocklisten | offen |
 
-### 4.7 Nicht funktional (NF)
+### 4.7 Stick-Ersteller (F-STICK)
+
+| ID | Prio | Anforderung | Status |
+|---|---|---|---|
+| F-STICK-01 | MUSS | Eine `.exe` für Windows 10 und 11 (x86-64), ohne Installation, ohne Laufzeitumgebung, Go nur mit Standardbibliothek (3.12) | offen |
+| F-STICK-02 | MUSS | Keine Fragen außer der Auswahl des Sticks und der Bestätigung vor dem Löschen | offen |
+| F-STICK-03 | MUSS | Nur USB-Wechseldatenträger anzeigen, nie das Systemlaufwerk; Datenträger über 256 GB nur nach zusätzlicher Bestätigung | offen |
+| F-STICK-04 | MUSS | Abbild herunterladen und vor dem Schreiben gegen ein signiertes Manifest prüfen (Ed25519, SHA-256) | offen |
+| F-STICK-05 | MUSS | Volumes sperren und aushängen, Abbild roh schreiben, danach zurücklesen und prüfen | offen |
+| F-STICK-06 | MUSS | Klare Meldungen bei Fehlern (Stick zu klein, schreibgeschützt, abgezogen, Download abgebrochen), Abbruch jederzeit | offen |
+| F-STICK-07 | SOLL | Sprache, Tastaturbelegung und Zeitzone aus Windows in `vr/stick.json` eintragen | offen |
+| F-STICK-08 | SOLL | Abbild zwischenspeichern, neueres Abbild erkennen; alternativ lokale Abbild-Datei wählen (offline) | offen |
+| F-STICK-09 | SOLL | Deutsch und Englisch nach Windows-Sprache | offen |
+| F-STICK-10 | SOLL | Hinweis am Ende, wie man vom USB-Stick startet (Boot-Menü, typische Tasten) | offen |
+| F-STICK-11 | KANN | Fassungen für macOS und Linux (Q-18) | offen |
+
+### 4.8 Nicht funktional (NF)
 
 | ID | Prio | Anforderung | Status |
 |---|---|---|---|
@@ -641,6 +741,8 @@ Spalten: ID · Priorität · Anforderung · Status. „Prototyp“ bedeutet: im 
 | D-11 | Lizenz **AGPL-3.0-or-later** | Entscheidung des Projektinhabers am 2026-11-04: die neueste AGPL-Fassung (Version 3), mit „oder später“ für künftige Fassungen. Die AGPL verlangt zusätzlich zur GPL, dass Nutzer einer veränderten Fassung, die über das Netz bedient wird, den Quelltext bekommen. Für die Weboberfläche bedeutet das F-UI-07. Text in `LICENSE`, jede Quelldatei bekommt eine SPDX-Zeile (NF-08). | erledigt (2026-11-04) |
 | D-12 | **Ubuntu Server** mit dem Paketumfang von `ubuntu-server`, nichts entfernen, nur per Konfiguration anpassen (3.2) | Wunsch des Projektinhabers (P-10). Ein System, das genau wie ein normales Ubuntu Server aussieht, ist für Helfer und Anleitungen am einfachsten. Pakete zu entfernen bricht die Metapakete und damit Release-Upgrades. Die Kosten (einige hundert MB, ein paar deaktivierte Dienste) sind auf PC-Hardware unerheblich. | erledigt (2026-11-04) |
 | D-13 | **Rücknahme nach Updates ohne snapper**: btrfs-Snapshot vor apt, GRUB-Eintrag aus dem Snapshot, Zustand (`vr_pending`, `vr_trial`) in einer grubenv auf der ESP, Bestätigung durch `vr-health`, Rücknahme wird durch Umbenennen der Subvolumes dauerhaft | snapper liegt in *universe* (D-10), grub-btrfs fehlt in Ubuntu. GRUB kann auf btrfs nicht schreiben, auf FAT schon. Kernel und initrd kommen aus dem Snapshot selbst, passen also immer. Neustart nach Fehler nur bei einem Versuch nach Update, sonst Neustartschleife. | erledigt (Code), Hardware-Test offen |
+| D-14 | **Eigener Stick-Ersteller für Windows** in Go (Win32 über `syscall`), lädt ein signiertes Abbild, keine Fremdbibliotheken (3.12) | Fremde Schreibprogramme sind für Laien eine Hürde (welches Abbild, welches Laufwerk, welche Einstellungen). Ein eigenes Programm kann nur USB-Sticks anbieten, das Abbild selbst prüfen und Vorgaben aus Windows mitgeben. Go mit `GOOS=windows` hält das Projekt bei einer Sprache (D-01). Kleine `.exe` plus Download statt einer `.exe` mit 2 GB, damit das Programm nicht bei jeder neuen Version neu geladen werden muss. Win32 statt WebView, weil WebView Fremdcode bräuchte. | offen (Vorschlag) |
+| D-15 | **Ablauf aus Sicht des Nutzers** (Abschnitt 1): Stick-Ersteller ohne Fragen, Assistent nur für Physisches (WAN-Port, Festplatte), alles andere in der Weboberfläche (P-11) | Entscheidung des Projektinhabers am 2026-11-04. Im Browser lässt sich bequemer tippen und Hilfe lesen als auf einer Konsole mit unbekannter Tastaturbelegung. Weniger Fragen bedeuten weniger Fehler. Folge: PPPoE-Eingabe wandert aus dem Assistenten in die Oberfläche (F-INST-04 verworfen, F-UI-08), F-UI-03 und T-M4-03 sind Voraussetzung für die erste Version. | erledigt (2026-11-04) |
 
 ---
 
@@ -652,7 +754,7 @@ Spalten: ID · Priorität · Anforderung · Status. „Prototyp“ bedeutet: im 
 | Q-02 | Werkzeug für das Image | mkosi · live-build · debos | mkosi (reproduzierbar, Debian und Ubuntu, systemd-nah) |
 | Q-03 | Rücknahme von Updates | btrfs + snapper + grub-btrfs · A/B-Partitionen · systemd-sysupdate | **umgesetzt: eigenes Werkzeug** (btrfs-Snapshot + GRUB-Zustand auf der ESP, D-13), Hardware-Test offen. Frühere Einschätzung: btrfs-Snapshots passen am besten zu P-01. snapper liegt unter Ubuntu in *universe*, grub-btrfs fehlt ganz [S-15]: entweder kleines eigenes Werkzeug (`btrfs subvolume snapshot` + apt-Hook) oder snapper als begründete Ausnahme. Bootfähigkeit von Snapshots und die automatische Rücknahme sind ungeklärt (3.7), deshalb Spike in M5. |
 | Q-04 | Wer macht IPv6 im LAN (RA, DHCPv6)? | systemd-networkd · dnsmasq | **umgesetzt: systemd-networkd** (RA, SLAAC, PD, eine Quelle), dnsmasq nur DHCPv4 + DNS. Bestätigung durch den Projektinhaber offen |
-| Q-05 | Assistent als Textoberfläche auf dem Bildschirm oder als Weboberfläche vom Handy aus? | TUI auf tty1 · Web über einen LAN-Port · beides | TUI zuerst (funktioniert ohne zweites Gerät) |
+| Q-05 | Assistent als Textoberfläche auf dem Bildschirm oder als Weboberfläche vom Handy aus? | TUI auf tty1 · Web über einen LAN-Port · beides | **TUI auf tty1**, seit D-15 nur noch drei Bildschirme ohne Texteingabe. Alles mit Eingaben läuft ohnehin über die Weboberfläche |
 | Q-06 | WLAN-Access-Point im Router? | nein (externe APs) · hostapd für unterstützte Karten | nein in Version 1 |
 | Q-07 | Sprache des Projekts (Code, Doku, Oberfläche) | Deutsch · Englisch · beides | offen. Oberfläche zweisprachig, Doku eventuell englisch für mehr Mitwirkende |
 | Q-08 | ARM (Raspberry Pi 5 u. ä.)? | später · nie | später |
@@ -664,6 +766,9 @@ Spalten: ID · Priorität · Anforderung · Status. „Prototyp“ bedeutet: im 
 | Q-14 | Woher kommen die Anbieterdaten (VLAN-IDs, Format der Zugangsdaten)? | eigene gepflegte Liste im Repo · Community-Beiträge | eigene Liste als Datendatei, Beiträge per Pull Request |
 | Q-15 | DS-Lite mit systemd-networkd: wird die AFTR-Adresse (DHCPv6 Option 64) ausgewertet? | networkd · eigener Helfer, der die Option liest und den Tunnel anlegt | offen, prüfen in der Provider-VM |
 | Q-16 | Secure Boot | shim + GRUB (signiert, Ubuntu-Standard) · systemd-boot (Signierung prüfen) · Secure Boot aus | offen. Muss mit Secure Boot funktionieren, viele Laien-Rechner haben es an. |
+| Q-17 | Code-Signierung des Stick-Erstellers | ohne (SmartScreen warnt „Unbekannter Herausgeber“, Anleitung nötig) · OV/EV-Zertifikat (kostet jährlich) · Signierdienst für Open Source (z. B. SignPath Foundation) | offen. Für Laien ist die Warnung abschreckend, ein Signierdienst für Open Source wäre ideal |
+| Q-18 | Stick-Ersteller auch für macOS und Linux? | nur Windows · später alle drei | Windows zuerst (Wunsch des Projektinhabers), Kern (Download, Prüfung, Schreiben) so bauen, dass nur Fenster und Laufwerkszugriff je System neu sind |
+| Q-19 | Woher kommen die Abbilder, wer signiert? | GitHub Releases · eigener Server · beides | offen. Signierschlüssel offline halten, Manifest getrennt vom Abbild signieren |
 
 ---
 
@@ -675,7 +780,7 @@ Spalten: ID · Priorität · Anforderung · Status. „Prototyp“ bedeutet: im 
 | M1 | Port-Erkennung | Go-Prototyp der WAN-Erkennung (3.9.3), läuft im Namespace-Labor mit 3 veth-Ports (geändert von VM auf Namespaces, siehe T-M1-01) | Kabel „stecken“ wird zuverlässig erkannt, DHCP- und PPPoE-Bestätigung (mit VLAN 7) klappen: `sudo test/lab/netns-lab.sh test` besteht |
 | M2 | Konfigurations-Kern | `vrctl` + Schema `config.json` + Generatoren für networkd, nftables, dnsmasq; routerui-Code bereinigt übernommen | Golden-File-Tests, VM mit erzeugter Konfiguration routet IPv4/IPv6 |
 | M3 | Installer-Image | mkosi-Image mit Assistent, installiert eine VM von Grund auf | VM bootet nach Installation, LAN-Client bekommt IP, DNS und Internet |
-| M4 | Laien-Ablauf | vollständiger Assistent (S1–S10), Einrichtungsmodus der Oberfläche | Testperson ohne Linux-Kenntnisse schafft die Installation ohne Hilfe |
+| M4 | Laien-Ablauf | Weboberfläche auf `config.json`, Stick-Ersteller für Windows (3.12), verkürzter Assistent (3.9.2), Einrichtungsmodus mit Internetzugang (F-UI-08) | Testperson ohne Linux-Kenntnisse schafft den ganzen Weg vom Download bis „Internet geht“ ohne Hilfe |
 | M5 | Updates und Rücknahme | Snapshots, Gesundheitsprüfung, automatische Rücknahme | absichtlich kaputtes Update wird automatisch zurückgenommen |
 | M6 | Hardware und Beta | Testmatrix echter Geräte, Dokumentation, erste öffentliche Version | ≥ 5 Gerätemodelle getestet, Doku für Laien vorhanden |
 
@@ -716,7 +821,12 @@ verify`. Das Paket `vanilla-router_*.deb` baut, alle 391 Pakete der Images komme
 | T-M3-04 | Images | `image/target`, `image/stick`, `image/build.sh` (mkosi) | **ungetestet**, siehe `image/README.md` |
 | T-M4-01 | Weboberfläche aus dem Prototyp übernehmen, auf `config.json` umstellen (3.11) | `cmd/vr-webui` mit Helper; `internal/conf` übersetzt nur noch zwischen API-Formen und `config.json`, Prüfung per `config.Validate`, Einspielen per `apply` (Sicherung, Rücknahme). dnsmasq-Leases, Adressen und Namen aus der Konfiguration, eigenes TLS-Zertifikat, Einrichtungscode vom Installer, Erweiterungen (Container, Dateiablage, Audit) nur sichtbar, wenn installiert. Im Browser gegen eine lokale Testinstanz geprüft (alle Seiten, Reservierung, DNS, Weiterleitung mit Bestätigung, Sperre, Fehlermeldungen) | erledigt (ungetestet auf Hardware) |
 | T-M4-02 | Seite „Über“ mit Lizenz und Quelltext-Link (F-UI-07) | Seitenleiste und Anmeldeseite, `/api/about`, Link per Build-Parameter | erledigt |
-| T-M4-03 | Einstellungen für WAN-Art, PPPoE-Zugangsdaten, Hostname und Heimnetz in der Oberfläche (F-UI-03) | – | offen |
+| T-M4-03 | Einstellungen für WAN-Art, PPPoE-Zugangsdaten, Hostname und Heimnetz in der Oberfläche (F-UI-03, F-UI-09). Seit D-15 Voraussetzung für die erste Version | – | offen |
+| T-M4-04 | Einrichtungsschritt „Internetzugang“ nach dem ersten Passwort (F-UI-08), Anbieter-Vorlagen als Datendatei (Q-14) | – | offen |
+| T-M4-05 | Assistent kürzen (3.9.2): S1 nur ohne `stick.json`, S2 nur bei Problem, S4 ohne Eingabe, S5 und S7 weg, nur Pfeiltasten und Enter (F-INST-15 bis 18) | `cmd/vr-install` | offen |
+| T-M4-06 | Anzeige von Adresse und Einrichtungscode auf tty1 nach jedem Start, bis die Oberfläche eingerichtet ist (F-INST-17) | – | offen |
+| T-M4-07 | Abbild mit reservierter `vr/stick.json` und signiertem Manifest (3.9.1, 3.12) | `image/build.sh`, Werkzeug zum Signieren | offen |
+| T-M4-08 | Stick-Ersteller für Windows (F-STICK-01 bis 10) | `cmd/vr-stick`, Test auf dem PC des Projektinhabers mit einem leeren Stick, nur nach Freigabe | offen |
 | T-M5-01 | Snapshot vor jedem apt-Lauf, GRUB-Eintrag „Stand vor dem Update“, Zustand auf der ESP | `internal/snapshot`, `packaging/grub.d`, apt-Hook | erledigt (ungetestet auf Hardware) |
 | T-M5-02 | Gesundheitsprüfung nach dem Start, automatische Rücknahme | `vr-health.service`, `panic=10`, Watchdog. Neustart nur bei einem Versuch nach Update (keine Neustartschleife) | erledigt (ungetestet auf Hardware) |
 
@@ -726,6 +836,7 @@ Reihenfolge so gewählt, dass jeder Schritt nur das Ergebnis des vorigen braucht
 
 1. **Labor in WSL** (ohne Hardware): `sudo test/lab/netns-lab.sh test` → 5 bestanden.
 2. **Stick bauen**: `image/build.sh` auf einem Ubuntu 26.04 mit mkosi. Fehler der mkosi-Schlüssel beheben.
+   Ab T-M4-08 den Stick mit dem Stick-Ersteller unter Windows schreiben.
 3. **Stick booten** (Secure Boot an): Assistent erscheint auf tty1, Probelauf bis S6 abbrechen.
 4. **Erkennung**: alle Kabel ab, Modem-Kabel an einen beliebigen Port → richtiger Port, DHCP erkannt.
    Mit einem Telekom-Anschluss zusätzlich: PPPoE über VLAN 7 erkannt.
@@ -770,6 +881,9 @@ Reihenfolge so gewählt, dass jeder Schritt nur das Ergebnis des vorigen braucht
 | R-04 | Laien sperren sich aus (falsche WAN-Einstellung, vergessenes Passwort) | Rücknahme bei Verbindungsverlust, Reset-Weg am Gerät (z. B. Stick erneut booten → „Passwort zurücksetzen“) |
 | R-05 | Sicherheitslücke in der Oberfläche | Privilegientrennung, nur LAN, keine Abhängigkeiten, Audit, schnelle Updates |
 | R-06 | Projekt hängt an einer Person | offene Lizenz, gute Doku, maschinenlesbares Planpapier, Tests |
+| R-07 | Stick-Ersteller überschreibt den falschen Datenträger | nur USB-Bus, nie das Systemlaufwerk, Größengrenze mit Zusatzbestätigung, Name und Größe in der Warnung (F-STICK-03) |
+| R-08 | SmartScreen oder Virenscanner warnen vor dem Stick-Ersteller, Laien brechen ab | Code-Signierung (Q-17), reproduzierbarer Build, Prüfsummen auf der Download-Seite, Anleitung mit Bildschirmfotos |
+| R-09 | Rechner startet nicht vom Stick (Boot-Reihenfolge, Secure Boot, alte BIOS-Rechner) | Hinweis zu Boot-Menü-Tasten (F-STICK-10), shim für Secure Boot (Q-16), Liste getesteter Geräte |
 
 ---
 
@@ -781,7 +895,7 @@ vanilla-router/
   CLAUDE.md            Anleitung für KI-Agenten (Konventionen, Arbeitsweise)
   README.md            Kurzvorstellung für Menschen
   docs/                Entwurfsdokumente, Anleitungen, Erkenntnisse aus dem Prototyp
-  cmd/                 routerui, vrctl, installer
+  cmd/                 vr-webui, vrctl, vr-install, vr-detect, vr-stick (Windows)
   internal/            conf (Schema, Prüfregeln, Generatoren), helper, api, sys, auth, files
   web/                 Frontend
   image/               mkosi-Konfiguration für Stick und Zielsystem
@@ -842,3 +956,4 @@ Recherche vom 2026-11-04. Foren sind als solche gekennzeichnet und müssen vor e
 | 0.5 | 2026-11-04 | Ubuntu Server mit Paketumfang `ubuntu-server` (D-12, Tabelle in 3.2: resolved, cloud-init, snapd …), chrony statt timesyncd. M1 begonnen: T-M1-02 bis 08 erledigt, T-M1-01 auf Namespace-Labor umgestellt (Lauf steht aus). L-17 (Locale, Prüfungen ohne Daten) |
 | 0.6 | 2026-11-04 | M2 (Konfigurations-Kern), M3 (Installer, Images) und M5 (Snapshots, Rücknahme) im Code fertig, ungetestet auf Hardware (7.2). Q-03 und Q-04 umgesetzt, D-13. Testplan für Hardware (7.3). M4 (Weboberfläche) offen |
 | 0.7 | 2026-11-04 | M4: Weboberfläche übernommen und auf `config.json` umgestellt (T-M4-01, T-M4-02), F-UI-07 erledigt, WAN-Einstellungen in der Oberfläche offen (T-M4-03). L-18 |
+| 0.8 | 2026-11-04 | Ablauf aus Sicht des Nutzers (Abschnitt 1, D-15) und Grundsatz P-11: Stick-Ersteller für Windows (3.12, F-STICK, D-14), Assistent auf Physisches gekürzt (3.9.2, F-INST-04 verworfen, F-INST-15 bis 18), `vr/stick.json`, Zugangsdaten und Einstellungen in der Oberfläche (3.8, F-UI-08/09). M4 erweitert (T-M4-04 bis 08), Q-17 bis Q-19, R-07 bis R-09 |

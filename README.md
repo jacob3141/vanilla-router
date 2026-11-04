@@ -16,7 +16,7 @@ und Sicherheitsupdates. vanilla-router macht daraus einen Router, ohne dass man 
 
 - **Unverändertes Ubuntu LTS** statt eines eigenen Router-Betriebssystems
 - **Komfort vor Optimierung**: bekannte Werkzeuge und Anleitungen statt des kleinstmöglichen Systems, aber nie auf Kosten der Sicherheit
-- **Für Laien**: Boot-Stick, ein paar verständliche Fragen, fertig
+- **Für Laien**: Stick mit einem Windows-Programm erstellen, in den Rechner stecken, Modem-Kabel einstecken, fertig. Alles Weitere im Browser
 - **Sicher ab Werk**: Firewall für IPv4 und IPv6, keine offenen Dienste, automatische Sicherheitsupdates
 - **Eine Konfigurationsdatei** als Wahrheitsquelle, alles andere wird daraus erzeugt und vor dem Einspielen geprüft
 - **Rücknahme**: Updates und Änderungen lassen sich rückgängig machen

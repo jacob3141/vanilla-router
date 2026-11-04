@@ -1,7 +1,10 @@
 # vanilla-router: Anleitung für KI-Agenten
 
-Ein Router aus einem unveränderten Debian auf Standardhardware, mit einem Installer, der Laien Schritt
+Ein Router aus einem unveränderten Ubuntu LTS auf Standardhardware, mit einem Installer, der Laien Schritt
 für Schritt führt. **Führend ist [PLAN.md](PLAN.md).** Lies es vor jeder größeren Aufgabe.
+
+Lizenz: **AGPL-3.0-or-later** (D-11). Leitlinie: **Komfort vor Optimierung, aber nie auf Kosten der
+Sicherheit** (P-10).
 
 ## Mit PLAN.md arbeiten
 
@@ -18,6 +21,10 @@ für Schritt führt. **Führend ist [PLAN.md](PLAN.md).** Lies es vor jeder grö
 
 - **Go nur mit der Standardbibliothek** (D-01, NF-03). Keine externen Module. Frontend ohne Frameworks,
   ohne Build-Schritt, ohne CDN.
+- **Jede neue Quelldatei** beginnt mit `SPDX-License-Identifier: AGPL-3.0-or-later` im Kommentarstil der
+  Sprache (NF-08).
+- **Paket-Abhängigkeiten nur aus Ubuntu *main*** (D-10, NF-09). Also `dnsmasq-base` statt `dnsmasq`, kein
+  `fail2ban`. Ausnahmen aus *universe* nur für Erweiterungen und nur mit einer begründeten Entscheidung.
 - **Eine Wahrheitsquelle** (`config.json`, D-02). Konfigurationsdateien von Diensten werden immer
   vollständig erzeugt, nie per Textsuche bearbeitet.
 - **Prüfen vor Einspielen** (P-05): erzeugen → mit dem Werkzeug des Dienstes prüfen → atomar ersetzen →

@@ -1,8 +1,9 @@
 ---
 document: vanilla-router-plan
 title: "vanilla-router: Planpapier"
-version: 0.3
+version: 0.4
 status: entwurf
+license: AGPL-3.0-or-later
 updated: 2026-11-04
 language: de
 id_schema:
@@ -64,6 +65,7 @@ mit einem Assistenten für Laien davor gibt es nicht.** Diese Lücke soll vanill
 | P-07 | **Offline installierbar** | Der Stick enthält alles für eine funktionierende Grundinstallation. Internet braucht es erst für Updates. |
 | P-08 | **Wenig Abhängigkeiten** | Eigener Code in Go nur mit der Standardbibliothek, Frontend ohne Frameworks und ohne CDN. Das hält die Angriffsfläche klein und das Projekt langlebig. |
 | P-09 | **Keine Telemetrie** | Der Router meldet nichts nach Hause. Prüfungen der Verbindung gehen nur an neutrale, dokumentierte Ziele. |
+| P-10 | **Komfort vor Optimierung** | Wenn Bequemlichkeit (bekannte Distribution, große Paketauswahl, verbreitete Anleitungen, vertraute Werkzeuge) und Optimierung (kleinstes System, wenigste Pakete, letzte Prozent Leistung) sich widersprechen, gewinnt der Komfort. Die Hardware hat Reserven genug. Sicherheit (P-03) ist davon ausgenommen und wird nie für Komfort geopfert. Festgelegt vom Projektinhaber am 2026-11-04. |
 
 ### 1.3 Zielgruppen
 
@@ -198,7 +200,7 @@ Das ist die Liste dessen, was der Installer automatisieren muss:
                │ erkennt Hardware, fragt, installiert
                ▼
 ┌──────────────────────── Zielsystem (Festplatte) ──────────────────┐
-│ Debian stable (unverändert, D-08) + Paket vanilla-router          │
+│ Ubuntu LTS (unverändert, D-10) + Paket vanilla-router             │
 │                                                                   │
 │  /etc/vanilla-router/config.json   ◀── einzige Wahrheitsquelle    │
 │            │                                                      │
@@ -211,17 +213,29 @@ Das ist die Liste dessen, was der Installer automatisieren muss:
 
 ### 3.2 Grundsystem
 
-- **Distribution:** Vorschlag **Debian stable**, minimale Installation (D-08, Q-01). Hauptgrund:
-  Unter Ubuntu liegen zentrale Router-Pakete in *universe* und bekommen ohne Ubuntu Pro keine
-  garantierten Sicherheitsupdates. Betroffen sind `dnsmasq` und `fail2ban` in 26.04 [S-01] und
-  `isc-dhcp-server` im Prototyp. Unter Debian bekommt alles in *main* Sicherheitsupdates.
-  Debian 13 hat volle Unterstützung bis 2028-08-09 und LTS bis 2030-06-30 [S-02].
+- **Distribution:** **Ubuntu LTS** (zuerst 26.04), Server-Minimalinstallation (D-10, entschieden
+  am 2026-11-04, P-10). Gründe: Der Prototyp läuft darauf, Ubuntu ist die bekannteste Distribution,
+  hat die meisten Anleitungen und unterstützt neue Hardware früh (HWE-Kernel).
+  - **Sicherheitsupdates nur aus *main*** (Stand 26.04, auf dem Prototyp geprüft [S-15]):
+    | Paket | Archiv | Folgerung |
+    |---|---|---|
+    | `dnsmasq-base` (das Programm) | main | Sicherheitsupdates garantiert |
+    | `dnsmasq` (nur Unit und Standardkonfiguration) | universe | **nicht installieren**. Eigene Unit im Paket vanilla-router, die `dnsmasq-base` startet |
+    | `nftables`, `ppp`, `btrfs-progs`, `kea-dhcp4-server` | main | in Ordnung |
+    | `fail2ban` | universe | **ersetzen** durch eigene Bremse in routerui (gibt es im Prototyp) und nft-Ratenbegrenzung. SSH ist ab Werk aus (F-SEC-04) |
+    | `snapper` | universe | Rücknahme mit eigenem kleinen Werkzeug über `btrfs subvolume snapshot` oder Ausnahme mit Begründung (Q-03) |
+    | `isc-dhcp-server` | universe, abgekündigt | entfällt (D-05) |
+  - Regel für das Paket vanilla-router: **Abhängigkeiten nur aus *main***. Ausnahmen aus *universe* nur
+    mit Begründung in einer D-NN und nur für Erweiterungen (F-ADD). Eine CI-Prüfung erzwingt das (T-M1-08).
+  - Ubuntu Pro (für Privatleute kostenlos, deckt *universe* ab) wird angeboten, aber **nicht vorausgesetzt**.
+  - **snapd** wird nicht installiert, das Grundsystem kommt ohne Snaps aus.
+  - Support: 5 Jahre Standard-Support pro LTS, alle zwei Jahre eine neue LTS mit geführtem Upgrade (F-UPD-05).
 - **Netzwerk-Stack:** systemd-networkd direkt, ohne netplan als Zwischenschicht (siehe D-06). networkd
   kann DHCPv4/v6-Client, Prefix Delegation, Router Advertisements und Bridges.
 - **Paketumfang Grundinstallation:**
-  - Netzwerk: `systemd-networkd`, `nftables`, `dnsmasq`, `ppp` (PPPoE über das rp-pppoe-Plugin von pppd)
+  - Netzwerk: `systemd-networkd`, `nftables`, `dnsmasq-base`, `ppp` (PPPoE über das rp-pppoe-Plugin von pppd)
   - Zeit: `systemd-timesyncd` (Teil von systemd, reicht als Client; NTP-Server fürs LAN später mit chrony)
-  - Sicherheit: `unattended-upgrades`, `fail2ban`, `apparmor`, `openssh-server` (installiert, aber aus)
+  - Sicherheit: `unattended-upgrades`, `apparmor`, `openssh-server` (installiert, aber aus). Kein fail2ban (siehe oben)
   - Werkzeuge: `ethtool`, `iproute2`
   - Snapshots: `btrfs-progs` + Snapshot-Werkzeug (siehe F-UPD)
   - Paket `vanilla-router`: routerui, vrctl, Units
@@ -361,8 +375,9 @@ des Anbieters. Ob networkd die AFTR-Option (DHCPv6 Option 64) auswertet, ist zu 
 - **Vor jedem Update ein Snapshot** des Systems. Optionen und Stand der Recherche (Entscheidung in Q-03):
   - *btrfs + snapper*: Snapshot vor und nach jedem apt-Lauf über einen apt-Hook. Ob der Hook eingebaut ist
     oder ein Zusatzpaket braucht, unterscheidet sich je nach Quelle [S-08] [S-09].
-  - *grub-btrfs*: Snapshots erscheinen im Bootmenü. Auf Debian-Systemen sollen sie ohne Anpassung des
-    initramfs aber nicht zuverlässig bootfähig sein [S-10]. Das ist ein Risiko und muss getestet werden.
+  - *grub-btrfs*: Snapshots erscheinen im Bootmenü. Auf Debian-basierten Systemen (also auch Ubuntu) sollen
+    sie ohne Anpassung des initramfs aber nicht zuverlässig bootfähig sein [S-10]. Das ist ein Risiko und
+    muss getestet werden. In Ubuntu 26.04 gibt es grub-btrfs nicht als Paket, snapper nur in *universe* [S-15].
   - *A/B-Partitionen* (z. B. mit systemd-sysupdate): sehr robust, passt aber schlecht zu „normalem apt“ (P-01).
   - Eine **fertige automatische Gesundheitsprüfung mit Rücknahme gibt es nicht** [S-08]. Sie muss gebaut
     werden. Ansatz: Zählung der Bootversuche (systemd-boot Boot Assessment oder `grubenv`-Zähler) und ein
@@ -439,7 +454,7 @@ Grundsätze für den Assistenten:
   - Rest als btrfs mit Subvolumes `@` (`/`), `@log` (`/var/log`, nicht im Snapshot, damit Protokolle
     eine Rücknahme überleben), `@snapshots` und optional `@data` (für das NAS-Modul, eigene Snapshot-Regeln)
 - **Kein Swap-Partition**, stattdessen zram (wenig RAM-Bedarf, schont die SSD).
-- **Bootloader:** GRUB mit signiertem shim (Debian-Standard, funktioniert mit Secure Boot) oder
+- **Bootloader:** GRUB mit signiertem shim (Ubuntu-Standard, funktioniert mit Secure Boot) oder
   systemd-boot (einfacher, Boot Assessment eingebaut). Hängt an Q-03 und Q-16.
 - **Kleinste Datenträger:** 16 GB (NF-01). Ab 64 GB bietet der Assistent an, den Rest für Daten zu nutzen.
 
@@ -536,7 +551,7 @@ Spalten: ID · Priorität · Anforderung · Status. „Prototyp“ bedeutet: im 
 |---|---|---|---|
 | F-SEC-01 | MUSS | Firewall IPv4 und IPv6, eingehend auf WAN standardmäßig verwerfen | Prototyp |
 | F-SEC-02 | MUSS | Firewall wird vor dem Netzwerk geladen (`Before=network-pre.target`) | Prototyp |
-| F-SEC-03 | MUSS | Weboberfläche nur aus dem LAN, HTTPS, Einrichtungscode, Login-Bremse, fail2ban | Prototyp |
+| F-SEC-03 | MUSS | Weboberfläche nur aus dem LAN, HTTPS, Einrichtungscode, Login-Bremse (im Prototyp zusätzlich fail2ban, im Ziel nft-Ratenbegrenzung statt fail2ban, D-10) | Prototyp |
 | F-SEC-04 | MUSS | SSH standardmäßig aus. Wenn an, dann nur mit Schlüssel und nur aus dem LAN | Prototyp (teilweise) |
 | F-SEC-05 | MUSS | Automatische Sicherheitsupdates | Prototyp |
 | F-SEC-06 | MUSS | AppArmor an, Zustand in der Oberfläche sichtbar (L-04) | Prototyp (Anzeige im Audit) |
@@ -556,6 +571,7 @@ Spalten: ID · Priorität · Anforderung · Status. „Prototyp“ bedeutet: im 
 | F-UI-04 | SOLL | Mobilgerätetauglich | Prototyp (Grundlagen) |
 | F-UI-05 | SOLL | Englische Übersetzung | offen |
 | F-UI-06 | KANN | Benachrichtigungen (E-Mail, Push) bei Ausfällen, neuen Geräten, Updates | offen |
+| F-UI-07 | MUSS | Seite „Über“ mit Version, Lizenz (AGPL-3.0-or-later) und Link zum Quelltext genau dieser Version (AGPL §13, D-11). Der Link ist ein Build-Parameter, damit veränderte Fassungen auf ihren eigenen Quelltext zeigen | offen |
 
 ### 4.5 Updates (F-UPD)
 
@@ -590,6 +606,8 @@ Spalten: ID · Priorität · Anforderung · Status. „Prototyp“ bedeutet: im 
 | NF-05 | MUSS | Testumgebung mit identischer Härtung wie der Betrieb (L-09) | Prototyp |
 | NF-06 | SOLL | Installation in unter 10 Minuten | offen |
 | NF-07 | SOLL | Leerlauf-Stromverbrauch wird nicht durch vanilla-router erhöht (keine Dauerlast, Polling nur bei offener Oberfläche) | Prototyp |
+| NF-08 | MUSS | Jede Quelldatei beginnt mit `SPDX-License-Identifier: AGPL-3.0-or-later` (D-11) | offen |
+| NF-09 | MUSS | Paket-Abhängigkeiten des Grundsystems nur aus Ubuntu *main* (D-10), per CI geprüft | offen |
 
 ---
 
@@ -604,8 +622,10 @@ Spalten: ID · Priorität · Anforderung · Status. „Prototyp“ bedeutet: im 
 | D-05 | **dnsmasq für DNS und DHCPv4** (statt isc-dhcp), RA und DHCPv6 über systemd-networkd oder dnsmasq (Q-04) | isc-dhcp wird seit Ende 2022 nicht mehr gepflegt [S-12]. OPNsense empfiehlt für kleine Netze dnsmasq inkl. DHCPv6 und RA, Kea erst für große Netze mit Hochverfügbarkeit [S-13]. Ein Dienst statt zwei vermeidet Fehler wie L-07. | offen (Vorschlag) |
 | D-06 | **systemd-networkd direkt** statt netplan | Eine Schicht weniger, PD/RA/Bridge nativ. netplan bringt auf Servern keinen Vorteil, wenn die Konfiguration ohnehin erzeugt wird. | offen (Vorschlag) |
 | D-07 | **Image-basierte Installation** (vorgefertigtes Root-Dateisystem auf dem Stick) statt debootstrap zur Laufzeit | Offline, schnell, für alle Nutzer identisch, testbar. | offen (Vorschlag) |
-| D-08 | **Debian stable** als Basis statt Ubuntu LTS | Alle Router-Pakete (dnsmasq, fail2ban, nftables, pppd) sind in *main* und bekommen Sicherheitsupdates. Unter Ubuntu liegen dnsmasq und fail2ban in *universe* [S-01], das ist dasselbe Problem wie bei isc-dhcp im Prototyp. Dazu kein snap und ein kleineres Grundsystem. Nachteil: Der Prototyp läuft auf Ubuntu, Erfahrungen sind aber weitgehend übertragbar. | offen (Vorschlag, entscheidet Q-01) |
+| D-08 | **Debian stable** als Basis statt Ubuntu LTS | Alle Router-Pakete (dnsmasq, fail2ban, nftables, pppd) sind in *main* und bekommen Sicherheitsupdates. Unter Ubuntu liegen dnsmasq und fail2ban in *universe* [S-01], das ist dasselbe Problem wie bei isc-dhcp im Prototyp. Dazu kein snap und ein kleineres Grundsystem. Nachteil: Der Prototyp läuft auf Ubuntu, Erfahrungen sind aber weitgehend übertragbar. | verworfen am 2026-11-04 zugunsten von D-10 |
 | D-09 | **Eine `inet`-Tabelle für den Filter** (IPv4 und IPv6 gemeinsam), NAT getrennt in `ip vr_nat` | Gemeinsame Regeln können nicht auseinanderlaufen. Der Prototyp hatte IPv6 vergessen, weil es eine eigene Tabelle brauchte (L-01). | offen (Vorschlag) |
+| D-10 | **Ubuntu LTS** als Basis | Entscheidung des Projektinhabers nach P-10: Ubuntu ist bekannter, hat mehr Anleitungen und bessere Unterstützung neuer Hardware, und der Prototyp läuft schon darauf. Das *universe*-Problem aus D-08 wird gelöst, indem Abhängigkeiten nur aus *main* kommen: `dnsmasq-base` statt `dnsmasq`, keine fail2ban-Pflicht, für snapper entscheidet Q-03 (3.2) [S-15]. | erledigt (2026-11-04) |
+| D-11 | Lizenz **AGPL-3.0-or-later** | Entscheidung des Projektinhabers am 2026-11-04: die neueste AGPL-Fassung (Version 3), mit „oder später“ für künftige Fassungen. Die AGPL verlangt zusätzlich zur GPL, dass Nutzer einer veränderten Fassung, die über das Netz bedient wird, den Quelltext bekommen. Für die Weboberfläche bedeutet das F-UI-07. Text in `LICENSE`, jede Quelldatei bekommt eine SPDX-Zeile (NF-08). | erledigt (2026-11-04) |
 
 ---
 
@@ -613,9 +633,9 @@ Spalten: ID · Priorität · Anforderung · Status. „Prototyp“ bedeutet: im 
 
 | ID | Frage | Optionen | Tendenz |
 |---|---|---|---|
-| Q-01 | Basis-Distribution | Debian stable · Ubuntu LTS | **Debian** (D-08): alle nötigen Pakete in *main* mit Sicherheitsupdates, 5 Jahre (3 + 2 LTS) [S-02]. Ubuntu hat 5 Jahre Standard-Support, ohne Pro aber nicht für *universe*, also nicht für dnsmasq und fail2ban [S-01]. |
+| Q-01 | Basis-Distribution | Debian stable · Ubuntu LTS | **erledigt: Ubuntu LTS** (D-10, 2026-11-04) |
 | Q-02 | Werkzeug für das Image | mkosi · live-build · debos | mkosi (reproduzierbar, Debian und Ubuntu, systemd-nah) |
-| Q-03 | Rücknahme von Updates | btrfs + snapper + grub-btrfs · A/B-Partitionen · systemd-sysupdate | offen. btrfs + snapper passt am besten zu P-01. Bootfähigkeit von Snapshots unter Debian und die automatische Rücknahme sind ungeklärt (3.7), deshalb Spike in M5. |
+| Q-03 | Rücknahme von Updates | btrfs + snapper + grub-btrfs · A/B-Partitionen · systemd-sysupdate | offen. btrfs-Snapshots passen am besten zu P-01. snapper liegt unter Ubuntu in *universe*, grub-btrfs fehlt ganz [S-15]: entweder kleines eigenes Werkzeug (`btrfs subvolume snapshot` + apt-Hook) oder snapper als begründete Ausnahme. Bootfähigkeit von Snapshots und die automatische Rücknahme sind ungeklärt (3.7), deshalb Spike in M5. |
 | Q-04 | Wer macht IPv6 im LAN (RA, DHCPv6)? | systemd-networkd · dnsmasq | offen |
 | Q-05 | Assistent als Textoberfläche auf dem Bildschirm oder als Weboberfläche vom Handy aus? | TUI auf tty1 · Web über einen LAN-Port · beides | TUI zuerst (funktioniert ohne zweites Gerät) |
 | Q-06 | WLAN-Access-Point im Router? | nein (externe APs) · hostapd für unterstützte Karten | nein in Version 1 |
@@ -623,12 +643,12 @@ Spalten: ID · Priorität · Anforderung · Status. „Prototyp“ bedeutet: im 
 | Q-08 | ARM (Raspberry Pi 5 u. ä.)? | später · nie | später |
 | Q-09 | TLS für die Oberfläche ohne Warnung | selbstsigniert + Anleitung · eigene lokale CA mit Installationshilfe · nur HTTP im LAN | offen |
 | Q-10 | DNS über TLS | dnsmasq kann es nicht, Zusatzdienst (z. B. unbound, stubby) | später |
-| Q-11 | Lizenz | GPL-3.0 · AGPL-3.0 · MIT · Apache-2.0 | offen, **muss vor der Veröffentlichung entschieden werden** |
+| Q-11 | Lizenz | GPL-3.0 · AGPL-3.0 · MIT · Apache-2.0 | **erledigt: AGPL-3.0-or-later** (D-11, 2026-11-04) |
 | Q-12 | Geräte trotz zufälliger MAC wiedererkennen | DHCP-Client-ID, Hostname, Fingerprinting | offen |
 | Q-13 | Name | „vanilla-router“ prüfen (Marken, vorhandene Projekte, Domains) | offen. Auf GitHub gibt es mehrere kleine JavaScript-Routing-Bibliotheken dieses Namens [S-14]. Das ist kein rechtliches Problem, aber Suchende landen dort. Möglich: Name behalten und mit Zusatz („vanilla-router OS“, Kürzel `vr`) eindeutig machen. Markenrecherche (DPMA/EUIPO) vor der Veröffentlichung. |
 | Q-14 | Woher kommen die Anbieterdaten (VLAN-IDs, Format der Zugangsdaten)? | eigene gepflegte Liste im Repo · Community-Beiträge | eigene Liste als Datendatei, Beiträge per Pull Request |
 | Q-15 | DS-Lite mit systemd-networkd: wird die AFTR-Adresse (DHCPv6 Option 64) ausgewertet? | networkd · eigener Helfer, der die Option liest und den Tunnel anlegt | offen, prüfen in der Provider-VM |
-| Q-16 | Secure Boot | shim + GRUB (signiert, Debian-Standard) · systemd-boot (Signierung prüfen) · Secure Boot aus | offen. Muss mit Secure Boot funktionieren, viele Laien-Rechner haben es an. |
+| Q-16 | Secure Boot | shim + GRUB (signiert, Ubuntu-Standard) · systemd-boot (Signierung prüfen) · Secure Boot aus | offen. Muss mit Secure Boot funktionieren, viele Laien-Rechner haben es an. |
 
 ---
 
@@ -655,6 +675,7 @@ Spalten: ID · Priorität · Anforderung · Status. „Prototyp“ bedeutet: im 
 | T-M1-05 | Bestätigung per DHCP-Discover auf dem Kandidaten-Port, ohne Adresse zu übernehmen (Rohsocket) | Antwort der Provider-VM erkannt, Ergebnis: DHCP ja/nein + angebotenes Netz |
 | T-M1-06 | PPPoE-Discovery (PADI senden, PADO erkennen), mit und ohne VLAN 7 | Erkennung gegen `pppoe-server` in der Provider-VM |
 | T-M1-07 | Kleine Textoberfläche als Vorführer: „Ziehen Sie alle Kabel ab …“ bis „Erkannt: Port 2, DHCP, Netz 192.0.2.0/24“ | Kabel „stecken“ per QEMU-Monitor (`set_link`) löst den Ablauf aus |
+| T-M1-08 | Prüfskript `test/check-main.sh`: alle Abhängigkeiten des Pakets vanilla-router auflösen und melden, was nicht aus Ubuntu *main* kommt (NF-09). Dazu Prüfung der SPDX-Zeilen (NF-08) | schlägt fehl bei `fail2ban` oder einer Datei ohne SPDX-Zeile |
 
 ---
 
@@ -746,6 +767,8 @@ Recherche vom 2026-11-04. Foren sind als solche gekennzeichnet und müssen vor e
 | S-12 | https://isc.org/dhcp/ | ISC DHCP nicht mehr gepflegt seit Ende 2022, Nachfolger Kea |
 | S-13 | https://docs.opnsense.org/manual/isc.html | OPNsense: Wechsel zu Kea oder dnsmasq, dnsmasq mit DHCPv6 und RA |
 | S-14 | https://github.com/xan105/web-vanilla-router · https://awesome.ecosyste.ms/projects/github.com%2Frayc2045%2Fvanilla-router | Namensgleiche JavaScript-Bibliotheken |
+| S-15 | `apt-cache show` auf dem Prototyp (Ubuntu 26.04, 2026-11-04) | *main*: dnsmasq-base, nftables, ppp, btrfs-progs, kea-dhcp4-server. *universe*: dnsmasq, fail2ban, snapper, mkosi. grub-btrfs: kein Paket |
+| S-16 | https://www.gnu.org/licenses/agpl-3.0.txt | Lizenztext AGPL Version 3 (19. November 2007), liegt als `LICENSE` im Repo |
 
 ---
 
@@ -756,3 +779,4 @@ Recherche vom 2026-11-04. Foren sind als solche gekennzeichnet und müssen vor e
 | 0.1 | 2026-11-04 | Erster Entwurf aus Prototyp und Gesprächen |
 | 0.2 | 2026-11-04 | Recherche eingearbeitet: Debian statt Ubuntu (D-08), networkd-PD-Beispiel, Anbieter-Details (Telekom, Vodafone), Stand Snapshots und Rücknahme, mkosi, Name; Q-14, Q-15, Quellen (S-NN) |
 | 0.3 | 2026-11-04 | Durchsicht: Widersprüche behoben (Distribution, Zeitdienst, Paketliste), ULA zufällig (F-NET-12), PPPoE-Vorlagen (F-NET-13), Firewall in einer `inet`-Tabelle (D-09), Datenträger und Boot (3.9.4), Wiederherstellung (3.9.5, F-INST-12–14), Code-Übernahme (3.11), Aufgaben für M1 (7.1), VM-Aufbau, Secure Boot (Q-16) |
+| 0.4 | 2026-11-04 | Entscheidungen des Projektinhabers: Ubuntu LTS (D-10, D-08 verworfen, Q-01 erledigt), Lizenz AGPL-3.0-or-later (D-11, Q-11 erledigt), Grundsatz Komfort vor Optimierung (P-10). Paketprüfung auf *main* [S-15]: dnsmasq-base statt dnsmasq, kein fail2ban, snapper offen (Q-03). Neu: F-UI-07, NF-08, NF-09, T-M1-08 |

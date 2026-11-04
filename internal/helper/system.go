@@ -16,7 +16,7 @@ import (
 )
 
 const (
-	AuditScript   = "/usr/lib/vanilla-router/audit-collect.sh"
+	AuditScript   = "/usr/lib/vanilla-router/audit-collect.sh" // Erweiterung, siehe api.AuditScript
 	AuditLastFile = "/var/lib/vanilla-router/audit-last.json"
 	updateUnit    = "vr-update"
 )

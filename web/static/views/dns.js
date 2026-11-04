@@ -5,7 +5,7 @@ import { get, post } from '../api.js';
 const SOURCE = {
   record: ['eigener Eintrag', 'info'],
   reservation: ['aus fester Adresse', ''],
-  manual: ['handgeschrieben', 'warn'],
+  manual: ['dieser Router', 'ok'],
 };
 
 export default {
@@ -34,7 +34,7 @@ export default {
           h('div', { class: 'card-head' }, h('span', { class: 'icon-badge' }, icon('info')), h('h2', null, 'Hinweise')),
           h('ul', { class: 'muted small list' },
             h('li', null, 'Namen aus festen Adressen pflegst du unter „Geräte“.'),
-            h('li', null, 'Handgeschriebene Einträge stehen in /etc/dnsmasq.conf und lassen sich hier nicht ändern.'),
+            h('li', null, 'Den Namen des Routers selbst legt die Installation fest (Einstellung „Name des Routers“).'),
             h('li', null, 'Alle eigenen Einträge liefern auch die Rückwärtsauflösung (IP → Name).')))));
 
     // --- Statistik (wie Pi-hole), aus dem Protokoll von dnsmasq ---------------------------
@@ -51,7 +51,7 @@ export default {
       clear(statBody).append(h('p', { class: 'muted' }, h('span', { class: 'spinner' }), ' Werte das Protokoll aus …'));
       let s;
       try { s = await get(`/api/dns/stats?hours=${hours}${client ? `&client=${encodeURIComponent(client)}` : ''}`); } catch (e) { clear(statBody).append(h('div', { class: 'banner crit' }, icon('alert'), e.message)); return; }
-      if (!s.logging) { clear(statBody).append(h('p', { class: 'muted' }, 'Keine Anfragen im Protokoll. Die Statistik braucht log-queries in der dnsmasq-Konfiguration.')); return; }
+      if (!s.logging) { clear(statBody).append(h('p', { class: 'muted' }, 'Zum Schutz der Privatsphäre protokolliert der Router keine DNS-Anfragen. Deshalb gibt es hier keine Statistik.')); return; }
       const answered = s.cached + s.forwarded + s.local;
       const kpi = (label, value, sub) => h('div', { class: 'stat' }, h('div', { class: 'stat-label' }, label), h('div', { class: 'stat-value small-value' }, value), sub && h('div', { class: 'stat-sub' }, sub));
       const list = (title, rows, label) => h('div', null, h('h3', { class: 'sub' }, title),
@@ -83,7 +83,7 @@ export default {
         tbody.append(h('tr', null,
           h('td', { class: 'mono' }, e.name),
           h('td', { class: 'mono' }, e.ip),
-          h('td', null, badge(label, kind), e.source === 'manual' && h('span', { class: 'muted small mono' }, ` ${e.detail}`)),
+          h('td', null, badge(label, kind)),
           h('td', { class: 'actions' }, e.source === 'record' && [
             h('button', { class: 'btn sm ghost icon', title: 'Bearbeiten', onclick: () => edit(e) }, icon('edit')),
             h('button', { class: 'btn sm ghost icon danger', title: 'Löschen', onclick: () => remove(e) }, icon('trash'))])));

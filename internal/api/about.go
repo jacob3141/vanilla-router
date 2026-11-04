@@ -2,7 +2,24 @@
 
 package api
 
-import "net/http"
+import (
+	"net/http"
+	"os"
+)
+
+// AuditScript ist das Prüfskript der Erweiterung Sicherheits-Audit (F-SEC-08).
+const AuditScript = "/usr/lib/vanilla-router/audit-collect.sh"
+
+// features meldet, welche Erweiterungen installiert sind. Nebenrollen erscheinen in der Oberfläche
+// nur, wenn es sie gibt (PLAN.md 3.8).
+func (s *Server) features() map[string]bool {
+	exists := func(p string) bool { _, err := os.Stat(p); return p != "" && err == nil }
+	return map[string]bool{
+		"containers": exists("/usr/bin/docker"),
+		"files":      exists(s.cfg.Files),
+		"audit":      exists(AuditScript),
+	}
+}
 
 // handleAbout liefert Version, Lizenz und den Ort des Quelltexts (F-UI-07, AGPL §13).
 func (s *Server) handleAbout(w http.ResponseWriter, r *http.Request) {

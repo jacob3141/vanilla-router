@@ -20,7 +20,6 @@ export function setupPalette(pages) {
 
     const items = pages.map((p) => ({ label: p.label, sub: p.section || 'Seite', icon: p.icon, href: `#/${p.path}`, text: `${p.label} ${p.section || ''}` }));
     items.push(
-      { label: 'Sicherheits-Audit starten', sub: 'Aktion', icon: 'shield', href: '#/system', text: 'audit sicherheit prüfen' },
       { label: 'Feste Adresse vergeben', sub: 'Aktion', icon: 'pin', href: '#/devices', text: 'reservierung dhcp fest ip' },
       { label: 'Portweiterleitung anlegen', sub: 'Aktion', icon: 'arrowRight', href: '#/firewall', text: 'port forward weiterleitung nat' },
       { label: 'Passwort ändern', sub: 'Aktion', icon: 'lock', href: '#/settings', text: 'passwort kennwort' },

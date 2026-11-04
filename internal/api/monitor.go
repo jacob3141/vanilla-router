@@ -119,7 +119,7 @@ func (s *Server) handleHints(w http.ResponseWriter, r *http.Request) {
 			Level string `json:"level"`
 		} `json:"checks"`
 	}
-	if s.call(r, "system.audit.get", nil, &audit) == nil {
+	if s.features()["audit"] && s.call(r, "system.audit.get", nil, &audit) == nil {
 		if audit == nil || audit.Time.IsZero() {
 			add("info", "Noch kein Sicherheits-Audit gelaufen", "", "#/system")
 		} else {

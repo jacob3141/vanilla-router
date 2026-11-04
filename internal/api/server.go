@@ -149,6 +149,7 @@ func (s *Server) handleState(w http.ResponseWriter, r *http.Request) {
 		"authenticated": s.authenticated(r),
 		"dev":           s.cfg.Dev,
 		"name":          s.cfg.Name,
+		"features":      s.features(),
 		"version":       s.cfg.Version,
 		"source":        s.cfg.SourceURL,
 	})

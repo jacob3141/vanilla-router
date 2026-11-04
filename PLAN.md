@@ -1,7 +1,7 @@
 ---
 document: vanilla-router-plan
 title: "vanilla-router: Planpapier"
-version: 0.6
+version: 0.7
 status: entwurf
 license: AGPL-3.0-or-later
 updated: 2026-11-04
@@ -173,6 +173,7 @@ vanilla-router (Verweis in der letzten Spalte).
 | L-14 | Die per DHCP verteilte Suchdomain war ein Fantasiename statt der lokalen Domain, deshalb funktionierten kurze Namen nicht. | Suchdomain `home.arpa` als Vorgabe (F-NET-05) |
 | L-15 | Ohne Backup lag die gesamte NAS-Ablage auf einer einzigen SSD. | Backup-Funktion für Nebenrollen einplanen (F-ADD-03) |
 | L-16 | Bei Sperren über Mitternacht war die Zuordnung der Wochentage zuerst falsch (Morgen gehört zum Folgetag). | Zeitlogik mit Tests absichern (umgesetzt, beibehalten) |
+| L-18 | Beim Übernehmen des Prototyp-Codes standen in Testdaten echte Werte aus dem Heimnetz (MAC eines Geräts, WAN-Adresse, Gerätenamen), auch als Bytes und Hex-Werte. | Übernommenen Code vor dem Commit nach Adressen, MACs und Namen durchsuchen, auch in Byte- und Hex-Schreibweise; Testdaten nur mit Dokumentationswerten |
 | L-17 | Die Paketprüfung (T-M1-08) fand auf dem deutschsprachigen Prototyp nichts, weil apt „Hängt ab von:“ statt „Depends:“ schreibt. Auf einem System ohne *universe* in den Quellen rutschten universe-Pakete als „unbekannt“ durch. | Ausgaben von Werkzeugen nur mit `LC_ALL=C` auswerten. Prüfungen müssen bei fehlenden Daten fehlschlagen, nicht bestehen |
 
 ### 2.5 Was am Prototyp noch Handarbeit ist
@@ -713,7 +714,9 @@ verify`. Das Paket `vanilla-router_*.deb` baut, alle 391 Pakete der Images komme
 | T-M3-02 | Installation: GPT, btrfs mit @/@log/@snapshots, Image entpacken, fstab, Einstellungen, shim+GRUB (auch Standardpfad), Dienste offline, Benutzer admin | `internal/install`, Prüfung vor dem ersten Schreibzugriff | erledigt (ungetestet auf Hardware) |
 | T-M3-03 | Assistent S1–S10 | `cmd/vr-install`, Telekom-Maske, verdeckte Passworteingabe, `--dry-run`, `--unattended` (F-INST-08) | erledigt |
 | T-M3-04 | Images | `image/target`, `image/stick`, `image/build.sh` (mkosi) | **ungetestet**, siehe `image/README.md` |
-| T-M4-01 | Weboberfläche aus dem Prototyp übernehmen, auf `config.json` umstellen (3.11) | – | offen |
+| T-M4-01 | Weboberfläche aus dem Prototyp übernehmen, auf `config.json` umstellen (3.11) | `cmd/vr-webui` mit Helper; `internal/conf` übersetzt nur noch zwischen API-Formen und `config.json`, Prüfung per `config.Validate`, Einspielen per `apply` (Sicherung, Rücknahme). dnsmasq-Leases, Adressen und Namen aus der Konfiguration, eigenes TLS-Zertifikat, Einrichtungscode vom Installer, Erweiterungen (Container, Dateiablage, Audit) nur sichtbar, wenn installiert. Im Browser gegen eine lokale Testinstanz geprüft (alle Seiten, Reservierung, DNS, Weiterleitung mit Bestätigung, Sperre, Fehlermeldungen) | erledigt (ungetestet auf Hardware) |
+| T-M4-02 | Seite „Über“ mit Lizenz und Quelltext-Link (F-UI-07) | Seitenleiste und Anmeldeseite, `/api/about`, Link per Build-Parameter | erledigt |
+| T-M4-03 | Einstellungen für WAN-Art, PPPoE-Zugangsdaten, Hostname und Heimnetz in der Oberfläche (F-UI-03) | – | offen |
 | T-M5-01 | Snapshot vor jedem apt-Lauf, GRUB-Eintrag „Stand vor dem Update“, Zustand auf der ESP | `internal/snapshot`, `packaging/grub.d`, apt-Hook | erledigt (ungetestet auf Hardware) |
 | T-M5-02 | Gesundheitsprüfung nach dem Start, automatische Rücknahme | `vr-health.service`, `panic=10`, Watchdog. Neustart nur bei einem Versuch nach Update (keine Neustartschleife) | erledigt (ungetestet auf Hardware) |
 
@@ -838,3 +841,4 @@ Recherche vom 2026-11-04. Foren sind als solche gekennzeichnet und müssen vor e
 | 0.4 | 2026-11-04 | Entscheidungen des Projektinhabers: Ubuntu LTS (D-10, D-08 verworfen, Q-01 erledigt), Lizenz AGPL-3.0-or-later (D-11, Q-11 erledigt), Grundsatz Komfort vor Optimierung (P-10). Paketprüfung auf *main* [S-15]: dnsmasq-base statt dnsmasq, kein fail2ban, snapper offen (Q-03). Neu: F-UI-07, NF-08, NF-09, T-M1-08 |
 | 0.5 | 2026-11-04 | Ubuntu Server mit Paketumfang `ubuntu-server` (D-12, Tabelle in 3.2: resolved, cloud-init, snapd …), chrony statt timesyncd. M1 begonnen: T-M1-02 bis 08 erledigt, T-M1-01 auf Namespace-Labor umgestellt (Lauf steht aus). L-17 (Locale, Prüfungen ohne Daten) |
 | 0.6 | 2026-11-04 | M2 (Konfigurations-Kern), M3 (Installer, Images) und M5 (Snapshots, Rücknahme) im Code fertig, ungetestet auf Hardware (7.2). Q-03 und Q-04 umgesetzt, D-13. Testplan für Hardware (7.3). M4 (Weboberfläche) offen |
+| 0.7 | 2026-11-04 | M4: Weboberfläche übernommen und auf `config.json` umgestellt (T-M4-01, T-M4-02), F-UI-07 erledigt, WAN-Einstellungen in der Oberfläche offen (T-M4-03). L-18 |

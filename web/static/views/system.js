@@ -7,11 +7,12 @@ const ORDER = { CRIT: 0, WARN: 1, INFO: 2, OK: 3 };
 
 export default {
   title: 'System',
-  subtitle: 'Updates, Neustart und Sicherheits-Audit',
+  subtitle: 'Updates, Hardware und Neustart',
   render(root) {
     const updBody = h('div');
     const updLog = h('pre', { class: 'code log hidden' });
     const auditBody = h('div');
+    let auditCard = null; // Erweiterung, nur sichtbar, wenn das Prüfskript installiert ist
     let poll = null;
 
     const hwBody = h('dl', { class: 'kv' });
@@ -25,7 +26,7 @@ export default {
       h('section', { class: 'card' }, h('div', { class: 'card-head' }, h('span', { class: 'icon-badge' }, icon('cpu')), h('h2', null, 'Hardware und Zeit')), hwBody),
       h('section', { class: 'card' }, h('div', { class: 'card-head' }, h('span', { class: 'icon-badge' }, icon('drive')), h('h2', null, 'Datenträger')), diskBody),
       h('section', { class: 'card span-2' }, h('div', { class: 'card-head' }, h('span', { class: 'icon-badge' }, icon('clock')), h('h2', null, 'Update-Verlauf')), histBody),
-      h('section', { class: 'card span-2' },
+      auditCard = h('section', { class: 'card span-2 hidden' },
         h('div', { class: 'card-head' }, h('span', { class: 'icon-badge' }, icon('shield')), h('h2', null, 'Sicherheits-Audit'),
           h('button', { class: 'btn', onclick: runAudit }, icon('play'), 'Jetzt prüfen')),
         auditBody),
@@ -189,7 +190,9 @@ export default {
     }
 
     loadUpdates();
-    loadAudit();
+    get('/api/state').then((s) => {
+      if (s.features && s.features.audit) { auditCard.classList.remove('hidden'); loadAudit(); }
+    }).catch(() => {});
     loadHardware();
     loadDisks();
     loadHistory();

@@ -33,8 +33,9 @@ const NAV = [
   ] },
   { section: 'Dienste', items: [
     { path: 'services', label: 'Dienste', icon: 'services', view: services },
-    { path: 'containers', label: 'Container', icon: 'container', view: containers },
-    { path: 'files', label: 'Dateiablage', icon: 'drive', view: files },
+    // Erweiterungen: nur sichtbar, wenn installiert (PLAN.md 3.8, /api/state → features)
+    { path: 'containers', label: 'Container', icon: 'container', view: containers, feature: 'containers' },
+    { path: 'files', label: 'Dateiablage', icon: 'drive', view: files, feature: 'files' },
   ] },
   { section: 'System', items: [
     { path: 'system', label: 'System', icon: 'system', view: system },
@@ -101,9 +102,10 @@ let routerName = 'vanilla-router';
 function renderShell(state) {
   navLinks = {};
   if (state.name) routerName = state.name;
+  const has = (i) => !i.feature || (state.features && state.features[i.feature]);
   const nav = h('nav', { class: 'nav' }, NAV.map((s) => [
     s.section && h('div', { class: 'nav-section' }, s.section),
-    s.items.map((i) => (navLinks[i.path] = h('a', { href: `#/${i.path}` }, icon(i.icon), i.label))),
+    s.items.filter(has).map((i) => (navLinks[i.path] = h('a', { href: `#/${i.path}` }, icon(i.icon), i.label))),
   ]));
   titleEl = h('h1');
   subtitleEl = h('p');

@@ -1,0 +1,72 @@
+#!/usr/sbin/nft -f
+# Von vanilla-router erzeugt, nicht von Hand ändern.
+# Änderungen über die Weboberfläche oder /etc/vanilla-router/config.json und `vrctl apply`.
+
+table inet vr_filter
+delete table inet vr_filter
+
+table inet vr_filter {
+	set icmpv6_errors {
+		type icmpv6_type
+		elements = { destination-unreachable, packet-too-big, time-exceeded, parameter-problem }
+	}
+
+	chain input {
+		type filter hook input priority filter; policy drop;
+
+		iif "lo" accept
+		ct state established,related accept
+		ct state invalid drop
+		iifname "lan0" accept comment "Heimnetz darf alles"
+
+		# ICMPv6 nach RFC 4890: ohne ND, RA, MLD und PMTU funktioniert IPv6 nicht
+		icmpv6 type @icmpv6_errors accept
+		icmpv6 type { nd-router-advert, nd-neighbor-solicit, nd-neighbor-advert } ip6 hoplimit 255 accept
+		icmpv6 type { mld-listener-query, mld-listener-report, mld-listener-done, mld2-listener-report } ip6 saddr fe80::/10 accept
+		icmpv6 type echo-request limit rate 10/second accept
+		icmp type echo-request limit rate 10/second accept
+		icmp type { destination-unreachable, time-exceeded, parameter-problem } accept
+		iifname "wan0" udp sport 67 udp dport 68 accept comment "DHCPv4-Antworten des Modems"
+		iifname "wan0" ip6 saddr fe80::/10 udp sport 547 udp dport 546 accept comment "DHCPv6-Antworten des Anbieters"
+	}
+
+	chain forward {
+		type filter hook forward priority filter; policy drop;
+
+		ct state established,related accept
+		ct state invalid drop
+		iifname "lan0" oifname "wan0" accept comment "Heimnetz ins Internet"
+		iifname "wan0" oifname "lan0" meta nfproto ipv4 ct status dnat accept comment "Portweiterleitungen (DNAT in vr_portfw)"
+		icmpv6 type @icmpv6_errors accept
+		icmpv6 type echo-request iifname "wan0" oifname "lan0" limit rate 10/second accept
+		iifname "wan0" oifname "lan0" ip6 daddr & ::ffff:ffff:ffff:ffff == ::1a2b:3c4d:5e6f:7890 tcp dport 443 accept comment "freigabe Webserver"
+	}
+}
+
+table ip vr_nat
+delete table ip vr_nat
+
+table ip vr_nat {
+	chain postrouting {
+		type nat hook postrouting priority srcnat; policy accept;
+		oifname "wan0" masquerade
+	}
+}
+
+table ip vr_portfw
+delete table ip vr_portfw
+
+table ip vr_portfw {
+	chain prerouting {
+		type nat hook prerouting priority dstnat; policy accept;
+	}
+}
+
+table inet vr_block
+delete table inet vr_block
+
+table inet vr_block {
+	chain forward {
+		type filter hook forward priority filter - 10; policy accept;
+	}
+}

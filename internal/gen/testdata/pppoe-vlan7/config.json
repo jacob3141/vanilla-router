@@ -1,0 +1,62 @@
+{
+  "schema": 1,
+  "system": {
+    "hostname": "router",
+    "timezone": "Europe/Berlin",
+    "locale": "de_DE.UTF-8",
+    "keymap": "de"
+  },
+  "wan": {
+    "match_mac": "02:00:00:00:00:01",
+    "type": "pppoe",
+    "pppoe": {
+      "user": "0029123456785512345678900001@t-online.de",
+      "password_ref": "pppoe",
+      "vlan": 7
+    },
+    "ipv6": {
+      "mode": "auto",
+      "request_prefix": 56
+    }
+  },
+  "lan": {
+    "members": [
+      "02:00:00:00:00:02",
+      "02:00:00:00:00:03"
+    ],
+    "ipv4": "192.168.42.1/24",
+    "ipv6": {
+      "ula": "fd12:3456:789a::/48",
+      "from_wan_prefix": true
+    }
+  },
+  "dhcp": {
+    "pool_start": "192.168.42.100",
+    "pool_end": "192.168.42.249",
+    "lease": "12h",
+    "reservations": []
+  },
+  "dns": {
+    "domain": "home.arpa",
+    "upstreams": [
+      "9.9.9.9",
+      "2620:fe::fe"
+    ],
+    "records": []
+  },
+  "firewall": {
+    "port_forwards": [],
+    "ipv6_pinholes": [],
+    "blocks": []
+  },
+  "services": {
+    "ssh": {
+      "enabled": false
+    }
+  },
+  "updates": {
+    "security_auto": true,
+    "reboot_window": "04:00",
+    "snapshots": true
+  }
+}

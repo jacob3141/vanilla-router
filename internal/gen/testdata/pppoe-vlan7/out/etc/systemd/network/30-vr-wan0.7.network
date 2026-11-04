@@ -1,0 +1,13 @@
+# Von vanilla-router erzeugt, nicht von Hand ändern.
+# Änderungen über die Weboberfläche oder /etc/vanilla-router/config.json und `vrctl apply`.
+
+[Match]
+Name=wan0.7
+
+[Link]
+RequiredForOnline=no
+
+[Network]
+DHCP=no
+LinkLocalAddressing=no
+IPv6AcceptRA=no

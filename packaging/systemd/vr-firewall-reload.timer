@@ -1,0 +1,12 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# nft rechnet Zeitsperren beim Laden in UTC um. Täglich neu laden, damit der Wechsel
+# zwischen Sommer- und Winterzeit stimmt (Erfahrung aus dem Prototyp).
+[Unit]
+Description=vanilla-router Firewall täglich neu laden (Zeitsperren, Sommerzeit)
+
+[Timer]
+OnCalendar=*-*-* 03:30:00 UTC
+Persistent=true
+
+[Install]
+WantedBy=timers.target

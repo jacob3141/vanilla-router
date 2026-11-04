@@ -1,0 +1,8 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+[Unit]
+Description=vanilla-router Firewall neu laden
+ConditionPathExists=/etc/vanilla-router/nft/vr.nft
+
+[Service]
+Type=oneshot
+ExecStart=/usr/sbin/vrctl firewall-load

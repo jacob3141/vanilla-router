@@ -1,0 +1,19 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Firewall vor dem Netzwerk laden (F-SEC-02). Nur eigene Tabellen, nie flush ruleset (D-03).
+[Unit]
+Description=vanilla-router Firewall
+DefaultDependencies=no
+Before=network-pre.target shutdown.target
+Wants=network-pre.target
+After=local-fs.target
+Conflicts=shutdown.target
+ConditionPathExists=/etc/vanilla-router/nft/vr.nft
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/sbin/vrctl firewall-load
+ExecReload=/usr/sbin/vrctl firewall-load
+
+[Install]
+WantedBy=sysinit.target

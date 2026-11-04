@@ -1,0 +1,11 @@
+# Von vanilla-router erzeugt, nicht von Hand ändern.
+# Änderungen über die Weboberfläche oder /etc/vanilla-router/config.json und `vrctl apply`.
+
+[Match]
+Name=lanp*
+
+[Link]
+RequiredForOnline=no
+
+[Network]
+Bridge=lan0

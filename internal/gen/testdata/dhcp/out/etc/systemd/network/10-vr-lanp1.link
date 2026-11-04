@@ -1,0 +1,9 @@
+# Von vanilla-router erzeugt, nicht von Hand ändern.
+# Änderungen über die Weboberfläche oder /etc/vanilla-router/config.json und `vrctl apply`.
+
+[Match]
+MACAddress=02:00:00:00:00:02
+Type=ether
+
+[Link]
+Name=lanp1

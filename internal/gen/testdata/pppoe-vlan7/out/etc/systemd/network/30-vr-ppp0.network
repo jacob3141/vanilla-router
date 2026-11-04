@@ -1,0 +1,22 @@
+# Von vanilla-router erzeugt, nicht von Hand ändern.
+# Änderungen über die Weboberfläche oder /etc/vanilla-router/config.json und `vrctl apply`.
+
+[Match]
+Name=ppp0
+
+[Link]
+RequiredForOnline=no
+
+[Network]
+KeepConfiguration=yes
+DHCP=ipv6
+IPv6AcceptRA=yes
+LinkLocalAddressing=ipv6
+
+[DHCPv6]
+PrefixDelegationHint=::/56
+UseDNS=yes
+WithoutRA=solicit
+
+[IPv6AcceptRA]
+UseDNS=yes

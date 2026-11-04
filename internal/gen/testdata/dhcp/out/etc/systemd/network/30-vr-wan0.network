@@ -1,0 +1,27 @@
+# Von vanilla-router erzeugt, nicht von Hand ändern.
+# Änderungen über die Weboberfläche oder /etc/vanilla-router/config.json und `vrctl apply`.
+
+[Match]
+Name=wan0
+
+[Link]
+RequiredForOnline=no
+
+[Network]
+DHCP=yes
+IPv6AcceptRA=yes
+LinkLocalAddressing=ipv6
+
+[DHCPv4]
+UseDNS=yes
+UseDomains=no
+SendHostname=no
+UseHostname=no
+
+[DHCPv6]
+PrefixDelegationHint=::/56
+UseDNS=yes
+WithoutRA=solicit
+
+[IPv6AcceptRA]
+UseDNS=yes

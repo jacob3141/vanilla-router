@@ -1,0 +1,24 @@
+# Von vanilla-router erzeugt, nicht von Hand ändern.
+# Änderungen über die Weboberfläche oder /etc/vanilla-router/config.json und `vrctl apply`.
+plugin pppoe.so
+nic-wan0.7
+ifname ppp0
+user "0029123456785512345678900001@t-online.de"
+noauth
+hide-password
+persist
+maxfail 0
+holdoff 10
+lcp-echo-interval 10
+lcp-echo-failure 6
+defaultroute
+noipdefault
+usepeerdns
++ipv6
+mtu 1492
+mru 1492
+noaccomp
+default-asyncmap
+nodeflate
+nobsdcomp
+novj

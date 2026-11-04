@@ -1,0 +1,8 @@
+#!/bin/sh
+# SPDX-License-Identifier: AGPL-3.0-or-later
+set -e
+locale-gen de_DE.UTF-8
+systemctl enable vr-installer.service
+systemctl mask getty@tty1.service
+# Auf dem Stick sollen keine Netzwerkdienste laufen: der Assistent schaltet die Ports selbst ein.
+systemctl disable systemd-networkd.service systemd-networkd.socket vr-firewall.service vr-dnsmasq.service 2>/dev/null || true

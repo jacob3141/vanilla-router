@@ -1,0 +1,10 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Zusätzlich im Image des Zielsystems (nicht Abhängigkeit des Pakets): Kernel, Bootloader, Sprache.
+linux-generic
+shim-signed
+grub-efi-amd64-signed
+grub-efi-amd64
+locales
+language-pack-de
+keyboard-configuration
+console-setup

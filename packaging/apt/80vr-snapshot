@@ -1,0 +1,3 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Vor jedem Update einen Snapshot anlegen (M5). Ein Fehler hält das Update nicht auf.
+DPkg::Pre-Invoke { "if [ -x /usr/sbin/vrctl ]; then /usr/sbin/vrctl snapshot pre-update || true; fi"; };

@@ -1,0 +1,25 @@
+#!/bin/sh
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Automatische Rücknahme nach einem kaputten Update (M5, internal/snapshot).
+# Der Zustand liegt auf der ESP (FAT), weil GRUB auf btrfs nicht schreiben kann.
+set -e
+ESP_UUID=$(findmnt -no UUID /boot/efi 2>/dev/null || true)
+[ -n "$ESP_UUID" ] || exit 0
+cat <<EOF
+# vanilla-router: Rücknahme nach Update
+search --no-floppy --fs-uuid --set=vresp $ESP_UUID
+if [ -f (\$vresp)/vr/rollback.cfg -a -f (\$vresp)/vr/grubenv ]; then
+	load_env -f (\$vresp)/vr/grubenv vr_pending vr_trial
+	source (\$vresp)/vr/rollback.cfg
+	if [ "\${vr_pending}" = "1" ]; then
+		if [ "\${vr_trial}" = "1" ]; then
+			# Der letzte Start nach dem Update kam nie bei der Gesundheitsprüfung an
+			set default=vr-rollback
+			set timeout=3
+		else
+			set vr_trial=1
+			save_env -f (\$vresp)/vr/grubenv vr_trial
+		fi
+	fi
+fi
+EOF

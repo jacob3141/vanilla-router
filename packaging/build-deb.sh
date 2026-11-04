@@ -25,6 +25,11 @@ install -Dm644 -t "$STAGE/usr/lib/systemd/system" packaging/systemd/*
 install -Dm644 packaging/sysusers.d/vanilla-router.conf "$STAGE/usr/lib/sysusers.d/vanilla-router.conf"
 install -Dm644 packaging/tmpfiles.d/vanilla-router.conf "$STAGE/usr/lib/tmpfiles.d/vanilla-router.conf"
 install -Dm644 LICENSE "$STAGE/usr/share/doc/vanilla-router/copyright"
+install -Dm644 packaging/system.conf.d/vanilla-router.conf "$STAGE/usr/lib/systemd/system.conf.d/vanilla-router.conf"
+# Unter /etc: Konfigurationsdateien des Pakets (conffiles), dürfen angepasst werden
+install -Dm755 packaging/grub.d/42_vanilla_router "$STAGE/etc/grub.d/42_vanilla_router"
+install -Dm644 packaging/default-grub.d/vanilla-router.cfg "$STAGE/etc/default/grub.d/vanilla-router.cfg"
+install -Dm644 packaging/apt/80vr-snapshot "$STAGE/etc/apt/apt.conf.d/80vr-snapshot"
 
 DEPENDS=$(grep -v '^\s*#' image/packages.txt | awk 'NF {print $1}' | paste -sd, - | sed 's/,/, /g')
 mkdir -p "$STAGE/DEBIAN"
@@ -51,6 +56,7 @@ if [ "$1" = configure ]; then
 fi
 EOF
 chmod 755 "$STAGE/DEBIAN/postinst"
+(cd "$STAGE" && find etc -type f | sed 's|^|/|') >"$STAGE/DEBIAN/conffiles"
 
 mkdir -p "$OUT"
 DEB="$OUT/vanilla-router_${VERSION}_amd64.deb"

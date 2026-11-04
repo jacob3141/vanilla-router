@@ -57,6 +57,7 @@ type ProbeResult struct {
 	Port      string
 	DHCP      bool   // DHCP-Angebot erhalten
 	Offer     string // z. B. "192.0.2.10/24 über 192.0.2.1", nur zur Anzeige
+	OfferNet  string // angebotenes Netz, z. B. "192.0.2.0/24" (das Heimnetz muss es meiden)
 	PPPoE     bool   // PPPoE-Zugangsserver gefunden
 	PPPoEVLAN int    // 0 = ohne VLAN, sonst VLAN-ID (Telekom: 7)
 	ACName    string // Name des PPPoE-Zugangsservers

@@ -1,0 +1,15 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Gesundheitsprüfung nach jedem Start (M5). Bestätigt den Start für GRUB oder startet neu, wenn das
+# Heimnetz nach 10 Minuten nicht läuft; dann wählt GRUB den Stand vor dem letzten Update.
+[Unit]
+Description=vanilla-router Gesundheitsprüfung nach dem Start
+After=multi-user.target vr-dnsmasq.service vr-firewall.service systemd-networkd.service
+Wants=multi-user.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/sbin/vrctl health --mark-good --timeout 10m --reboot-on-fail
+TimeoutStartSec=15min
+
+[Install]
+WantedBy=multi-user.target

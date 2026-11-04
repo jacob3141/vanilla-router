@@ -28,7 +28,7 @@ command -v apt-cache >/dev/null || { echo "  apt-cache fehlt, übersprungen"; ex
 export LC_ALL=C # apt übersetzt sonst „Depends:“ (z. B. „Hängt ab von:“) und die Auswertung findet nichts
 . /etc/os-release
 echo "  geprüft gegen: $PRETTY_NAME"
-mapfile -t roots < <(grep -v '^\s*#' image/packages.txt | awk 'NF {print $1}')
+mapfile -t roots < <(cat image/packages*.txt | grep -v '^\s*#' | awk 'NF {print $1}' | sort -u)
 mapfile -t allow < <(grep -v '^\s*#' test/universe-allow.txt | awk 'NF {print $1}')
 
 bad=0

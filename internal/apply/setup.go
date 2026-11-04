@@ -12,7 +12,10 @@ import (
 // Setup passt ein frisch installiertes Ubuntu Server einmalig an (D-12, PLAN.md 3.2). Es werden keine
 // Pakete entfernt, nur Dienste und Dateien eingestellt. Mehrfaches Ausführen ist unschädlich.
 // Liefert die ausgeführten Schritte (für Protokoll und Probelauf).
-func (a *Applier) Setup(dryRun bool) ([]string, error) {
+//
+// offline != "": Das System läuft nicht (Installer). systemctl arbeitet dann mit --root=offline und
+// ohne --now, netplan generate entfällt. a.Root muss in diesem Fall auf dasselbe Ziel zeigen.
+func (a *Applier) Setup(dryRun bool, offline string) ([]string, error) {
 	var steps []string
 	var errs []error
 	step := func(desc string, fn func() error) {
@@ -25,12 +28,24 @@ func (a *Applier) Setup(dryRun bool) ([]string, error) {
 		}
 	}
 	// Dienste, die fehlen dürfen (je nach Ubuntu-Variante), werden ohne Fehler übersprungen.
+	sysctl := func(args []string) []string {
+		if offline == "" {
+			return args
+		}
+		out := []string{"--root=" + offline}
+		for _, a := range args {
+			if a != "--now" {
+				out = append(out, a)
+			}
+		}
+		return out
+	}
 	soft := func(args ...string) func() error {
-		return func() error { a.Run.Run(nil, "systemctl", args...); return nil }
+		return func() error { a.Run.Run(nil, "systemctl", sysctl(args)...); return nil }
 	}
 	hard := func(args ...string) func() error {
 		return func() error {
-			out, err := a.Run.Run(nil, "systemctl", args...)
+			out, err := a.Run.Run(nil, "systemctl", sysctl(args)...)
 			if err != nil {
 				return errors.New(strings.TrimSpace(string(out)))
 			}
@@ -58,7 +73,7 @@ func (a *Applier) Setup(dryRun bool) ([]string, error) {
 				return err
 			}
 		}
-		if len(matches) > 0 {
+		if len(matches) > 0 && offline == "" {
 			a.Run.Run(nil, "netplan", "generate") // entfernt die erzeugten Dateien unter /run
 		}
 		return nil
@@ -74,8 +89,9 @@ func (a *Applier) Setup(dryRun bool) ([]string, error) {
 	step("unnötige Dienste abschalten: snapd, multipathd, iscsid, NetworkManager", soft("disable", "--now",
 		"snapd.socket", "snapd.service", "snapd.seeded.service", "multipathd.socket", "multipathd.service",
 		"iscsid.socket", "open-iscsi.service", "NetworkManager.service"))
-	step("Netzwerkdienste einschalten: systemd-networkd, vr-firewall, vr-dnsmasq", hard("enable",
-		"systemd-networkd.service", "vr-firewall.service", "vr-firewall-reload.timer", "vr-dnsmasq.service"))
+	step("Netzwerkdienste einschalten: systemd-networkd, vr-firewall, vr-dnsmasq, Gesundheitsprüfung", hard("enable",
+		"systemd-networkd.service", "vr-firewall.service", "vr-firewall-reload.timer", "vr-dnsmasq.service",
+		"vr-health.service"))
 	step("SSH ab Werk aus (F-SEC-04)", soft("disable", "--now", "ssh.socket", "ssh.service"))
 	return steps, errors.Join(errs...)
 }

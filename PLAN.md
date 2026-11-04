@@ -1,7 +1,7 @@
 ---
 document: vanilla-router-plan
 title: "vanilla-router: Planpapier"
-version: 0.5
+version: 0.6
 status: entwurf
 license: AGPL-3.0-or-later
 updated: 2026-11-04
@@ -639,6 +639,7 @@ Spalten: ID · Priorität · Anforderung · Status. „Prototyp“ bedeutet: im 
 | D-10 | **Ubuntu LTS** als Basis | Entscheidung des Projektinhabers nach P-10: Ubuntu ist bekannter, hat mehr Anleitungen und bessere Unterstützung neuer Hardware, und der Prototyp läuft schon darauf. Das *universe*-Problem aus D-08 wird gelöst, indem Abhängigkeiten nur aus *main* kommen: `dnsmasq-base` statt `dnsmasq`, keine fail2ban-Pflicht, für snapper entscheidet Q-03 (3.2) [S-15]. | erledigt (2026-11-04) |
 | D-11 | Lizenz **AGPL-3.0-or-later** | Entscheidung des Projektinhabers am 2026-11-04: die neueste AGPL-Fassung (Version 3), mit „oder später“ für künftige Fassungen. Die AGPL verlangt zusätzlich zur GPL, dass Nutzer einer veränderten Fassung, die über das Netz bedient wird, den Quelltext bekommen. Für die Weboberfläche bedeutet das F-UI-07. Text in `LICENSE`, jede Quelldatei bekommt eine SPDX-Zeile (NF-08). | erledigt (2026-11-04) |
 | D-12 | **Ubuntu Server** mit dem Paketumfang von `ubuntu-server`, nichts entfernen, nur per Konfiguration anpassen (3.2) | Wunsch des Projektinhabers (P-10). Ein System, das genau wie ein normales Ubuntu Server aussieht, ist für Helfer und Anleitungen am einfachsten. Pakete zu entfernen bricht die Metapakete und damit Release-Upgrades. Die Kosten (einige hundert MB, ein paar deaktivierte Dienste) sind auf PC-Hardware unerheblich. | erledigt (2026-11-04) |
+| D-13 | **Rücknahme nach Updates ohne snapper**: btrfs-Snapshot vor apt, GRUB-Eintrag aus dem Snapshot, Zustand (`vr_pending`, `vr_trial`) in einer grubenv auf der ESP, Bestätigung durch `vr-health`, Rücknahme wird durch Umbenennen der Subvolumes dauerhaft | snapper liegt in *universe* (D-10), grub-btrfs fehlt in Ubuntu. GRUB kann auf btrfs nicht schreiben, auf FAT schon. Kernel und initrd kommen aus dem Snapshot selbst, passen also immer. Neustart nach Fehler nur bei einem Versuch nach Update, sonst Neustartschleife. | erledigt (Code), Hardware-Test offen |
 
 ---
 
@@ -648,8 +649,8 @@ Spalten: ID · Priorität · Anforderung · Status. „Prototyp“ bedeutet: im 
 |---|---|---|---|
 | Q-01 | Basis-Distribution | Debian stable · Ubuntu LTS | **erledigt: Ubuntu LTS** (D-10, 2026-11-04) |
 | Q-02 | Werkzeug für das Image | mkosi · live-build · debos | mkosi (reproduzierbar, Debian und Ubuntu, systemd-nah) |
-| Q-03 | Rücknahme von Updates | btrfs + snapper + grub-btrfs · A/B-Partitionen · systemd-sysupdate | offen. btrfs-Snapshots passen am besten zu P-01. snapper liegt unter Ubuntu in *universe*, grub-btrfs fehlt ganz [S-15]: entweder kleines eigenes Werkzeug (`btrfs subvolume snapshot` + apt-Hook) oder snapper als begründete Ausnahme. Bootfähigkeit von Snapshots und die automatische Rücknahme sind ungeklärt (3.7), deshalb Spike in M5. |
-| Q-04 | Wer macht IPv6 im LAN (RA, DHCPv6)? | systemd-networkd · dnsmasq | offen |
+| Q-03 | Rücknahme von Updates | btrfs + snapper + grub-btrfs · A/B-Partitionen · systemd-sysupdate | **umgesetzt: eigenes Werkzeug** (btrfs-Snapshot + GRUB-Zustand auf der ESP, D-13), Hardware-Test offen. Frühere Einschätzung: btrfs-Snapshots passen am besten zu P-01. snapper liegt unter Ubuntu in *universe*, grub-btrfs fehlt ganz [S-15]: entweder kleines eigenes Werkzeug (`btrfs subvolume snapshot` + apt-Hook) oder snapper als begründete Ausnahme. Bootfähigkeit von Snapshots und die automatische Rücknahme sind ungeklärt (3.7), deshalb Spike in M5. |
+| Q-04 | Wer macht IPv6 im LAN (RA, DHCPv6)? | systemd-networkd · dnsmasq | **umgesetzt: systemd-networkd** (RA, SLAAC, PD, eine Quelle), dnsmasq nur DHCPv4 + DNS. Bestätigung durch den Projektinhaber offen |
 | Q-05 | Assistent als Textoberfläche auf dem Bildschirm oder als Weboberfläche vom Handy aus? | TUI auf tty1 · Web über einen LAN-Port · beides | TUI zuerst (funktioniert ohne zweites Gerät) |
 | Q-06 | WLAN-Access-Point im Router? | nein (externe APs) · hostapd für unterstützte Karten | nein in Version 1 |
 | Q-07 | Sprache des Projekts (Code, Doku, Oberfläche) | Deutsch · Englisch · beides | offen. Oberfläche zweisprachig, Doku eventuell englisch für mehr Mitwirkende |
@@ -693,6 +694,44 @@ Laborlauf**, er braucht Root-Rechte und die Pakete `golang-go dnsmasq-base pppoe
 | T-M1-06 | PPPoE-Discovery (PADI senden, PADO erkennen), mit und ohne VLAN 7 | ein AF_PACKET-Socket für alles, VLAN-Tag aus `PACKET_AUXDATA` wieder eingefügt (Treiber mit VLAN-Offload), Host-Uniq ordnet Antworten zu | erledigt (Labor offen) |
 | T-M1-07 | Kleine Textoberfläche als Vorführer | `cmd/vr-detect`: `-list` (ohne Rechte), Ablauf mit Eingaben (Nummer = Port von Hand, w = wiederholen, j = trotzdem), `-json` für die spätere `config.json` | erledigt |
 | T-M1-08 | Prüfskript `test/check-main.sh`: Abhängigkeiten auflösen und melden, was nicht aus Ubuntu *main* kommt (NF-09), dazu SPDX-Zeilen (NF-08) | Auflösung wie apt (nur erste Alternative, erster Anbieter virtueller Pakete): 325 Pakete, alle *main*. Gegenprobe: `fail2ban` und eine Datei ohne SPDX schlagen fehl. Unbekannte Pakete zählen als Fehler | erledigt |
+
+### 7.2 Stand M2, M3, M5 (2026-11-04)
+
+Code und Unit-Tests fertig (10 Pakete, alle grün auf Ubuntu 26.04). Erzeugte Firewall- und dnsmasq-Dateien
+für vier Beispielkonfigurationen bestehen `nft -c` und `dnsmasq --test`. Units bestehen `systemd-analyze
+verify`. Das Paket `vanilla-router_*.deb` baut, alle 391 Pakete der Images kommen aus *main*.
+**Noch nirgends eingespielt oder gebootet**, das ist der Hardware-Test (7.3).
+
+| ID | Aufgabe | Ergebnis | Status |
+|---|---|---|---|
+| T-M2-01 | Schema `config.json` (Version 1), strenges Laden, Prüfung mit allen Fehlern auf einmal | `internal/config`, 30 Fehlerfälle getestet | erledigt |
+| T-M2-02 | Generatoren networkd, nftables, dnsmasq, pppd, sysctl, resolved, sshd, unattended-upgrades | `internal/gen`, Golden Files in `testdata/` (NF-04) | erledigt |
+| T-M2-03 | `vrctl apply`: prüfen, sichern, atomar ersetzen, gezielt neu laden, Gesundheitsprüfung, Rücknahme | `internal/apply`, Bestätigung per systemd-run-Timer (überlebt Abbruch der Sitzung) | erledigt |
+| T-M2-04 | `vrctl setup`: Ubuntu Server anpassen (D-12) | resolved-Stub, cloud-init, netplan, snapd, SSH aus | erledigt |
+| T-M2-05 | Paket und Units | `packaging/build-deb.sh`, `vr-dnsmasq` (dnsmasq-base, gehärtet), `vr-firewall` (vor dem Netzwerk), `vr-pppoe` | erledigt |
+| T-M3-01 | Datenträger finden, Stick ausschließen, Partitionen planen | `internal/disk` | erledigt |
+| T-M3-02 | Installation: GPT, btrfs mit @/@log/@snapshots, Image entpacken, fstab, Einstellungen, shim+GRUB (auch Standardpfad), Dienste offline, Benutzer admin | `internal/install`, Prüfung vor dem ersten Schreibzugriff | erledigt (ungetestet auf Hardware) |
+| T-M3-03 | Assistent S1–S10 | `cmd/vr-install`, Telekom-Maske, verdeckte Passworteingabe, `--dry-run`, `--unattended` (F-INST-08) | erledigt |
+| T-M3-04 | Images | `image/target`, `image/stick`, `image/build.sh` (mkosi) | **ungetestet**, siehe `image/README.md` |
+| T-M4-01 | Weboberfläche aus dem Prototyp übernehmen, auf `config.json` umstellen (3.11) | – | offen |
+| T-M5-01 | Snapshot vor jedem apt-Lauf, GRUB-Eintrag „Stand vor dem Update“, Zustand auf der ESP | `internal/snapshot`, `packaging/grub.d`, apt-Hook | erledigt (ungetestet auf Hardware) |
+| T-M5-02 | Gesundheitsprüfung nach dem Start, automatische Rücknahme | `vr-health.service`, `panic=10`, Watchdog. Neustart nur bei einem Versuch nach Update (keine Neustartschleife) | erledigt (ungetestet auf Hardware) |
+
+### 7.3 Testplan für echte Hardware
+
+Reihenfolge so gewählt, dass jeder Schritt nur das Ergebnis des vorigen braucht.
+
+1. **Labor in WSL** (ohne Hardware): `sudo test/lab/netns-lab.sh test` → 5 bestanden.
+2. **Stick bauen**: `image/build.sh` auf einem Ubuntu 26.04 mit mkosi. Fehler der mkosi-Schlüssel beheben.
+3. **Stick booten** (Secure Boot an): Assistent erscheint auf tty1, Probelauf bis S6 abbrechen.
+4. **Erkennung**: alle Kabel ab, Modem-Kabel an einen beliebigen Port → richtiger Port, DHCP erkannt.
+   Mit einem Telekom-Anschluss zusätzlich: PPPoE über VLAN 7 erkannt.
+5. **Installation** auf die interne SSD, Neustart ohne Stick → bootet, `lan0` hat 192.168.42.1, ein Gerät
+   im Heimnetz bekommt Adresse, DNS und Internet, IPv6 falls der Anbieter ein Präfix gibt.
+6. **vrctl apply --confirm 60s** mit einer Portweiterleitung, nicht bestätigen → nach 60 s zurück.
+7. **Rücknahme nach Update**: `vrctl snapshot pre-update`, dann absichtlich `vr-dnsmasq` kaputt machen
+   (z. B. `systemctl mask vr-dnsmasq`), neu starten → vr-health startet neu, GRUB nimmt den Snapshot,
+   danach läuft der alte Stand und bleibt nach einem weiteren Neustart.
 
 ---
 
@@ -798,3 +837,4 @@ Recherche vom 2026-11-04. Foren sind als solche gekennzeichnet und müssen vor e
 | 0.3 | 2026-11-04 | Durchsicht: Widersprüche behoben (Distribution, Zeitdienst, Paketliste), ULA zufällig (F-NET-12), PPPoE-Vorlagen (F-NET-13), Firewall in einer `inet`-Tabelle (D-09), Datenträger und Boot (3.9.4), Wiederherstellung (3.9.5, F-INST-12–14), Code-Übernahme (3.11), Aufgaben für M1 (7.1), VM-Aufbau, Secure Boot (Q-16) |
 | 0.4 | 2026-11-04 | Entscheidungen des Projektinhabers: Ubuntu LTS (D-10, D-08 verworfen, Q-01 erledigt), Lizenz AGPL-3.0-or-later (D-11, Q-11 erledigt), Grundsatz Komfort vor Optimierung (P-10). Paketprüfung auf *main* [S-15]: dnsmasq-base statt dnsmasq, kein fail2ban, snapper offen (Q-03). Neu: F-UI-07, NF-08, NF-09, T-M1-08 |
 | 0.5 | 2026-11-04 | Ubuntu Server mit Paketumfang `ubuntu-server` (D-12, Tabelle in 3.2: resolved, cloud-init, snapd …), chrony statt timesyncd. M1 begonnen: T-M1-02 bis 08 erledigt, T-M1-01 auf Namespace-Labor umgestellt (Lauf steht aus). L-17 (Locale, Prüfungen ohne Daten) |
+| 0.6 | 2026-11-04 | M2 (Konfigurations-Kern), M3 (Installer, Images) und M5 (Snapshots, Rücknahme) im Code fertig, ungetestet auf Hardware (7.2). Q-03 und Q-04 umgesetzt, D-13. Testplan für Hardware (7.3). M4 (Weboberfläche) offen |

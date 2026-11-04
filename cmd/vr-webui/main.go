@@ -372,6 +372,17 @@ func cmdPrepare(args []string) error {
 	} else if !errors.Is(err, os.ErrNotExist) {
 		return err
 	}
+	store := auth.NewStore(*data)
+	setupCode := ""
+	if !store.Configured() {
+		if setupCode, err = store.SetupCode(); err != nil {
+			return err
+		}
+		os.Chown(filepath.Join(*data, "setup-code"), uid, gid)
+	}
+	if err := helper.WriteIssue(helper.IssueFile, ni.fqdn, ni.router.String(), setupCode); err != nil {
+		fmt.Fprintln(os.Stderr, "Hinweis auf der Konsole:", err) // nicht wichtig genug, um den Start zu verhindern
+	}
 	return nil
 }
 

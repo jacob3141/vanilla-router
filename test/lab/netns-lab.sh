@@ -222,7 +222,8 @@ scenario_keine_antwort() {
 	wait_text $n "$PLUG_MSG" 5 || return 1
 	plug plan
 	wait_text $n "antwortet kein Modem" 25 || { kill "$DETECT_PID"; return 1; }
-	echo j >&3
+	# Menü: ↓ auf „Diesen Anschluss trotzdem verwenden“, Enter (P-11: nur Pfeiltasten und Enter)
+	printf '\033[B\n' >&3
 	finish_detect || return 1
 	expect_json $n '"wan": "r2"' '"method": "link"'
 }

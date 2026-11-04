@@ -11,7 +11,6 @@
 package main
 
 import (
-	"bufio"
 	"context"
 	"encoding/json"
 	"flag"
@@ -24,6 +23,7 @@ import (
 	"time"
 
 	"vanilla-router/internal/netdetect"
+	"vanilla-router/internal/tui"
 	"vanilla-router/internal/wandetect"
 	"vanilla-router/internal/wandetect/live"
 )
@@ -63,9 +63,14 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	fmt.Fprintf(out, "Gefunden: %d Netzwerkanschlüsse. Eingabe einer Nummer wählt einen Anschluss von Hand.\n", len(ports))
+	fmt.Fprintf(out, "Gefunden: %d Netzwerkanschlüsse.\n", len(ports))
+	term := tui.IsTerminal(0)
+	if term {
+		defer tui.RawMode(0)()
+	}
+	p := tui.New(os.Stdin, out, !term)
 	res, err := live.Run(ctx, out, ports, live.Options{ProbeTimeout: *probeTimeout, RetryDelay: *retryDelay,
-		ListOpts: lo, Input: lines(os.Stdin)})
+		ListOpts: lo, Menu: p.MenuAsync})
 	if err != nil {
 		fatal("%v", err)
 	}
@@ -76,18 +81,6 @@ func main() {
 		enc.SetIndent("", "  ")
 		enc.Encode(res)
 	}
-}
-
-func lines(r io.Reader) <-chan string {
-	ch := make(chan string)
-	go func() {
-		sc := bufio.NewScanner(r)
-		for sc.Scan() {
-			ch <- sc.Text()
-		}
-		close(ch)
-	}()
-	return ch
 }
 
 // FilterPorts behält nur die genannten Ports und nummeriert neu.

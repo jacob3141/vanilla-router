@@ -11,7 +11,6 @@ import (
 	"io"
 	"net"
 	"net/netip"
-	"strconv"
 	"strings"
 	"time"
 
@@ -25,10 +24,17 @@ type Options struct {
 	ProbeTimeout time.Duration
 	RetryDelay   time.Duration
 	ListOpts     netdetect.Options
-	// Input liefert Eingaben des Nutzers zeilenweise: Nummer = Port von Hand, w = wiederholen,
-	// j = trotzdem verwenden. nil = keine Eingaben.
-	Input <-chan string
+	// Menu zeigt eine Auswahl, während die Erkennung weiterläuft (tui.Prompt.MenuAsync), bedient nur
+	// mit Pfeiltasten und Enter (P-11). nil = keine Eingaben.
+	Menu func(options []string, def int) (<-chan int, func())
 }
+
+// Menüs während der Erkennung.
+const (
+	menuNoAnswer = "no-answer"
+	menuWaiting  = "hint-modem"
+	menuList     = "list"
+)
 
 // Output ist das Ergebnis.
 type Output struct {
@@ -95,13 +101,46 @@ func Run(ctx context.Context, out io.Writer, ports []netdetect.Port, opt Options
 		}
 	}()
 
+	// Höchstens ein Menü ist offen. Jede neue Meldung des Automaten schließt es, weil sich der
+	// Zustand geändert hat (z. B. wurde inzwischen ein Kabel eingesteckt).
+	var menuCh <-chan int
+	var menuCancel func()
+	menuKind, listFrom := "", ""
+	closeMenu := func() {
+		if menuCancel != nil {
+			menuCancel()
+		}
+		menuCh, menuCancel, menuKind = nil, nil, ""
+	}
+	defer closeMenu()
+	openMenu := func(kind string, options []string) {
+		closeMenu()
+		if opt.Menu == nil {
+			return
+		}
+		menuCh, menuCancel = opt.Menu(options, 0)
+		menuKind = kind
+	}
+	listMenu := func() {
+		var opts []string
+		for _, p := range ports {
+			opts = append(opts, p.Label())
+		}
+		fmt.Fprintln(out, "→ Welcher Anschluss ist mit dem Modem verbunden?")
+		openMenu(menuList, append(opts, "Zurück"))
+	}
+
 	exec := func(acts []wandetect.Action) *wandetect.Result {
 		for _, a := range acts {
 			switch a := a.(type) {
 			case wandetect.Say:
+				closeMenu()
 				fmt.Fprintln(out, "→ "+a.Text)
-				if a.ID == "no-answer" {
-					fmt.Fprintln(out, "  Eingabe: w = noch einmal versuchen, j = diesen Anschluss trotzdem verwenden")
+				switch a.ID {
+				case menuNoAnswer:
+					openMenu(menuNoAnswer, []string{"Noch einmal versuchen", "Diesen Anschluss trotzdem verwenden", "Anschluss selbst auswählen"})
+				case menuWaiting:
+					openMenu(menuWaiting, []string{"Weiter warten", "Anschluss selbst auswählen"})
 				}
 			case wandetect.StartProbe:
 				p := byName[a.Port]
@@ -132,12 +171,19 @@ func Run(ctx context.Context, out io.Writer, ports []netdetect.Port, opt Options
 		select {
 		case pr := <-probeDone:
 			acts = m.Handle(wandetect.ProbeDone{Result: pr}, time.Now())
-		case line, ok := <-opt.Input:
+		case choice, ok := <-menuCh:
+			kind := menuKind
+			menuCh, menuCancel, menuKind = nil, nil, ""
 			if !ok {
-				opt.Input = nil
 				break
 			}
-			if ev := parseInput(line, ports); ev != nil {
+			if ev, list := menuEvent(kind, choice, ports); list {
+				listFrom = kind
+				listMenu()
+			} else if kind == menuList && ev == nil && listFrom == menuNoAnswer && m.State() == wandetect.StateNoAnswer {
+				// „Zurück“ aus der Liste: wieder die Auswahl von vorher, sonst stünde man ohne Menü da
+				openMenu(menuNoAnswer, []string{"Noch einmal versuchen", "Diesen Anschluss trotzdem verwenden", "Anschluss selbst auswählen"})
+			} else if ev != nil {
 				acts = m.Handle(ev, time.Now())
 			}
 		default:
@@ -167,18 +213,27 @@ func Run(ctx context.Context, out io.Writer, ports []netdetect.Port, opt Options
 	}
 }
 
-func parseInput(line string, ports []netdetect.Port) wandetect.Event {
-	switch s := strings.ToLower(strings.TrimSpace(line)); s {
-	case "w":
-		return wandetect.UserRetry{}
-	case "j":
-		return wandetect.UserAccept{}
-	default:
-		if n, err := strconv.Atoi(s); err == nil && n >= 1 && n <= len(ports) {
-			return wandetect.UserManual{Port: ports[n-1].Name}
+// menuEvent übersetzt eine Wahl in ein Ereignis für den Automaten. list = true: die Liste der
+// Anschlüsse zeigen. Kein Ereignis und keine Liste: nichts tun (weiter warten, zurück).
+func menuEvent(kind string, choice int, ports []netdetect.Port) (wandetect.Event, bool) {
+	switch kind {
+	case menuNoAnswer:
+		switch choice {
+		case 0:
+			return wandetect.UserRetry{}, false
+		case 1:
+			return wandetect.UserAccept{}, false
+		default:
+			return nil, true
+		}
+	case menuWaiting:
+		return nil, choice == 1
+	case menuList:
+		if choice >= 0 && choice < len(ports) {
+			return wandetect.UserManual{Port: ports[choice].Name}, false
 		}
 	}
-	return nil
+	return nil, false
 }
 
 func runProbe(ctx context.Context, p netdetect.Port, timeout time.Duration) wandetect.ProbeResult {

@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-// vr-install ist der Installations-Assistent auf dem Boot-Stick (PLAN.md 3.9.2, S1–S10).
-// Er startet automatisch auf tty1. Bis zur ausdrücklichen Bestätigung in S6 wird nichts auf die
-// Festplatte geschrieben.
+// vr-install ist der Installations-Assistent auf dem Boot-Stick (PLAN.md 3.9.2). Er startet
+// automatisch auf tty1, wird nur mit Pfeiltasten und Enter bedient und fragt nur nach Physischem
+// (P-11). Bis zur ausdrücklichen Bestätigung in S6 wird nichts auf die Festplatte geschrieben.
 //
 //	vr-install                         Assistent
 //	vr-install --dry-run               Assistent ohne Schreiben (zeigt am Ende den Plan)
@@ -28,11 +28,10 @@ import (
 	"vanilla-router/internal/disk"
 	"vanilla-router/internal/install"
 	"vanilla-router/internal/netdetect"
+	"vanilla-router/internal/stick"
 	"vanilla-router/internal/tui"
 	"vanilla-router/internal/wandetect/live"
 )
-
-const totalSteps = 10
 
 var version = "dev"
 
@@ -50,17 +49,37 @@ func main() {
 		}
 		return
 	}
-	p := tui.New(os.Stdin, os.Stdout, tui.StdinFd())
-	err := assistant(p, *rootfs, *dry, netdetect.Options{IncludeVirtual: *virtual})
-	if errors.Is(err, tui.ErrEOF) {
-		fmt.Println("\nAbgebrochen.")
-		os.Exit(1)
+	term := tui.IsTerminal(0)
+	restore := func() {}
+	if term {
+		restore = tui.RawMode(0)
 	}
+	p := tui.New(os.Stdin, os.Stdout, !term)
+	err := assistant(p, *rootfs, *dry, netdetect.Options{IncludeVirtual: *virtual}, stick.Mounts)
+	if err != nil && !errors.Is(err, tui.ErrEOF) && !errors.Is(err, errAborted) {
+		p.Say("\nDas hat leider nicht geklappt:\n  %v\n", err)
+		var ie *installError
+		if errors.As(err, &ie) {
+			p.Say("Die Installation ist unvollständig. Der Rechner startet so noch nicht als Router.")
+		} else {
+			p.Say("Es wurde nichts verändert.")
+		}
+		p.WaitEnter("Drücken Sie Enter, um von vorn zu beginnen.")
+	}
+	restore()
 	if err != nil {
-		fmt.Printf("\nDas hat leider nicht geklappt:\n  %v\n\nSie können den Rechner neu starten und es noch einmal versuchen.\n", err)
 		os.Exit(1)
 	}
 }
+
+// errAborted: Der Nutzer hat vor dem Löschen abgebrochen.
+var errAborted = errors.New("abgebrochen")
+
+// installError: Fehler nach dem Beginn des Schreibens auf die Festplatte.
+type installError struct{ err error }
+
+func (e *installError) Error() string { return e.err.Error() }
+func (e *installError) Unwrap() error { return e.err }
 
 // UnattendedPlan ist das Format für --unattended.
 type UnattendedPlan struct {
@@ -103,22 +122,37 @@ func runUnattended(path, rootfs string, dry bool) error {
 	return nil
 }
 
-func assistant(p *tui.Prompt, rootfs string, dry bool, lo netdetect.Options) error {
+// assistant ist der Ablauf aus PLAN.md 3.9.2 (Stand 0.8): gefragt wird nur nach Physischem, also
+// welches Kabel ins Modem geht und welche Festplatte gelöscht werden darf (P-11). Bedient wird nur
+// mit Pfeiltasten und Enter. Alles andere stellt man danach in der Weboberfläche ein.
+func assistant(p *tui.Prompt, rootfs string, dry bool, lo netdetect.Options, mounts []string) error {
 	p.Say("\nWillkommen bei vanilla-router %s!\n", version)
-	p.Say("Dieser Assistent macht aus diesem Rechner einen Router. Er fragt nur, was er nicht selbst")
-	p.Say("herausfinden kann. Bis Schritt 6 wird nichts auf die Festplatte geschrieben.")
+	p.Say("Aus diesem Rechner wird jetzt ein Router. Sie müssen nur zwei Dinge tun:")
+	p.Say("  1. das Kabel vom Modem einstecken,")
+	p.Say("  2. bestätigen, auf welche Festplatte installiert wird.")
+	p.Say("Alles Weitere stellen Sie danach bequem im Browser ein.")
 	if !dry {
 		if err := install.CheckRoot(); err != nil {
 			return err
 		}
 	}
 
-	// S1 Sprache
-	p.Heading(1, totalSteps, "Sprache")
-	p.Say("Sprache: Deutsch, Tastatur: deutsch. (Weitere Sprachen folgen, F-UI-05.)")
+	// S1 Sprache: aus dem Stick-Ersteller, sonst eine Frage (Texte vorerst deutsch, F-INST-10)
+	info, ok := stick.Find(mounts)
+	if !ok {
+		p.Heading("Sprache und Region")
+		var labels []string
+		for _, l := range stick.Languages {
+			labels = append(labels, l.Label)
+		}
+		i, err := p.Menu(labels, 0)
+		if err != nil {
+			return err
+		}
+		info = stick.Languages[i].Info()
+	}
 
-	// S2 Hardware
-	p.Heading(2, totalSteps, "Hardware prüfen")
+	// S2 Hardware: nur sichtbar, wenn etwas fehlt (F-INST-18)
 	ports, _, err := netdetect.ListPortsOpts("/sys", lo)
 	if err != nil {
 		return err
@@ -132,17 +166,24 @@ func assistant(p *tui.Prompt, rootfs string, dry bool, lo netdetect.Options) err
 	if dry && len(cands) == 0 {
 		cands = []disk.Disk{{Name: "probelauf", Path: "/dev/probelauf", SizeBytes: 128e9, Model: "Schein-Datenträger (Probelauf)"}}
 	}
-	p.Say("Gefunden: %d Netzwerkanschlüsse, %d passende Datenträger, %s Arbeitsspeicher.", len(ports), len(cands), memText())
+	if dry && os.Geteuid() != 0 && len(ports) < 2 {
+		// Probelauf auf einem Entwicklungsrechner: Schein-Anschlüsse, damit der ganze Ablauf zu sehen ist
+		ports = nil
+		for i := 1; i <= 3; i++ {
+			ports = append(ports, netdetect.Port{Name: fmt.Sprintf("probe%d", i), MAC: fmt.Sprintf("02:00:00:00:00:%02x", i), Number: i})
+		}
+	}
 	if len(ports) < 2 {
-		return fmt.Errorf("Ein Router braucht mindestens zwei Netzwerkanschlüsse, gefunden: %d. Ein USB-Netzwerkadapter hilft", len(ports))
+		return fmt.Errorf("Dieser Rechner hat %d Netzwerkanschluss/-anschlüsse. Ein Router braucht mindestens zwei, "+
+			"zum Beispiel mit einem USB-Netzwerkadapter. Schalten Sie den Rechner aus, schließen Sie einen Adapter an "+
+			"und starten Sie dann wieder vom Stick", len(ports))
 	}
 	if len(cands) == 0 {
-		return fmt.Errorf("Kein Datenträger mit mindestens 16 GB gefunden (der Stick selbst zählt nicht)")
+		return fmt.Errorf("Es gibt keine Festplatte mit mindestens 16 GB (der Stick selbst zählt nicht)")
 	}
-	p.Say("Passt.")
 
-	// S3/S4 Internet-Anschluss
-	p.Heading(3, totalSteps, "Internet-Anschluss erkennen")
+	// S3/S4 Internet-Anschluss: erkennen, nichts eingeben
+	p.Heading("Internet-Anschluss")
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	var det live.Output
@@ -150,7 +191,7 @@ func assistant(p *tui.Prompt, rootfs string, dry bool, lo netdetect.Options) err
 		p.Say("(Probelauf ohne Root-Rechte: Erkennung übersprungen, Anschluss 1 gilt als Internet-Anschluss.)")
 		det = fakeDetect(ports)
 	} else {
-		det, err = live.Run(ctx, p.Out, ports, live.Options{ListOpts: lo, Input: p.Lines})
+		det, err = live.Run(ctx, p.Out, ports, live.Options{ListOpts: lo, Menu: p.MenuAsync})
 		if err != nil {
 			return err
 		}
@@ -165,97 +206,61 @@ func assistant(p *tui.Prompt, rootfs string, dry bool, lo netdetect.Options) err
 	if err != nil {
 		return err
 	}
-	secrets := map[string]string{}
-
-	p.Heading(4, totalSteps, "Zugang zum Internet")
+	info.Apply(cfg)
+	// F-INST-15: Ergebnis vermerken, die Oberfläche fragt dann nach Zugangsdaten (F-UI-08)
 	switch {
 	case det.PPPoE != nil:
-		if err := askPPPoE(p, cfg, secrets, det.PPPoE.VLAN); err != nil {
-			return err
-		}
+		cfg.WAN.Detected = &config.Detected{Method: config.WANPPPoE, VLAN: det.PPPoE.VLAN}
+		p.Say("Die Zugangsdaten aus dem Brief Ihres Anbieters geben Sie nach der Installation im Browser ein.")
 	case det.DHCP != "":
-		p.Say("Keine Zugangsdaten nötig, das Modem vergibt die Adresse automatisch.")
+		cfg.WAN.Detected = &config.Detected{Method: config.WANDHCP}
 		if in.WANNet.IsValid() && in.WANNet.Addr().IsPrivate() {
-			p.Say("Hinweis: Vor diesem Router steht noch ein Router des Anbieters (Netz %s).", det.DHCPNet)
-			p.Say("Das funktioniert. Für Portweiterleitungen muss dort zusätzlich weitergeleitet werden.")
+			p.Say("Vor diesem Router steht noch ein Router des Anbieters. Das funktioniert so.")
 		}
 	default:
-		i, err := p.Choose("Wie kommt dieser Anschluss ins Internet?", []string{
-			"Automatisch (DHCP), das Modem war wohl noch nicht bereit",
-			"Mit Zugangsdaten (PPPoE, z. B. DSL der Telekom)",
-		}, 0)
-		if err != nil {
-			return err
-		}
-		if i == 1 {
-			vlan := 0
-			if ok, err := p.YesNo("Telekom-Anschluss (VLAN 7)?", true); err != nil {
-				return err
-			} else if ok {
-				vlan = 7
-			}
-			if err := askPPPoE(p, cfg, secrets, vlan); err != nil {
-				return err
-			}
-		}
-	}
-
-	// S5 Heimnetz
-	p.Heading(5, totalSteps, "Heimnetz")
-	p.Say("Alle anderen Anschlüsse (%d) sind Ihr Heimnetz. Dort können Sie einen Switch oder", len(det.LAN))
-	p.Say("WLAN-Access-Point anschließen. Adressbereich: %s, Geräte bekommen ihre Adresse automatisch.", cfg.LAN.IPv4)
-
-	// S6 Datenträger
-	p.Heading(6, totalSteps, "Datenträger wählen")
-	var labels []string
-	for _, d := range cands {
-		labels = append(labels, d.Label()+"  "+d.Path)
-	}
-	di, err := p.Choose("Auf welchen Datenträger soll vanilla-router?", labels, 0)
-	if err != nil {
-		return err
-	}
-	target := cands[di]
-	ok, err := p.Confirm(fmt.Sprintf("\nACHTUNG: Alle Daten auf %s werden gelöscht.", target.Label()), "LÖSCHEN")
-	if err != nil {
-		return err
-	}
-	if !ok {
-		return errors.New("Installation auf Wunsch abgebrochen, nichts wurde verändert")
-	}
-
-	// S7 Name und Zeitzone
-	p.Heading(7, totalSteps, "Name und Zeitzone")
-	cfg.System.Hostname, err = p.Ask("Name des Routers im Netz", cfg.System.Hostname, func(s string) error {
-		if !config.ValidHostname(s) {
-			return errors.New("Bitte nur Kleinbuchstaben, Ziffern und Bindestrich")
-		}
-		return nil
-	})
-	if err != nil {
-		return err
-	}
-	p.Say("So heißt Ihr Router im Netz: %s.%s", cfg.System.Hostname, cfg.DNS.Domain)
-	cfg.System.Timezone, err = p.Ask("Zeitzone", cfg.System.Timezone, func(s string) error {
-		if _, err := os.Stat("/usr/share/zoneinfo/" + s); err != nil && !dry {
-			return errors.New("Unbekannte Zeitzone, z. B. Europe/Berlin oder Europe/Vienna")
-		}
-		return nil
-	})
-	if err != nil {
-		return err
+		cfg.WAN.Detected = &config.Detected{Method: config.DetectedNone}
+		p.Say("Wie Ihr Anschluss funktioniert, wählen Sie nach der Installation im Browser.")
 	}
 	if err := cfg.Validate(); err != nil {
 		return err
 	}
 
+	// S6 Festplatte: immer bewusst bestätigen, auch wenn es nur eine gibt
+	p.Heading("Festplatte")
+	target := cands[0]
+	if len(cands) > 1 {
+		p.Say("Auf welche Festplatte soll vanilla-router?")
+		var labels []string
+		for _, d := range cands {
+			labels = append(labels, d.Label())
+		}
+		i, err := p.Menu(labels, 0)
+		if err != nil {
+			return err
+		}
+		target = cands[i]
+	}
+	p.Say("ACHTUNG: Alle Daten auf dieser Festplatte werden gelöscht:\n\n    %s\n", target.Label())
+	i, err := p.Menu([]string{"Nein, abbrechen", "Ja, alles löschen und installieren"}, 0)
+	if err != nil {
+		return err
+	}
+	if i == 0 {
+		p.Say("\nAbgebrochen. Es wurde nichts verändert.")
+		p.WaitEnter("Drücken Sie Enter, um den Rechner auszuschalten.")
+		if !dry {
+			install.ExecRunner{}.Run(nil, nil, "systemctl", "poweroff")
+		}
+		return errAborted
+	}
+
 	// S8 Installation
-	p.Heading(8, totalSteps, "Installation")
+	p.Heading("Installation")
 	code := newSetupCode()
-	plan := install.Plan{Disk: target.Path, Rootfs: rootfs, Config: cfg, Secrets: secrets, SetupCode: code}
+	plan := install.Plan{Disk: target.Path, Rootfs: rootfs, Config: cfg, Secrets: map[string]string{}, SetupCode: code}
 	if dry {
 		b, _ := json.MarshalIndent(UnattendedPlan{Disk: plan.Disk, Config: cfg, SetupCode: code}, "", "  ")
-		p.Say("Probelauf: Es wurde nichts geschrieben. Dieser Plan würde installiert (Geheimnisse ausgelassen):\n%s", b)
+		p.Say("Probelauf: Es wurde nichts geschrieben. Dieser Plan würde installiert:\n%s", b)
 		return nil
 	}
 	start := time.Now()
@@ -263,76 +268,29 @@ func assistant(p *tui.Prompt, rootfs string, dry bool, lo netdetect.Options) err
 		p.Say("  [%s] %s …", bar(n, t), s)
 	}}
 	if err := inst.Install(plan); err != nil {
-		return err
+		return &installError{err}
 	}
 	p.Say("Fertig nach %s.", time.Since(start).Round(time.Second))
 
 	// S9 Zusammenfassung
-	p.Heading(9, totalSteps, "Zusammenfassung")
-	p.Say("Ihr Router ist eingerichtet.\n")
-	p.Say("  Öffnen Sie auf einem Gerät im Heimnetz:  https://%s.%s", cfg.System.Hostname, cfg.DNS.Domain)
-	p.Say("  Einrichtungscode für das erste Anmelden: %s", code)
-	p.Say("\nSchreiben Sie den Code auf. Er gilt nur für die erste Anmeldung.")
+	_, router, _ := cfg.LANPrefix()
+	p.Heading("Geschafft")
+	p.Say("Ihr Router ist installiert. So geht es weiter:\n")
+	p.Say("  1. Verbinden Sie einen Laptop oder ein Handy mit dem Heimnetz,")
+	p.Say("     also mit einem der anderen Anschlüsse oder Ihrem WLAN-Access-Point.")
+	p.Say("  2. Öffnen Sie im Browser:  https://%s.%s", cfg.System.Hostname, cfg.DNS.Domain)
+	p.Say("     (oder https://%s)", router)
+	p.Say("  3. Einrichtungscode für die erste Anmeldung:  %s\n", code)
+	p.Say("Der Router zeigt Adresse und Code nach dem Neustart auch auf diesem Bildschirm an.")
 
 	// S10 Neustart
-	p.Heading(10, totalSteps, "Neustart")
-	p.Ask("Ziehen Sie jetzt den Stick ab und drücken Sie Enter", "", func(string) error { return nil })
+	if err := p.WaitEnter("\nZiehen Sie jetzt den Stick ab und drücken Sie Enter."); err != nil {
+		return err
+	}
 	if out, err := (install.ExecRunner{}).Run(nil, nil, "systemctl", "reboot"); err != nil {
 		return fmt.Errorf("Neustart: %v %s", err, out)
 	}
 	return nil
-}
-
-func askPPPoE(p *tui.Prompt, cfg *config.Config, secrets map[string]string, vlan int) error {
-	telekom := vlan == 7
-	if vlan == 7 {
-		p.Say("Ihr Anschluss braucht Zugangsdaten. Das sieht nach einem Telekom-Anschluss aus (VLAN 7).")
-	} else {
-		p.Say("Ihr Anschluss braucht Zugangsdaten. Sie stehen im Brief Ihres Anbieters.")
-	}
-	var user string
-	if telekom {
-		p.Say("Bitte die Angaben aus dem Telekom-Brief „Ihre persönlichen Zugangsdaten“:")
-		for {
-			ak, err := p.Ask("  Anschlusskennung (12 Ziffern)", "", nil)
-			if err != nil {
-				return err
-			}
-			zn, err := p.Ask("  Zugangsnummer bzw. T-Online-Nummer (12 Ziffern)", "", nil)
-			if err != nil {
-				return err
-			}
-			mb, err := p.Ask("  Mitbenutzernummer", "0001", nil)
-			if err != nil {
-				return err
-			}
-			if user, err = config.TelekomUser(ak, zn, mb); err != nil {
-				p.Say("  %v", err)
-				continue
-			}
-			break
-		}
-	} else {
-		var err error
-		if user, err = p.Ask("Benutzername", "", nil); err != nil {
-			return err
-		}
-	}
-	for {
-		pw, err := p.Password("Passwort bzw. persönliches Kennwort (wird nicht angezeigt)")
-		if err != nil {
-			return err
-		}
-		if pw == "" || strings.ContainsAny(pw, `"\`) {
-			p.Say("  Das Passwort darf nicht leer sein und kein \" oder \\ enthalten.")
-			continue
-		}
-		secrets["pppoe"] = pw
-		break
-	}
-	cfg.WAN.Type = config.WANPPPoE
-	cfg.WAN.PPPoE = &config.PPPoE{User: user, PasswordRef: "pppoe", VLAN: vlan}
-	return cfg.Validate()
 }
 
 // newSetupCode erzeugt einen Code wie „K7PM-Q2XA“ ohne verwechselbare Zeichen (0/O, 1/I/L).

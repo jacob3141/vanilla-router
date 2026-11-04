@@ -1,176 +1,234 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-// Package tui ist eine schlichte zeilenbasierte Textoberfläche für den Installer: funktioniert auf
-// jeder Konsole (tty1, serielle Konsole, SSH), braucht keine Bibliotheken (P-08).
+// Package tui ist die Textoberfläche des Installers. Bedient wird sie nur mit Pfeiltasten und Enter
+// (P-11, F-INST-16): Es gibt keine Texteingabe, deshalb spielt die Tastaturbelegung keine Rolle.
+// Funktioniert auf jeder Konsole (tty1, serielle Konsole), braucht keine Bibliotheken (P-08).
 package tui
 
 import (
 	"bufio"
 	"fmt"
 	"io"
-	"strconv"
 	"strings"
+	"sync"
 	"syscall"
 	"unsafe"
 )
 
-// Prompt fragt den Nutzer. Alle Eingaben kommen über Lines, damit andere Teile (die WAN-Erkennung)
-// dieselbe Eingabe mitlesen können.
+// Key ist ein Tastendruck.
+type Key int
+
+const (
+	KeyOther Key = iota
+	KeyUp
+	KeyDown
+	KeyEnter
+)
+
+// Prompt zeigt Text und Menüs. Alle Tasten kommen über einen Kanal, damit ein Menü neben einer
+// laufenden Erkennung warten kann (MenuAsync).
 type Prompt struct {
-	Out   io.Writer
-	Lines <-chan string
-	Fd    int // Dateideskriptor des Terminals für verdeckte Eingaben, -1 = keiner
+	Out  io.Writer
+	keys chan Key
+	mu   sync.Mutex
+	back []Key // zurückgelegte Tasten (ein abgebrochenes Menü hat eine Taste zu viel gelesen)
+	// Plain: keine Steuerzeichen zum Neuzeichnen (Tests, Protokolle)
+	Plain bool
 }
 
-// New liest zeilenweise von r.
-func New(r io.Reader, out io.Writer, fd int) *Prompt {
-	ch := make(chan string)
-	go func() {
-		sc := bufio.NewScanner(r)
-		for sc.Scan() {
-			ch <- sc.Text()
-		}
-		close(ch)
-	}()
-	return &Prompt{Out: out, Lines: ch, Fd: fd}
-}
-
-// ErrEOF: Eingabe beendet (z. B. Strg+D).
+// ErrEOF: Eingabe beendet.
 var ErrEOF = io.EOF
 
-func (p *Prompt) line() (string, error) {
-	s, ok := <-p.Lines
-	if !ok {
-		return "", ErrEOF
-	}
-	return strings.TrimSpace(s), nil
+// New liest Tasten aus r. Pfeiltasten kommen als Escape-Folgen (ESC [ A, ESC O A).
+func New(r io.Reader, out io.Writer, plain bool) *Prompt {
+	p := &Prompt{Out: out, keys: make(chan Key), Plain: plain}
+	go func() {
+		br := bufio.NewReader(r)
+		for {
+			b, err := br.ReadByte()
+			if err != nil {
+				close(p.keys)
+				return
+			}
+			switch b {
+			case '\r', '\n':
+				p.keys <- KeyEnter
+			case 0x1b:
+				b1, err1 := br.ReadByte()
+				b2, err2 := br.ReadByte()
+				if err1 != nil || err2 != nil || (b1 != '[' && b1 != 'O') {
+					p.keys <- KeyOther
+					continue
+				}
+				switch b2 {
+				case 'A':
+					p.keys <- KeyUp
+				case 'B':
+					p.keys <- KeyDown
+				default:
+					p.keys <- KeyOther
+				}
+			default:
+				p.keys <- KeyOther
+			}
+		}
+	}()
+	return p
 }
 
-// Heading zeigt die Überschrift eines Schritts.
-func (p *Prompt) Heading(n, total int, title string) {
-	fmt.Fprintf(p.Out, "\n━━━ Schritt %d von %d: %s ━━━\n\n", n, total, title)
+// Heading zeigt die Überschrift eines Abschnitts. Laien sehen keine Schrittnummern, weil
+// Schritte ohne Handlung nicht erscheinen (F-INST-18).
+func (p *Prompt) Heading(title string) {
+	fmt.Fprintf(p.Out, "\n━━━ %s ━━━\n\n", title)
 }
 
 // Say zeigt Text.
 func (p *Prompt) Say(format string, args ...any) { fmt.Fprintf(p.Out, format+"\n", args...) }
 
-// Ask fragt mit Vorgabe. Leere Eingabe übernimmt die Vorgabe. valid darf nil sein.
-func (p *Prompt) Ask(q, def string, valid func(string) error) (string, error) {
+// next liefert die nächste Taste. ok = false: Eingabe zu Ende oder done geschlossen.
+func (p *Prompt) next(done <-chan struct{}) (Key, bool) {
+	p.mu.Lock()
+	if len(p.back) > 0 {
+		k := p.back[0]
+		p.back = p.back[1:]
+		p.mu.Unlock()
+		return k, true
+	}
+	p.mu.Unlock()
+	select {
+	case <-done:
+		return 0, false
+	case k, ok := <-p.keys:
+		if !ok {
+			return 0, false
+		}
+		select {
+		case <-done: // gleichzeitig abgebrochen: Taste gehört dem nächsten Leser
+			p.mu.Lock()
+			p.back = append(p.back, k)
+			p.mu.Unlock()
+			return 0, false
+		default:
+			return k, true
+		}
+	}
+}
+
+// WaitEnter wartet auf Enter.
+func (p *Prompt) WaitEnter(text string) error {
+	fmt.Fprintf(p.Out, "%s\n", text)
 	for {
-		if def != "" {
-			fmt.Fprintf(p.Out, "%s [%s]: ", q, def)
-		} else {
-			fmt.Fprintf(p.Out, "%s: ", q)
+		k, ok := p.next(nil)
+		if !ok {
+			return ErrEOF
 		}
-		s, err := p.line()
-		if err != nil {
-			return "", err
+		if k == KeyEnter {
+			return nil
 		}
-		if s == "" {
-			s = def
-		}
-		if valid != nil {
-			if err := valid(s); err != nil {
-				fmt.Fprintf(p.Out, "  %v\n", err)
-				continue
+	}
+}
+
+// Menu zeigt eine Auswahl, die mit ↑ ↓ und Enter bedient wird. def ist die Vorauswahl.
+func (p *Prompt) Menu(options []string, def int) (int, error) {
+	ch, _ := p.MenuAsync(options, def)
+	n, ok := <-ch
+	if !ok {
+		return 0, ErrEOF
+	}
+	return n, nil
+}
+
+// MenuAsync zeigt ein Menü und liefert die Wahl über den Kanal, ohne zu blockieren. cancel beendet
+// das Menü (der Kanal wird dann geschlossen). Es darf immer nur ein Menü offen sein.
+func (p *Prompt) MenuAsync(options []string, def int) (<-chan int, func()) {
+	out := make(chan int, 1)
+	done := make(chan struct{})
+	sel := max(0, min(def, len(options)-1))
+	p.draw(options, sel, false)
+	go func() {
+		defer close(out)
+		for {
+			k, ok := p.next(done)
+			if !ok {
+				return
 			}
-		} else if s == "" {
-			continue
+			{
+				switch k {
+				case KeyUp:
+					if sel > 0 {
+						sel--
+						p.draw(options, sel, true)
+					}
+				case KeyDown:
+					if sel < len(options)-1 {
+						sel++
+						p.draw(options, sel, true)
+					}
+				case KeyEnter:
+					fmt.Fprintf(p.Out, "  → %s\n", options[sel])
+					out <- sel
+					return
+				}
+			}
 		}
-		return s, nil
-	}
+	}()
+	var once sync.Once
+	return out, func() { once.Do(func() { close(done) }) }
 }
 
-// Choose lässt eine von mehreren Möglichkeiten wählen (Nummer ab 1). def ist die Vorgabe (Index).
-func (p *Prompt) Choose(q string, options []string, def int) (int, error) {
-	fmt.Fprintln(p.Out, q)
+func (p *Prompt) draw(options []string, sel int, redraw bool) {
+	var b strings.Builder
+	if redraw && !p.Plain {
+		fmt.Fprintf(&b, "\x1b[%dA", len(options)+1) // zurück an den Anfang des Menüs
+	}
+	if redraw && p.Plain {
+		return // ohne Steuerzeichen nur die Wahl am Ende melden
+	}
 	for i, o := range options {
-		mark := " "
-		if i == def {
-			mark = "*"
+		mark := "   "
+		if i == sel {
+			mark = " ▸ "
 		}
-		fmt.Fprintf(p.Out, "  %s %d) %s\n", mark, i+1, o)
+		if !p.Plain {
+			b.WriteString("\r\x1b[K")
+			if i == sel {
+				b.WriteString("\x1b[7m") // invertiert
+			}
+		}
+		b.WriteString(mark + o)
+		if !p.Plain && i == sel {
+			b.WriteString("\x1b[0m")
+		}
+		b.WriteString("\n")
 	}
-	for {
-		fmt.Fprintf(p.Out, "Auswahl [%d]: ", def+1)
-		s, err := p.line()
-		if err != nil {
-			return 0, err
-		}
-		if s == "" {
-			return def, nil
-		}
-		if n, err := strconv.Atoi(s); err == nil && n >= 1 && n <= len(options) {
-			return n - 1, nil
-		}
-		fmt.Fprintf(p.Out, "  Bitte eine Zahl von 1 bis %d eingeben.\n", len(options))
+	if !p.Plain {
+		b.WriteString("\r\x1b[K")
 	}
+	b.WriteString("  (Pfeiltasten ↑ ↓, Enter)\n")
+	io.WriteString(p.Out, b.String())
 }
 
-// Confirm verlangt für gefährliche Schritte die Eingabe eines bestimmten Worts.
-func (p *Prompt) Confirm(q, word string) (bool, error) {
-	fmt.Fprintf(p.Out, "%s\nZum Bestätigen %q eingeben, sonst Enter: ", q, word)
-	s, err := p.line()
-	if err != nil {
-		return false, err
-	}
-	return strings.EqualFold(s, word), nil
-}
-
-// YesNo fragt ja/nein.
-func (p *Prompt) YesNo(q string, def bool) (bool, error) {
-	d := "J/n"
-	if !def {
-		d = "j/N"
-	}
-	for {
-		fmt.Fprintf(p.Out, "%s [%s]: ", q, d)
-		s, err := p.line()
-		if err != nil {
-			return false, err
-		}
-		switch strings.ToLower(s) {
-		case "":
-			return def, nil
-		case "j", "ja", "y", "yes":
-			return true, nil
-		case "n", "nein", "no":
-			return false, nil
-		}
-	}
-}
-
-// Password liest ohne Anzeige (Echo aus), wenn ein Terminal vorhanden ist.
-func (p *Prompt) Password(q string) (string, error) {
-	fmt.Fprintf(p.Out, "%s: ", q)
-	restore := noEcho(p.Fd)
-	s, err := p.line()
-	restore()
-	fmt.Fprintln(p.Out)
-	return s, err
-}
-
-// noEcho schaltet die Anzeige der Eingabe aus und liefert die Funktion zum Zurücksetzen.
-func noEcho(fd int) func() {
-	if fd < 0 {
-		return func() {}
-	}
+// RawMode schaltet das Terminal auf Tastendrücke ohne Echo um (für Pfeiltasten). Liefert die
+// Funktion zum Zurücksetzen. Ohne Terminal passiert nichts.
+func RawMode(fd int) func() {
 	var t syscall.Termios
 	if _, _, e := syscall.Syscall(syscall.SYS_IOCTL, uintptr(fd), syscall.TCGETS, uintptr(unsafe.Pointer(&t))); e != 0 {
 		return func() {}
 	}
 	old := t
-	t.Lflag &^= syscall.ECHO
-	t.Lflag |= syscall.ECHONL
+	t.Lflag &^= syscall.ICANON | syscall.ECHO
+	t.Cc[syscall.VMIN], t.Cc[syscall.VTIME] = 1, 0
 	syscall.Syscall(syscall.SYS_IOCTL, uintptr(fd), syscall.TCSETS, uintptr(unsafe.Pointer(&t)))
-	return func() { syscall.Syscall(syscall.SYS_IOCTL, uintptr(fd), syscall.TCSETS, uintptr(unsafe.Pointer(&old))) }
+	fmt.Print("\x1b[?25l") // Cursor ausblenden
+	return func() {
+		fmt.Print("\x1b[?25h")
+		syscall.Syscall(syscall.SYS_IOCTL, uintptr(fd), syscall.TCSETS, uintptr(unsafe.Pointer(&old)))
+	}
 }
 
-// StdinFd liefert 0, wenn stdin ein Terminal ist, sonst -1.
-func StdinFd() int {
+// IsTerminal sagt, ob fd ein Terminal ist.
+func IsTerminal(fd int) bool {
 	var t syscall.Termios
-	if _, _, e := syscall.Syscall(syscall.SYS_IOCTL, 0, syscall.TCGETS, uintptr(unsafe.Pointer(&t))); e != 0 {
-		return -1
-	}
-	return 0
+	_, _, e := syscall.Syscall(syscall.SYS_IOCTL, uintptr(fd), syscall.TCGETS, uintptr(unsafe.Pointer(&t)))
+	return e == 0
 }

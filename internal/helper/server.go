@@ -224,4 +224,5 @@ func (s *Server) registerAll() {
 	s.registerSysinfo()
 	s.registerExtras()
 	s.registerSettings()
+	s.registerConsole()
 }

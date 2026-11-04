@@ -4,60 +4,74 @@ package tui
 
 import (
 	"bytes"
-	"errors"
+	"io"
 	"strings"
 	"testing"
+	"time"
 )
 
 func prompt(input string) (*Prompt, *bytes.Buffer) {
 	var out bytes.Buffer
-	return New(strings.NewReader(input), &out, -1), &out
+	return New(strings.NewReader(input), &out, true), &out
 }
 
-func TestAskVorgabeUndPruefung(t *testing.T) {
-	p, out := prompt("\nFALSCH\nrichtig\n")
-	s, err := p.Ask("Name", "router", nil)
-	if err != nil || s != "router" {
-		t.Fatal(s, err)
-	}
-	s, err = p.Ask("Name", "", func(v string) error {
-		if v != strings.ToLower(v) {
-			return errors.New("nur Kleinbuchstaben")
-		}
-		return nil
-	})
-	if err != nil || s != "richtig" || !strings.Contains(out.String(), "nur Kleinbuchstaben") {
-		t.Fatal(s, err, out.String())
-	}
-}
+const (
+	up   = "\x1b[A"
+	down = "\x1b[B"
+)
 
-func TestChoose(t *testing.T) {
-	p, out := prompt("7\n2\n\n")
-	n, err := p.Choose("Welche?", []string{"a", "b"}, 0)
-	if err != nil || n != 1 || !strings.Contains(out.String(), "Bitte eine Zahl von 1 bis 2") {
+func TestMenuPfeiltasten(t *testing.T) {
+	p, out := prompt(down + down + down + up + "\n")
+	n, err := p.Menu([]string{"a", "b", "c"}, 0)
+	if err != nil || n != 1 {
 		t.Fatal(n, err)
 	}
-	if n, _ := p.Choose("Welche?", []string{"a", "b"}, 1); n != 1 {
-		t.Error("Vorgabe")
+	if !strings.Contains(out.String(), "→ b") {
+		t.Error(out.String())
 	}
 }
 
-func TestConfirmUndYesNo(t *testing.T) {
-	p, _ := prompt("ja\nLÖSCHEN\nvielleicht\nn\n")
-	if ok, _ := p.Confirm("Wirklich?", "LÖSCHEN"); ok {
-		t.Error("falsches Wort angenommen")
+func TestMenuVorgabeUndAndereTasten(t *testing.T) {
+	// Buchstaben und unbekannte Folgen werden ignoriert, Enter nimmt die Vorauswahl
+	p, _ := prompt("x\x1b[Cj\n")
+	if n, err := p.Menu([]string{"a", "b"}, 1); err != nil || n != 1 {
+		t.Fatal(n, err)
 	}
-	if ok, _ := p.Confirm("Wirklich?", "LÖSCHEN"); !ok {
-		t.Error("richtiges Wort abgelehnt")
+	// Anwendungsmodus der Pfeiltasten (ESC O A)
+	p, _ = prompt("\x1bOB\r")
+	if n, _ := p.Menu([]string{"a", "b"}, 0); n != 1 {
+		t.Error("ESC O B nicht erkannt")
 	}
-	if ok, _ := p.YesNo("Weiter?", true); ok {
-		t.Error("n nicht erkannt")
+}
+
+func TestMenuAsyncAbbrechen(t *testing.T) {
+	r, w := io.Pipe()
+	var out bytes.Buffer
+	p := New(r, &out, true)
+	ch, cancel := p.MenuAsync([]string{"a", "b"}, 0)
+	cancel()
+	cancel() // zweimal ist harmlos
+	select {
+	case _, ok := <-ch:
+		if ok {
+			t.Error("abgebrochenes Menü lieferte eine Wahl")
+		}
+	case <-time.After(time.Second):
+		t.Fatal("Menü nicht beendet")
+	}
+	// Danach gehören die Tasten dem nächsten Menü
+	go w.Write([]byte(down + "\n"))
+	if n, err := p.Menu([]string{"x", "y"}, 0); err != nil || n != 1 {
+		t.Fatal(n, err)
 	}
 }
 
 func TestEOF(t *testing.T) {
 	p, _ := prompt("")
-	if _, err := p.Ask("x", "", nil); err != ErrEOF {
+	if _, err := p.Menu([]string{"a"}, 0); err != ErrEOF {
+		t.Error(err)
+	}
+	if err := p.WaitEnter("weiter"); err != ErrEOF {
 		t.Error(err)
 	}
 }

@@ -193,6 +193,9 @@ func (s *Server) handleSetup(w http.ResponseWriter, r *http.Request) {
 	}
 	s.cfg.Limiter.Success(ip)
 	s.cfg.Log.Info("auth: password set via setup page", "ip", ip)
+	if err := s.call(r, "console.setup_done", nil, nil); err != nil {
+		s.cfg.Log.Warn("konsole: hinweis nicht aktualisiert", "err", err)
+	}
 	s.setSessionCookie(w, s.cfg.Sessions.Create(ip))
 	writeJSON(w, map[string]any{"ok": true})
 }

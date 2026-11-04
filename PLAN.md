@@ -1,7 +1,7 @@
 ---
 document: vanilla-router-plan
 title: "vanilla-router: Planpapier"
-version: 0.9
+version: 0.10
 status: entwurf
 license: AGPL-3.0-or-later
 updated: 2026-11-04
@@ -617,10 +617,10 @@ Spalten: ID · Priorität · Anforderung · Status. „Prototyp“ bedeutet: im 
 | F-INST-12 | MUSS | Stick erkennt eine vorhandene Installation und bietet Rettungsaktionen an (3.9.5) | offen |
 | F-INST-13 | MUSS | Passwort der Oberfläche vom Stick aus zurücksetzen | offen |
 | F-INST-14 | SOLL | Diagnose-Bericht auf den Stick schreiben (ohne Geheimnisse) | offen |
-| F-INST-15 | MUSS | Anschlussart erkennen (DHCP, PPPoE ohne und mit VLAN, keine Antwort) und in `config.json` vermerken (`wan.detected`), damit die Oberfläche weiß, ob sie nach Zugangsdaten fragen muss | Schema und Oberfläche fertig, Assistent schreibt es noch nicht (T-M4-05) |
-| F-INST-16 | MUSS | Bedienung nur mit Pfeiltasten und Enter, keine Texteingabe (P-11) | offen |
-| F-INST-17 | MUSS | Solange die Oberfläche nicht eingerichtet ist, zeigt der Router nach jedem Start Adresse und Einrichtungscode auf dem Bildschirm (Text und QR) | offen |
-| F-INST-18 | MUSS | Schritte ohne Problem werden nicht angezeigt (S2), im Normalfall nur S3, S6, S10 mit einer Handlung (3.9.2) | offen |
+| F-INST-15 | MUSS | Anschlussart erkennen (DHCP, PPPoE ohne und mit VLAN, keine Antwort) und in `config.json` vermerken (`wan.detected`), damit die Oberfläche weiß, ob sie nach Zugangsdaten fragen muss | erledigt (T-M4-05) |
+| F-INST-16 | MUSS | Bedienung nur mit Pfeiltasten und Enter, keine Texteingabe (P-11) | erledigt (T-M4-05) |
+| F-INST-17 | MUSS | Solange die Oberfläche nicht eingerichtet ist, zeigt der Router nach jedem Start Adresse und Einrichtungscode auf dem Bildschirm (Text und QR) | Text erledigt (T-M4-06), QR offen |
+| F-INST-18 | MUSS | Schritte ohne Problem werden nicht angezeigt (S2), im Normalfall nur S3, S6, S10 mit einer Handlung (3.9.2) | erledigt (T-M4-05) |
 
 ### 4.2 Netzwerk (F-NET)
 
@@ -823,8 +823,8 @@ verify`. Das Paket `vanilla-router_*.deb` baut, alle 391 Pakete der Images komme
 | T-M4-02 | Seite „Über“ mit Lizenz und Quelltext-Link (F-UI-07) | Seitenleiste und Anmeldeseite, `/api/about`, Link per Build-Parameter | erledigt |
 | T-M4-03 | Einstellungen für WAN-Art, PPPoE-Zugangsdaten, Hostname und Heimnetz in der Oberfläche (F-UI-03, F-UI-09). Seit D-15 Voraussetzung für die erste Version | Seite „Internet & Heimnetz“ (`web/static/views/internet.js`), Helper-Aktionen `settings.*`. Netzwerk-Änderungen über die Bestätigung von apply (systemd-Timer: WAN 2 min, Heimnetz 5 min), Prüfung „Internet erreichbar“. Heimnetz-Umzug verschiebt Pool, Reservierungen, DNS-Einträge und Weiterleitungen (`config.MoveLAN`), prüft Überschneidung mit dem WAN-Netz. Neues PPPoE-Passwort unter neuem Verweis, damit eine Rücknahme zum alten passt. apply übernimmt Hostname und Zeitzone (`hostnamectl`, `timedatectl`) und startet die Oberfläche bei neuem Namen, neuer Adresse oder Wechsel DHCP/PPPoE neu. Im Browser gegen die Testinstanz geprüft: Telekom-Maske mit Fehlermeldung, Bestätigen, Ablauf der Frist mit Rücknahme, Heimnetz-Umzug, Name und Zeitzone | erledigt (ungetestet auf Hardware) |
 | T-M4-04 | Einrichtungsschritt „Internetzugang“ nach dem ersten Passwort (F-UI-08), Anbieter-Vorlagen als Datendatei (Q-14) | `wan.detected` in config.json (F-INST-15), nach der Anmeldung automatisch `#/internet?setup=1` mit erkanntem PPPoE/VLAN vorbelegt, „Später“ für einen Tag, Hinweis auf der Übersicht. Anbieter-Vorlagen bisher nur Telekom (fest im Code), Datendatei offen | erledigt bis auf die Datendatei |
-| T-M4-05 | Assistent kürzen (3.9.2): S1 nur ohne `stick.json`, S2 nur bei Problem, S4 ohne Eingabe, S5 und S7 weg, nur Pfeiltasten und Enter (F-INST-15 bis 18) | `cmd/vr-install` | offen |
-| T-M4-06 | Anzeige von Adresse und Einrichtungscode auf tty1 nach jedem Start, bis die Oberfläche eingerichtet ist (F-INST-17) | – | offen |
+| T-M4-05 | Assistent kürzen (3.9.2): S1 nur ohne `stick.json`, S2 nur bei Problem, S4 ohne Eingabe, S5 und S7 weg, nur Pfeiltasten und Enter (F-INST-15 bis 18) | `cmd/vr-install`: `internal/tui` neu (Tasten statt Zeilen, Menüs mit ↑ ↓ Enter, `MenuAsync` neben der laufenden Erkennung), `internal/stick` (liest `vr/stick.json` unter /efi, /boot/efi, /boot; sonst Auswahl Deutsch DE/AT/CH, English), Erkennung mit Menüs statt Buchstaben („noch einmal“, „trotzdem verwenden“, „Anschluss selbst auswählen“), `wan.detected` wird geschrieben, Löschen per Menü mit Vorauswahl „Nein, abbrechen“. Probelauf in WSL geprüft (Abbruch, Bestätigung, Plan). `vr-detect` und Laborskript angepasst | erledigt (Labor und Hardware offen) |
+| T-M4-06 | Anzeige von Adresse und Einrichtungscode auf tty1 nach jedem Start, bis die Oberfläche eingerichtet ist (F-INST-17) | `vr-webui prepare` schreibt `/run/issue.d/50-vanilla-router.issue` (agetty zeigt es vor der Anmeldung), nach dem ersten Passwort ohne Code (`console.setup_done`). QR-Code fehlt noch | erledigt bis auf QR |
 | T-M4-07 | Abbild mit reservierter `vr/stick.json` und signiertem Manifest (3.9.1, 3.12) | `image/build.sh`, Werkzeug zum Signieren | offen |
 | T-M4-08 | Stick-Ersteller für Windows (F-STICK-01 bis 10) | `cmd/vr-stick`, Test auf dem PC des Projektinhabers mit einem leeren Stick, nur nach Freigabe | offen |
 | T-M5-01 | Snapshot vor jedem apt-Lauf, GRUB-Eintrag „Stand vor dem Update“, Zustand auf der ESP | `internal/snapshot`, `packaging/grub.d`, apt-Hook | erledigt (ungetestet auf Hardware) |
@@ -962,3 +962,4 @@ Recherche vom 2026-11-04. Foren sind als solche gekennzeichnet und müssen vor e
 | 0.7 | 2026-11-04 | M4: Weboberfläche übernommen und auf `config.json` umgestellt (T-M4-01, T-M4-02), F-UI-07 erledigt, WAN-Einstellungen in der Oberfläche offen (T-M4-03). L-18 |
 | 0.8 | 2026-11-04 | Ablauf aus Sicht des Nutzers (Abschnitt 1, D-15) und Grundsatz P-11: Stick-Ersteller für Windows (3.12, F-STICK, D-14), Assistent auf Physisches gekürzt (3.9.2, F-INST-04 verworfen, F-INST-15 bis 18), `vr/stick.json`, Zugangsdaten und Einstellungen in der Oberfläche (3.8, F-UI-08/09). M4 erweitert (T-M4-04 bis 08), Q-17 bis Q-19, R-07 bis R-09 |
 | 0.9 | 2026-11-04 | T-M4-03 und T-M4-04 erledigt: Seite „Internet & Heimnetz“, Einrichtungsschritt Internetzugang, `wan.detected`. F-UI-03, F-UI-08, F-UI-09 erledigt (ohne Hardware-Test), Testplan 7.3 ergänzt |
+| 0.10 | 2026-11-05 | T-M4-05 und T-M4-06: Assistent nur mit Pfeiltasten und Enter, ohne Zugangsdaten, Name und Zeitzone; `vr/stick.json`; Adresse und Code auf der Konsole. F-INST-15, 16, 18 erledigt, F-INST-17 ohne QR |

@@ -60,14 +60,16 @@ fehl (L-17).
 
 ## Sprache und Texte
 
-- Oberfläche, Doku und Kommentare derzeit auf Deutsch (Q-07 offen). Texte für Laien ohne Fachbegriffe:
+- **Auf GitHub immer Englisch:** Commit-Nachrichten, Issues, Pull Requests, Releases, Repo-Beschreibung.
+  `README.md` und `SECURITY.md` sind englisch.
+- Oberfläche, übrige Doku und Kommentare derzeit auf Deutsch (Q-07 offen). Texte für Laien ohne Fachbegriffe:
   „Internet-Anschluss“ statt „WAN“, „Heimnetz“ statt „LAN“.
 - Beispiele nur mit Dokumentations-Adressen: IPv4 `192.0.2.0/24`, `198.51.100.0/24`, `203.0.113.0/24`
   (RFC 5737), IPv6 `2001:db8::/32` (RFC 3849), Domain `home.arpa` oder `example.org`.
 
 ## Datenschutz im Repo
 
-Das Projekt wird öffentlich. **Keine** echten MAC-, IP- oder IPv6-Adressen, Hostnamen, Zugangsdaten,
+Das Projekt ist öffentlich (GitHub). **Keine** echten MAC-, IP- oder IPv6-Adressen, Hostnamen, Zugangsdaten,
 Schlüssel, Backups, Audit-Ergebnisse oder Logs aus einem echten Netz ins Repo. Der Prototyp liegt in einem
 privaten Repo; was von dort übernommen wird, wird vorher bereinigt (PLAN.md 3.11).
 

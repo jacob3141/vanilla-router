@@ -3,8 +3,9 @@
 Danke, dass du etwas beitragen willst. Dieses Dokument sagt, wie ein Beitrag aussieht, der ohne viel Hin
 und Her übernommen werden kann.
 
-> **Stand:** Das Projekt ist noch nicht veröffentlicht und nimmt noch keine Beiträge von außen an
-> (PLAN.md, Q-13). Die Regeln unten gelten schon jetzt für alle, die daran arbeiten, auch für KI-Agenten.
+> **Stand:** frühe Vorabversion. Fehlerberichte und Fragen gern als Issue. Größere Änderungen bitte vorher
+> in einem Issue absprechen, damit niemand umsonst arbeitet. Die Regeln unten gelten für alle, auch für
+> KI-Agenten.
 
 ## Bevor du anfängst
 
@@ -48,14 +49,16 @@ einen Laien verständlich und für einen Angreifer schwer ist, nicht das, was am
 
 ## Texte
 
-- Oberfläche, Doku und Kommentare sind derzeit **deutsch** (Q-07 offen).
+- Oberfläche, Doku und Kommentare sind derzeit **deutsch** (Q-07 offen). Ausnahmen: `README.md` und
+  `SECURITY.md` sind **englisch**, ebenso alles auf GitHub (Commit-Nachrichten, Issues, Pull Requests,
+  Releases).
 - Texte für Laien **ohne Fachbegriffe**: „Internet-Anschluss“ statt „WAN“, „Heimnetz“ statt „LAN“.
 - Beispiele nur mit Dokumentations-Adressen: IPv4 `192.0.2.0/24`, `198.51.100.0/24`, `203.0.113.0/24`
   (RFC 5737), IPv6 `2001:db8::/32` (RFC 3849), Domain `home.arpa` oder `example.org`, MACs mit `02:`.
 
 ## Datenschutz im Repo
 
-Das Projekt wird öffentlich. **Nie** ins Repo: echte MAC-, IP- oder IPv6-Adressen, Hostnamen,
+Das Projekt ist öffentlich. **Nie** ins Repo: echte MAC-, IP- oder IPv6-Adressen, Hostnamen,
 Zugangsdaten, Schlüssel, Backups, Audit-Ergebnisse oder Logs aus einem echten Netz. Testpasswörter und
 Testschlüssel gehören nach `dev/` (per `.gitignore` ausgeschlossen).
 
@@ -71,8 +74,8 @@ test/check-all.sh
 - **Kennungen nennen**, wo es passt: im Betreff oder Text (`F-INST-03`, `D-05`), ebenso in Kommentaren und Tests.
 - Ändert ein Commit den Stand einer Aufgabe, aktualisiert er im selben Commit den Status in PLAN.md,
   dazu `version`, `updated` und den Änderungsverlauf unten in PLAN.md.
-- Betreff kurz und auf Deutsch, z. B. `M4: Assistent nur mit Pfeiltasten und Enter`, darunter bei Bedarf
-  eine Liste der Änderungen.
+- Betreff kurz und auf **Englisch**, z. B. `M4: setup assistant with arrow keys and Enter only`, darunter
+  bei Bedarf eine Liste der Änderungen.
 
 ## PLAN.md pflegen
 

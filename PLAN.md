@@ -1,7 +1,7 @@
 ---
 document: vanilla-router-plan
 title: "vanilla-router: Planpapier"
-version: 0.15
+version: 0.17
 status: entwurf
 license: AGPL-3.0-or-later
 updated: 2026-11-05
@@ -761,20 +761,20 @@ Spalten: ID · Priorität · Anforderung · Status. „Prototyp“ bedeutet: im 
 | Q-04 | Wer macht IPv6 im LAN (RA, DHCPv6)? | systemd-networkd · dnsmasq | **umgesetzt: systemd-networkd** (RA, SLAAC, PD, eine Quelle), dnsmasq nur DHCPv4 + DNS. Bestätigung durch den Projektinhaber offen |
 | Q-05 | Assistent als Textoberfläche auf dem Bildschirm oder als Weboberfläche vom Handy aus? | TUI auf tty1 · Web über einen LAN-Port · beides | **TUI auf tty1**, seit D-15 nur noch drei Bildschirme ohne Texteingabe. Alles mit Eingaben läuft ohnehin über die Weboberfläche |
 | Q-06 | WLAN-Access-Point im Router? | nein (externe APs) · hostapd für unterstützte Karten | nein in Version 1 |
-| Q-07 | Sprache des Projekts (Code, Doku, Oberfläche) | Deutsch · Englisch · beides | offen. Oberfläche zweisprachig, Doku eventuell englisch für mehr Mitwirkende |
+| Q-07 | Sprache des Projekts (Code, Doku, Oberfläche) | Deutsch · Englisch · beides | offen. Oberfläche zweisprachig, Doku eventuell englisch für mehr Mitwirkende. Festgelegt (2026-11-05): alles auf GitHub (Commits, Issues, Releases) sowie `README.md` und `SECURITY.md` englisch |
 | Q-08 | ARM (Raspberry Pi 5 u. ä.)? | später · nie | später |
 | Q-09 | TLS für die Oberfläche ohne Warnung | selbstsigniert + Anleitung · eigene lokale CA mit Installationshilfe · nur HTTP im LAN | offen |
 | Q-10 | DNS über TLS | dnsmasq kann es nicht, Zusatzdienst (z. B. unbound, stubby) | später |
 | Q-11 | Lizenz | GPL-3.0 · AGPL-3.0 · MIT · Apache-2.0 | **erledigt: AGPL-3.0-or-later** (D-11, 2026-11-04) |
 | Q-12 | Geräte trotz zufälliger MAC wiedererkennen | DHCP-Client-ID, Hostname, Fingerprinting | offen |
-| Q-13 | Name | „vanilla-router“ prüfen (Marken, vorhandene Projekte, Domains) | offen. Auf GitHub gibt es mehrere kleine JavaScript-Routing-Bibliotheken dieses Namens [S-14]. Das ist kein rechtliches Problem, aber Suchende landen dort. Möglich: Name behalten und mit Zusatz („vanilla-router OS“, Kürzel `vr`) eindeutig machen. Markenrecherche (DPMA/EUIPO) vor der Veröffentlichung. |
+| Q-13 | Name | „vanilla-router“ prüfen (Marken, vorhandene Projekte, Domains) | offen. Auf GitHub gibt es mehrere kleine JavaScript-Routing-Bibliotheken dieses Namens [S-14]. Das ist kein rechtliches Problem, aber Suchende landen dort. Möglich: Name behalten und mit Zusatz („vanilla-router OS“, Kürzel `vr`) eindeutig machen. Markenrecherche (DPMA/EUIPO) vor der Veröffentlichung. Stand 2026-11-05 [S-17]: Keine Marke „vanilla router“. Die EU-Marke „VANILLA“ (018129708, Cinnamon B.V.) umfasst in Klasse 42 auch Softwareentwicklung und Netzwerkdienste. Für ein kostenloses Open-Source-Projekt geringes Risiko, vor kommerziellen Angeboten unter dem Namen anwaltlich prüfen. Entscheidung des Projektinhabers: Name bleibt vorerst. |
 | Q-14 | Woher kommen die Anbieterdaten (VLAN-IDs, Format der Zugangsdaten)? | eigene gepflegte Liste im Repo · Community-Beiträge | eigene Liste als Datendatei, Beiträge per Pull Request |
 | Q-15 | DS-Lite mit systemd-networkd: wird die AFTR-Adresse (DHCPv6 Option 64) ausgewertet? | networkd · eigener Helfer, der die Option liest und den Tunnel anlegt | offen, prüfen in der Provider-VM |
 | Q-16 | Secure Boot | shim + GRUB (signiert, Ubuntu-Standard) · systemd-boot (Signierung prüfen) · Secure Boot aus | offen. Muss mit Secure Boot funktionieren, viele Laien-Rechner haben es an. |
 | Q-17 | Code-Signierung des Stick-Erstellers | ohne (SmartScreen warnt „Unbekannter Herausgeber“, Anleitung nötig) · OV/EV-Zertifikat (kostet jährlich) · Signierdienst für Open Source (z. B. SignPath Foundation) | offen. Für Laien ist die Warnung abschreckend, ein Signierdienst für Open Source wäre ideal |
 | Q-18 | Stick-Ersteller auch für macOS und Linux? | nur Windows · später alle drei | Windows zuerst (Wunsch des Projektinhabers), Kern (Download, Prüfung, Schreiben) so bauen, dass nur Fenster und Laufwerkszugriff je System neu sind |
 | Q-19 | Woher kommen die Abbilder, wer signiert? | GitHub Releases · eigener Server · beides | offen. Signierschlüssel offline halten, Manifest getrennt vom Abbild signieren |
-| Q-20 | Meldeweg für Sicherheitslücken (SECURITY.md) | eigene Adresse mit PGP · Meldefunktion der Plattform („private vulnerability reporting“) · beides | offen. Vor der Veröffentlichung festlegen. Tendenz: Meldefunktion der Plattform plus eine Adresse |
+| Q-20 | Meldeweg für Sicherheitslücken (SECURITY.md) | eigene Adresse mit PGP · Meldefunktion der Plattform („private vulnerability reporting“) · beides | erledigt (2026-11-05): Meldefunktion von GitHub („Private vulnerability reporting“), in SECURITY.md verlinkt. Eine eigene Adresse kann später dazukommen |
 
 ---
 
@@ -907,7 +907,7 @@ vanilla-router/
   PLAN.md              dieses Planpapier (führend)
   README.md            Einstieg für Menschen, Wegweiser zur Doku
   CONTRIBUTING.md      Regeln für Code, Tests, Texte, Commits
-  SECURITY.md          Sicherheitslücken melden (Meldeweg: Q-20)
+  SECURITY.md          Sicherheitslücken melden (Meldefunktion von GitHub, Q-20)
   CLAUDE.md            Arbeitsregeln für KI-Agenten
   docs/                architektur.md, entwicklung.md, logo/
   cmd/                 vrctl, vr-webui, vr-install, vr-detect, vr-stick (Windows), vr-sign
@@ -959,6 +959,7 @@ Recherche vom 2026-11-04. Foren sind als solche gekennzeichnet und müssen vor e
 | S-14 | https://github.com/xan105/web-vanilla-router · https://awesome.ecosyste.ms/projects/github.com%2Frayc2045%2Fvanilla-router | Namensgleiche JavaScript-Bibliotheken |
 | S-15 | `apt-cache show` auf dem Prototyp (Ubuntu 26.04, 2026-11-04) | *main*: dnsmasq-base, nftables, ppp, btrfs-progs, kea-dhcp4-server. *universe*: dnsmasq, fail2ban, snapper, mkosi. grub-btrfs: kein Paket |
 | S-16 | https://www.gnu.org/licenses/agpl-3.0.txt | Lizenztext AGPL Version 3 (19. November 2007), liegt als `LICENSE` im Repo |
+| S-17 | https://www.tmdn.org/tmview/ (Suche „vanilla“, Klassen 9/38/42, Ämter DE/EM/WO/AT/CH/BX, 2026-11-05) · https://euipo.europa.eu/eSearch/#details/trademarks/018129708 | Markenrecherche zum Namen (Q-13): 18 Treffer, keine Marke „vanilla router“; „VANILLA“ von Cinnamon B.V. mit Klasse 42 |
 
 ---
 
@@ -975,6 +976,8 @@ Recherche vom 2026-11-04. Foren sind als solche gekennzeichnet und müssen vor e
 | 0.7 | 2026-11-04 | M4: Weboberfläche übernommen und auf `config.json` umgestellt (T-M4-01, T-M4-02), F-UI-07 erledigt, WAN-Einstellungen in der Oberfläche offen (T-M4-03). L-18 |
 | 0.8 | 2026-11-04 | Ablauf aus Sicht des Nutzers (Abschnitt 1, D-15) und Grundsatz P-11: Stick-Ersteller für Windows (3.12, F-STICK, D-14), Assistent auf Physisches gekürzt (3.9.2, F-INST-04 verworfen, F-INST-15 bis 18), `vr/stick.json`, Zugangsdaten und Einstellungen in der Oberfläche (3.8, F-UI-08/09). M4 erweitert (T-M4-04 bis 08), Q-17 bis Q-19, R-07 bis R-09 |
 | 0.9 | 2026-11-04 | T-M4-03 und T-M4-04 erledigt: Seite „Internet & Heimnetz“, Einrichtungsschritt Internetzugang, `wan.detected`. F-UI-03, F-UI-08, F-UI-09 erledigt (ohne Hardware-Test), Testplan 7.3 ergänzt |
+| 0.17 | 2026-11-05 | Auf GitHub englisch (Q-07, Teil): `README.md`, `SECURITY.md` und alle Commit-Nachrichten übersetzt, Verlauf neu geschrieben |
+| 0.16 | 2026-11-05 | Erste Veröffentlichung auf GitHub (`jacob3141/vanilla-router`), Vorabversion 0.0.1. Q-20 erledigt (Meldefunktion von GitHub), Markenrecherche zu Q-13 [S-17], Name bleibt vorerst |
 | 0.15 | 2026-11-05 | Doku für Entwickler: `docs/architektur.md` (Idee, Programme, Datenfluss, Prozesse, Pakete, Dateien, Sicherheitsmodell, Lesereihenfolge, Stand auf Hardware), `docs/entwicklung.md` (Einrichtung, Testen, Ausprobieren ohne Router, Bauen, Stick-Ersteller, häufige Probleme), `CONTRIBUTING.md`, `SECURITY.md`, README als Wegweiser. Werkzeuge: `test/check-all.sh` (alle Prüfungen mit einem Befehl), `test/dev/webui.sh` (Testinstanz ohne Root), `test/stick/test-package.sh` und `preview.sh`. Q-20 neu, Abschnitt 10 auf den echten Stand |
 | 0.14 | 2026-11-05 | Logo als Piktogramm: Kreis (Kugel) über Dreieck (Hörnchen), zwei Farben, ohne Muster. Text-Logo im Assistenten ebenso |
 | 0.13 | 2026-11-05 | Logo schlichter: nur Kugel und Hörnchen in zwei Farben (Vanille, Braun), ohne WLAN-Bezug. Stick-Ersteller und Assistent in diesen Farben |

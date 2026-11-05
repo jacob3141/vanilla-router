@@ -29,7 +29,7 @@ sudo apt install golang-go git
 ```
 
 ```bash
-git clone <Adresse des Repos> vanilla-router && cd vanilla-router
+git clone https://github.com/jacob3141/vanilla-router.git && cd vanilla-router
 ```
 
 ```bash

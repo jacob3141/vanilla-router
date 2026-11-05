@@ -1,41 +1,42 @@
-# Sicherheit
+# Security
 
-vanilla-router steht zwischen dem Internet und einem Heimnetz. Sicherheitslücken nehmen wir deshalb
-besonders ernst.
+vanilla-router sits between the internet and a home network, so we take security issues very seriously.
 
-## Lücken melden
+## Reporting a vulnerability
 
-> **Noch offen:** Der Meldeweg (Adresse, verschlüsselter Kontakt, ggf. „Private vulnerability reporting“
-> der Plattform) wird vor der Veröffentlichung festgelegt (PLAN.md, Q-20). Bis dahin ist das Projekt
-> nicht öffentlich.
+Please **do not open a public issue**. Report it privately through GitHub instead:
+[report a vulnerability](https://github.com/jacob3141/vanilla-router/security/advisories/new)
+(“Security” tab → “Report a vulnerability”). Only the project maintainers can see the report. We will
+reply there, coordinate the fix with you and publish an advisory only afterwards. Reports in English or
+German are welcome.
 
-Bitte melde Lücken nicht als öffentliches Issue. Hilfreich sind:
+Helpful details:
 
-- betroffene Version oder Commit,
-- welcher Teil (Weboberfläche, Helper, Firewall, Installer, Stick-Ersteller …),
-- Schritte zum Nachstellen und was ein Angreifer damit erreichen kann.
+- affected version or commit,
+- which part (web interface, helper, firewall, installer, stick creator …),
+- steps to reproduce and what an attacker could achieve.
 
-## Was als Sicherheitslücke gilt
+## What counts as a vulnerability
 
-- Zugriff auf den Router oder das Heimnetz **aus dem Internet**, den die Konfiguration nicht erlaubt
-  (Firewall, IPv4 wie IPv6).
-- Zugriff auf die Weboberfläche **ohne gültige Anmeldung**, Umgehung von CSRF-Schutz, Login-Bremse oder
-  Sitzungsablauf.
-- Ein Weg vom Webserver (Benutzer `vr-webui`) zu **root**, z. B. über eine Helper-Aktion, die ihre
-  Parameter nicht ausreichend prüft.
-- Der Dateidienst gibt Dateien außerhalb der Freigabe preis.
-- Der Stick-Ersteller schreibt ein Abbild **ohne gültige Signatur** oder auf einen anderen Datenträger
-  als einen ausgewählten USB-Stick.
-- Geheimnisse (PPPoE-Passwort, Passwort-Hash) werden lesbar für Unbefugte oder landen in einem Export.
+- Access to the router or the home network **from the internet** that the configuration does not allow
+  (firewall, IPv4 and IPv6).
+- Access to the web interface **without a valid login**, or bypassing CSRF protection, login rate
+  limiting or session expiry.
+- A path from the web server (user `vr-webui`) to **root**, for example through a helper action that does
+  not validate its parameters sufficiently.
+- The file service exposes files outside the share.
+- The stick creator writes an image **without a valid signature**, or writes to a disk other than a
+  selected USB stick.
+- Secrets (PPPoE password, password hash) become readable by unauthorized users or end up in an export.
 
-Kein Sicherheitsproblem ist, was jemand mit dem Passwort der Oberfläche oder mit Root-Zugang am Router
-tun kann: Das ist der Zweck dieser Zugänge.
+Not a security issue: anything someone can do with the web interface password or with root access to the
+router. That is what those credentials are for.
 
-## Wie das Projekt geschützt ist
+## How the project is protected
 
-Das Sicherheitsmodell mit allen Grenzen steht in
-[docs/architektur.md, Abschnitt 12](docs/architektur.md#12-sicherheitsmodell). Kurz: Firewall vor dem
-Netzwerk und für IPv4 und IPv6 in einer Tabelle, Webserver ohne root mit gehärteter systemd-Unit,
-privilegierte Aktionen nur über einen Helper mit fester Aktionsliste, keine Fremdbibliotheken,
-Pakete nur aus Ubuntu *main* mit automatischen Sicherheitsupdates, Snapshot und automatische Rücknahme
-nach Updates.
+The security model with all its boundaries is described in
+[docs/architektur.md, section 12](docs/architektur.md#12-sicherheitsmodell) (German). In short: a
+firewall in front of the network covering IPv4 and IPv6 in one table, a web server that never runs as
+root and has a hardened systemd unit, privileged actions only through a helper with a fixed list of
+actions, no third-party libraries, packages only from Ubuntu *main* with automatic security updates, and
+snapshots with automatic rollback after updates.

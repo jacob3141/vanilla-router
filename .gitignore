@@ -24,3 +24,6 @@ test/lab/work/
 *.swp
 .DS_Store
 Thumbs.db
+
+# Erzeugte Windows-Ressource (go generate ./cmd/vr-stick)
+cmd/vr-stick/*.syso

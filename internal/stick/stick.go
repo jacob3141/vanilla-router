@@ -63,6 +63,25 @@ func Parse(b []byte) (Info, error) {
 	return in, nil
 }
 
+// Encode erzeugt den Inhalt der reservierten Datei: JSON, mit Leerzeichen auf Size aufgefüllt.
+func (in Info) Encode() ([]byte, error) {
+	b, err := json.Marshal(in)
+	if err != nil {
+		return nil, err
+	}
+	b = append(b, '\n')
+	if len(b) > Size {
+		return nil, errors.New("stick.json zu groß")
+	}
+	return append(b, bytes.Repeat([]byte{' '}, Size-len(b))...), nil
+}
+
+// Blank meldet, ob b eine leere Reservierung ist (nur Leerzeichen, Größe Size). Der Stick-Ersteller
+// überschreibt nur eine solche Stelle im Abbild.
+func Blank(b []byte) bool {
+	return len(b) == Size && len(bytes.Trim(b, " ")) == 0
+}
+
 // Apply übernimmt die Vorgaben in die Konfiguration. Ungültige Werte werden einzeln verworfen,
 // damit eine kaputte Angabe nie die Installation verhindert.
 func (in Info) Apply(c *config.Config) {

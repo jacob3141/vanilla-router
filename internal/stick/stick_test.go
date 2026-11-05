@@ -45,6 +45,24 @@ func TestLeereReservierung(t *testing.T) {
 	}
 }
 
+func TestEncodeRundlauf(t *testing.T) {
+	in := Info{Schema: 1, Locale: "de_CH.UTF-8", Keymap: "ch", Timezone: "Europe/Zurich"}
+	b, err := in.Encode()
+	if err != nil || len(b) != Size || Blank(b) {
+		t.Fatalf("%d %v", len(b), err)
+	}
+	got, err := Parse(b)
+	if err != nil || got != in {
+		t.Fatalf("%+v %v", got, err)
+	}
+	if !Blank([]byte(strings.Repeat(" ", Size))) || Blank([]byte(strings.Repeat(" ", Size-1))) {
+		t.Error("Blank")
+	}
+	if _, err := (Info{Schema: 1, Locale: strings.Repeat("x", Size)}).Encode(); err == nil {
+		t.Error("zu groß muss scheitern")
+	}
+}
+
 func TestUngueltigeWerteVerworfen(t *testing.T) {
 	c := defaultConfig(t)
 	Info{Schema: 1, Locale: "de_DE.UTF-8; rm -rf /", Timezone: "../../etc/passwd", Keymap: "us"}.Apply(c)

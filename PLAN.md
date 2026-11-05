@@ -1,7 +1,7 @@
 ---
 document: vanilla-router-plan
 title: "vanilla-router: Planpapier"
-version: 0.11
+version: 0.12
 status: entwurf
 license: AGPL-3.0-or-later
 updated: 2026-11-05
@@ -705,7 +705,7 @@ Spalten: ID · Priorität · Anforderung · Status. „Prototyp“ bedeutet: im 
 | F-STICK-02 | MUSS | Keine Fragen außer der Auswahl des Sticks und der Bestätigung vor dem Löschen | erledigt (T-M4-08) |
 | F-STICK-03 | MUSS | Nur USB-Wechseldatenträger anzeigen, nie das Systemlaufwerk; Datenträger über 256 GB nur nach zusätzlicher Bestätigung | erledigt, dazu der Datenträger, von dem das Programm läuft (T-M4-08) |
 | F-STICK-04 | MUSS | Abbild herunterladen und vor dem Schreiben gegen ein signiertes Manifest prüfen (Ed25519, SHA-256) | erledigt (T-M4-08), Download-Adresse und Schlüssel offen (Q-19) |
-| F-STICK-05 | MUSS | Volumes sperren und aushängen, Abbild roh schreiben, danach zurücklesen und prüfen | erledigt (T-M4-08), mit echtem Stick ungetestet |
+| F-STICK-05 | MUSS | Volumes sperren und aushängen, Abbild roh schreiben, danach zurücklesen und prüfen | erledigt (T-M4-08), mit echtem Stick geprüft (Test-Abbild, 2026-11-05) |
 | F-STICK-06 | MUSS | Klare Meldungen bei Fehlern (Stick zu klein, schreibgeschützt, abgezogen, Download abgebrochen), Abbruch jederzeit | erledigt (T-M4-08) |
 | F-STICK-07 | SOLL | Sprache, Tastaturbelegung und Zeitzone aus Windows in `vr/stick.json` eintragen | erledigt (T-M4-08) |
 | F-STICK-08 | SOLL | Abbild zwischenspeichern, neueres Abbild erkennen; alternativ lokale Abbild-Datei wählen (offline) | erledigt (T-M4-08) |
@@ -831,7 +831,7 @@ verify`. Das Paket `vanilla-router_*.deb` baut, alle 391 Pakete der Images komme
 | T-M4-05 | Assistent kürzen (3.9.2): S1 nur ohne `stick.json`, S2 nur bei Problem, S4 ohne Eingabe, S5 und S7 weg, nur Pfeiltasten und Enter (F-INST-15 bis 18) | `cmd/vr-install`: `internal/tui` neu (Tasten statt Zeilen, Menüs mit ↑ ↓ Enter, `MenuAsync` neben der laufenden Erkennung), `internal/stick` (liest `vr/stick.json` unter /efi, /boot/efi, /boot; sonst Auswahl Deutsch DE/AT/CH, English), Erkennung mit Menüs statt Buchstaben („noch einmal“, „trotzdem verwenden“, „Anschluss selbst auswählen“), `wan.detected` wird geschrieben, Löschen per Menü mit Vorauswahl „Nein, abbrechen“. Probelauf in WSL geprüft (Abbruch, Bestätigung, Plan). `vr-detect` und Laborskript angepasst | erledigt (Labor und Hardware offen) |
 | T-M4-06 | Anzeige von Adresse und Einrichtungscode auf tty1 nach jedem Start, bis die Oberfläche eingerichtet ist (F-INST-17) | `vr-webui prepare` schreibt `/run/issue.d/50-vanilla-router.issue` (agetty zeigt es vor der Anmeldung), nach dem ersten Passwort ohne Code (`console.setup_done`). QR-Code fehlt noch | erledigt bis auf QR |
 | T-M4-07 | Abbild mit reservierter `vr/stick.json` und signiertem Manifest (3.9.1, 3.12) | `image/build.sh`, Werkzeug zum Signieren | Werkzeug `cmd/vr-sign` erledigt (keygen, manifest mit Suche der Reservierung, verify), Abbild offen |
-| T-M4-08 | Stick-Ersteller für Windows (F-STICK-01 bis 10) | `cmd/vr-stick`: Fenster mit Win32 über `syscall` (Liste, Knöpfe, Fortschritt, Dateiauswahl), Manifest als Ressource über `internal/winres` (eigene .syso, kein fremdes Werkzeug), `packaging/build-stick-exe.sh`. `internal/windisk` (nur USB-Bus, Systemlaufwerk, Programm- und Zwischenspeicher-Laufwerk ausgeschlossen, Volumes sperren und aushängen, NO_BUFFERING), `internal/stickwrite` (Prüfen vor dem Schreiben, Partitionstabelle zuletzt, `stick.json` eintragen, Zurücklesen), `internal/manifest`, `internal/windefaults` (CLDR `windowsZones`). Download mit Fortsetzen, Zwischenspeicher, Offline-Rückfall. Tests unter Linux und Windows, Fenster als Vorschau geprüft. Schreiben auf einen echten Stick nur nach Freigabe | erledigt bis auf den Test mit echtem Stick |
+| T-M4-08 | Stick-Ersteller für Windows (F-STICK-01 bis 10) | `cmd/vr-stick`: Fenster mit Win32 über `syscall` (Liste, Knöpfe, Fortschritt, Dateiauswahl), Manifest als Ressource über `internal/winres` (eigene .syso, kein fremdes Werkzeug), `packaging/build-stick-exe.sh`. `internal/windisk` (nur USB-Bus, Systemlaufwerk, Programm- und Zwischenspeicher-Laufwerk ausgeschlossen, Volumes sperren und aushängen, NO_BUFFERING), `internal/stickwrite` (Prüfen vor dem Schreiben, Partitionstabelle zuletzt, `stick.json` eintragen, Zurücklesen), `internal/manifest`, `internal/windefaults` (CLDR `windowsZones`). Download mit Fortsetzen, Zwischenspeicher, Offline-Rückfall. Tests unter Linux und Windows, Fenster als Vorschau geprüft. Mit echtem Stick und signiertem Test-Abbild geprüft (2026-11-05). Seit 0.12 im Stil des Logos: Kopf mit Logo, eigene Knöpfe und eigener Fortschrittsbalken, Logo als Programm-Icon | erledigt |
 | T-M5-01 | Snapshot vor jedem apt-Lauf, GRUB-Eintrag „Stand vor dem Update“, Zustand auf der ESP | `internal/snapshot`, `packaging/grub.d`, apt-Hook | erledigt (ungetestet auf Hardware) |
 | T-M5-02 | Gesundheitsprüfung nach dem Start, automatische Rücknahme | `vr-health.service`, `panic=10`, Watchdog. Neustart nur bei einem Versuch nach Update (keine Neustartschleife) | erledigt (ungetestet auf Hardware) |
 
@@ -967,5 +967,6 @@ Recherche vom 2026-11-04. Foren sind als solche gekennzeichnet und müssen vor e
 | 0.7 | 2026-11-04 | M4: Weboberfläche übernommen und auf `config.json` umgestellt (T-M4-01, T-M4-02), F-UI-07 erledigt, WAN-Einstellungen in der Oberfläche offen (T-M4-03). L-18 |
 | 0.8 | 2026-11-04 | Ablauf aus Sicht des Nutzers (Abschnitt 1, D-15) und Grundsatz P-11: Stick-Ersteller für Windows (3.12, F-STICK, D-14), Assistent auf Physisches gekürzt (3.9.2, F-INST-04 verworfen, F-INST-15 bis 18), `vr/stick.json`, Zugangsdaten und Einstellungen in der Oberfläche (3.8, F-UI-08/09). M4 erweitert (T-M4-04 bis 08), Q-17 bis Q-19, R-07 bis R-09 |
 | 0.9 | 2026-11-04 | T-M4-03 und T-M4-04 erledigt: Seite „Internet & Heimnetz“, Einrichtungsschritt Internetzugang, `wan.detected`. F-UI-03, F-UI-08, F-UI-09 erledigt (ohne Hardware-Test), Testplan 7.3 ergänzt |
+| 0.12 | 2026-11-05 | Projektlogo (Vanilleeis, die Vanilleschote als Antenne): `internal/logo` erzeugt SVG, PNG und Icon ohne fremde Werkzeuge (`docs/logo/`, Favicon der Oberfläche). Stick-Ersteller im Stil des Logos und mit Icon (`internal/winres` kann jetzt mehrere Ressourcen), Assistent mit Text-Logo und farbigen Überschriften. T-M4-08 mit echtem Stick geprüft |
 | 0.11 | 2026-11-05 | T-M4-08: Stick-Ersteller für Windows (`cmd/vr-stick`), F-STICK-01 bis 10 erledigt, Test mit echtem Stick offen. `vr-sign` für signierte Manifeste (Teil von T-M4-07) |
 | 0.10 | 2026-11-05 | T-M4-05 und T-M4-06: Assistent nur mit Pfeiltasten und Enter, ohne Zugangsdaten, Name und Zeitzone; `vr/stick.json`; Adresse und Code auf der Konsole. F-INST-15, 16, 18 erledigt, F-INST-17 ohne QR |

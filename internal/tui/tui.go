@@ -79,7 +79,60 @@ func New(r io.Reader, out io.Writer, plain bool) *Prompt {
 // Heading zeigt die Überschrift eines Abschnitts. Laien sehen keine Schrittnummern, weil
 // Schritte ohne Handlung nicht erscheinen (F-INST-18).
 func (p *Prompt) Heading(title string) {
-	fmt.Fprintf(p.Out, "\n━━━ %s ━━━\n\n", title)
+	if p.Plain {
+		fmt.Fprintf(p.Out, "\n━━━ %s ━━━\n\n", title)
+		return
+	}
+	fmt.Fprintf(p.Out, "\n%s━━━%s %s%s%s %s━━━%s\n\n", brown, reset, bold, title, reset, brown, reset)
+}
+
+// Farben der Konsole im Stil des Logos (internal/logo). Die Linux-Konsole kennt nur 16 Farben, Farbe 3
+// ist dort braun.
+const (
+	brown = "\x1b[33m"
+	cream = "\x1b[1;37m"
+	bold  = "\x1b[1m"
+	reset = "\x1b[0m"
+)
+
+// banner ist das Logo als Textbild: Eiskugel, Hörnchen und die Vanilleschote als Antenne.
+var banner = [][2]string{
+	{cream, `      _.---._  `}, {brown, `/ ))`},
+	{cream, `     ( .  .  )`}, {brown, `/`},
+	{cream, `    (_ . __ ._)`}, {"", ""},
+	{brown, `     \/\/\/\/ `}, {"", ""},
+	{brown, `      \/\/\/  `}, {"", ""},
+	{brown, `       \/\/   `}, {"", ""},
+	{brown, `        \/    `}, {"", ""},
+}
+
+// Banner zeigt das Logo mit Titel und Untertitel daneben.
+func (p *Prompt) Banner(title, sub string) {
+	var b strings.Builder
+	b.WriteString("\n")
+	for i := 0; i < len(banner); i += 2 {
+		row := banner[i : i+2]
+		text := map[int]string{1: title, 2: sub}[i/2]
+		if text == "" && row[1][1] == "" { // keine Leerzeichen am Zeilenende
+			row = [][2]string{{row[0][0], strings.TrimRight(row[0][1], " ")}}
+		}
+		for _, part := range row {
+			if !p.Plain && part[0] != "" {
+				b.WriteString(part[0] + part[1] + reset)
+			} else {
+				b.WriteString(part[1])
+			}
+		}
+		if text != "" {
+			if !p.Plain && i/2 == 1 {
+				text = bold + text + reset
+			}
+			b.WriteString("   " + text)
+		}
+		b.WriteString("\n")
+	}
+	b.WriteString("\n")
+	io.WriteString(p.Out, b.String())
 }
 
 // Say zeigt Text.

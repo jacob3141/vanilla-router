@@ -6,12 +6,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"image/color"
 	"os"
 	"path/filepath"
 	"runtime"
 	"syscall"
 	"unsafe"
 
+	"vanilla-router/internal/logo"
 	"vanilla-router/internal/windefaults"
 	"vanilla-router/internal/windisk"
 )
@@ -36,21 +38,49 @@ const (
 	stRunning
 )
 
+// Farben im Stil des Logos (internal/logo). Texte und Knöpfe erfüllen den Kontrast 4,5:1.
+var (
+	colBody      = hex(0xFFFDF8) // warmes Weiß
+	colHeader    = logo.Cream
+	colLine      = hex(0xEBD3A8)
+	colText      = logo.Outline
+	colSub       = hex(0x8A5626)
+	colPrimary   = hex(0x9C5F27)
+	colPressed   = hex(0x7F4C1E)
+	colDisabled  = hex(0xEFE4D3)
+	colDisText   = hex(0x9C8B74)
+	colSecBorder = hex(0xD9BF98)
+	colTrack     = hex(0xF3E6CC)
+	colBar       = logo.Caramel
+	colWhite     = hex(0xFFFFFF)
+)
+
+const (
+	W, H    = 560, 500 // Fenstergröße bei 96 DPI
+	pad     = 20
+	headerH = 92
+	barY    = 432
+)
+
 type app struct {
-	hwnd                                     uintptr
-	heading, intro, label, list, status, bar uintptr
-	btnCreate, btnClose, btnFile, footer     uintptr
-	dpi                                      int
-	disks                                    []windisk.Disk
-	st                                       state
-	j                                        *job
-	target                                   windisk.Disk
-	src                                      *source
-	local                                    *image
-	stickJSON                                []byte
-	quitWhenDone                             bool
-	prefix                                   string // Hinweis vor dem Fortschritt (offline)
-	shown                                    string // zuletzt angezeigter Fortschrittstext
+	hwnd                                 uintptr
+	intro, label, list, status           uintptr
+	btnCreate, btnClose, btnFile, footer uintptr
+	font, bold, title                    uintptr
+	bodyBrush                            uintptr
+	icon                                 uintptr // Logo in Kopfgröße (0: ohne Ressource, z. B. in Tests)
+	progress                             int     // 0…1000
+	dpi                                  int
+	disks                                []windisk.Disk
+	st                                   state
+	j                                    *job
+	target                               windisk.Disk
+	src                                  *source
+	local                                *image
+	stickJSON                            []byte
+	quitWhenDone                         bool
+	prefix                               string // Hinweis vor dem Fortschritt (offline)
+	shown                                string // zuletzt angezeigter Fortschrittstext
 }
 
 var theApp *app
@@ -86,6 +116,14 @@ func main() {
 		if int32(r) <= 0 {
 			break
 		}
+		// Enter auf einem anderen Knopf als „Stick erstellen“ löst diesen Knopf aus (selbst gezeichnete
+		// Knöpfe sind für IsDialogMessage keine Standardknöpfe, Enter hieße sonst immer IDOK).
+		if m.Message == wmKeyDown && m.WParam == vkReturn {
+			if f, _, _ := pGetFocus.Call(); f == a.btnClose || f == a.btnFile {
+				send(f, bmClick, 0, 0)
+				continue
+			}
+		}
 		if r, _, _ := pIsDialogMessageW.Call(a.hwnd, uintptr(unsafe.Pointer(&m))); r == 0 {
 			pTranslateMessage.Call(uintptr(unsafe.Pointer(&m)))
 			pDispatchMessageW.Call(uintptr(unsafe.Pointer(&m)))
@@ -98,16 +136,6 @@ func (a *app) s(v int) int32 { return int32(v * a.dpi / 96) }
 func (a *app) create() error {
 	inst, _, _ := pGetModuleHandleW.Call(0)
 	cursor, _, _ := pLoadCursorW.Call(0, idcArrow)
-	icon, _, _ := pLoadIconW.Call(0, idiApplication)
-	bg, _, _ := pGetSysColorBrush.Call(colorWindow)
-	cls := u16("vanilla-router-stick")
-	wc := wndClassEx{WndProc: syscall.NewCallback(wndProc), Instance: inst, Icon: icon, IconSm: icon,
-		Cursor: cursor, Background: bg, ClassName: cls}
-	wc.Size = uint32(unsafe.Sizeof(wc))
-	if r, _, err := pRegisterClassExW.Call(uintptr(unsafe.Pointer(&wc))); r == 0 {
-		return fmt.Errorf("RegisterClassEx: %v", err)
-	}
-
 	dc, _, _ := pGetDC.Call(0)
 	dpi, _, _ := pGetDeviceCaps.Call(dc, logPixelsY)
 	pReleaseDC.Call(0, dc)
@@ -116,7 +144,27 @@ func (a *app) create() error {
 		a.dpi = 96
 	}
 
-	const W, H = 560, 452
+	// Logo aus der Ressource (Icon-Gruppe 1, internal/winres/mkres), sonst das Standard-Symbol.
+	loadIcon := func(n int32) uintptr {
+		h, _, _ := pLoadImageW.Call(inst, 1, imageIcon, uintptr(n), uintptr(n), 0)
+		return h
+	}
+	small, _, _ := pGetSystemMetrics.Call(smCxSmIcon)
+	icon, iconSm := loadIcon(a.s(32)), loadIcon(int32(small))
+	a.icon = loadIcon(a.s(64))
+	if icon == 0 {
+		icon, _, _ = pLoadIconW.Call(0, idiApplication)
+		iconSm = icon
+	}
+	a.bodyBrush = brush(colBody)
+	cls := u16("vanilla-router-stick")
+	wc := wndClassEx{WndProc: syscall.NewCallback(wndProc), Instance: inst, Icon: icon, IconSm: iconSm,
+		Cursor: cursor, Background: a.bodyBrush, ClassName: cls}
+	wc.Size = uint32(unsafe.Sizeof(wc))
+	if r, _, err := pRegisterClassExW.Call(uintptr(unsafe.Pointer(&wc))); r == 0 {
+		return fmt.Errorf("RegisterClassEx: %v", err)
+	}
+
 	style := uintptr(wsOverlapped | wsCaption | wsSysMenu | wsMinimizeBox)
 	rc := rect{0, 0, a.s(W), a.s(H)}
 	pAdjustWindowRectEx.Call(uintptr(unsafe.Pointer(&rc)), style, 0, 0)
@@ -134,30 +182,34 @@ func (a *app) create() error {
 	var ncm nonClientMetrics
 	ncm.Size = uint32(unsafe.Sizeof(ncm))
 	pSystemParametersInfoW.Call(spiGetNonClient, uintptr(ncm.Size), uintptr(unsafe.Pointer(&ncm)), 0)
-	font, _, _ := pCreateFontIndirectW.Call(uintptr(unsafe.Pointer(&ncm.MessageFont)))
-	big := ncm.MessageFont
-	big.Height = big.Height * 3 / 2
-	big.Weight = 600
-	bigFont, _, _ := pCreateFontIndirectW.Call(uintptr(unsafe.Pointer(&big)))
+	mkFont := func(lf logFont) uintptr {
+		f, _, _ := pCreateFontIndirectW.Call(uintptr(unsafe.Pointer(&lf)))
+		return f
+	}
+	a.font = mkFont(ncm.MessageFont)
+	b := ncm.MessageFont
+	b.Weight = 600
+	a.bold = mkFont(b)
+	t := ncm.MessageFont
+	t.Height = t.Height * 17 / 10
+	t.Weight = 700
+	a.title = mkFont(t)
 
-	const pad = 20
 	ctl := func(class, text string, style uintptr, ex uintptr, id, x, y, w, h int, f uintptr) uintptr {
 		c, _, _ := pCreateWindowExW.Call(ex, uintptr(unsafe.Pointer(u16(class))), uintptr(unsafe.Pointer(u16(text))),
 			wsChild|wsVisible|style, uintptr(a.s(x)), uintptr(a.s(y)), uintptr(a.s(w)), uintptr(a.s(h)), hwnd, uintptr(id), inst, 0)
 		send(c, wmSetFont, f, 1)
 		return c
 	}
-	a.heading = ctl("STATIC", tr("heading"), ssLeft|ssNoPrefix, 0, 0, pad, 16, W-2*pad, 34, bigFont)
-	a.intro = ctl("STATIC", tr("intro"), ssLeft|ssNoPrefix, 0, 0, pad, 56, W-2*pad, 40, font)
-	a.label = ctl("STATIC", tr("sticks"), ssLeft|ssNoPrefix, 0, 0, pad, 104, W-2*pad, 20, font)
-	a.list = ctl("LISTBOX", "", wsTabStop|wsVScroll|lbsNotify|lbsNoIntegral, wsExClientEdge, idList, pad, 126, W-2*pad, 96, font)
-	a.btnFile = ctl("BUTTON", tr("btn_file"), wsTabStop|bsPushButton, 0, idFile, pad, 230, 220, 28, font)
-	a.status = ctl("STATIC", tr("ready"), ssLeft|ssNoPrefix, 0, 0, pad, 272, W-2*pad, 104, font)
-	a.bar = ctl("msctls_progress32", "", 0, 0, 0, pad, 380, W-2*pad, 18, font)
-	send(a.bar, pbmSetRange32, 0, 1000)
-	a.footer = ctl("STATIC", "Version "+version, ssLeft|ssNoPrefix, 0, 0, pad, 418, 200, 20, font)
-	a.btnCreate = ctl("BUTTON", tr("btn_create"), wsTabStop|bsDefPushButton, 0, idCreate, W-pad-120-10-150, 410, 150, 30, font)
-	a.btnClose = ctl("BUTTON", tr("btn_close"), wsTabStop|bsPushButton, 0, idClose, W-pad-120, 410, 120, 30, font)
+	// Kopf (Logo, Name, Überschrift) und Fortschrittsbalken zeichnet paint().
+	a.intro = ctl("STATIC", tr("intro"), ssLeft|ssNoPrefix, 0, 0, pad, headerH+16, W-2*pad, 40, a.font)
+	a.label = ctl("STATIC", tr("sticks"), ssLeft|ssNoPrefix, 0, 0, pad, headerH+62, W-2*pad, 38, a.bold)
+	a.list = ctl("LISTBOX", "", wsTabStop|wsVScroll|lbsNotify|lbsNoIntegral, wsExClientEdge, idList, pad, headerH+102, W-2*pad, 88, a.font)
+	a.btnFile = ctl("BUTTON", tr("btn_file"), wsTabStop|bsOwnerDraw, 0, idFile, pad, headerH+200, 230, 30, a.font)
+	a.status = ctl("STATIC", tr("ready"), ssLeft|ssNoPrefix, 0, 0, pad, headerH+242, W-2*pad, 94, a.font)
+	a.footer = ctl("STATIC", "Version "+version, ssLeft|ssNoPrefix, 0, 0, pad, H-36, 200, 20, a.font)
+	a.btnCreate = ctl("BUTTON", tr("btn_create"), wsTabStop|bsOwnerDraw, 0, idCreate, W-pad-120-10-160, H-44, 160, 32, a.bold)
+	a.btnClose = ctl("BUTTON", tr("btn_close"), wsTabStop|bsOwnerDraw, 0, idClose, W-pad-120, H-44, 120, 32, a.font)
 
 	a.refreshDisks()
 	pShowWindow.Call(hwnd, swShow)
@@ -195,8 +247,14 @@ func wndProc(hwnd, m, w, l uintptr) uintptr {
 		return 1
 	case wmCtlColorStatic, wmCtlColorBtn:
 		pSetBkMode.Call(w, transparent)
-		bg, _, _ := pGetSysColorBrush.Call(colorWindow)
-		return bg
+		pSetTextColor.Call(w, rgb(colText))
+		return a.bodyBrush
+	case wmPaint:
+		a.paint()
+		return 0
+	case wmDrawItem:
+		a.drawButton(*(**drawItemStruct)(unsafe.Pointer(&l))) // lParam zeigt auf DRAWITEMSTRUCT
+		return 1
 	case wmClose:
 		if a.st != stIdle {
 			if messageBox(hwnd, tr("confirm_cancel"), tr("title"), mbYesNo|mbIconWarning|mbDefButton2) == idYes && a.j != nil {
@@ -213,6 +271,84 @@ func wndProc(hwnd, m, w, l uintptr) uintptr {
 	}
 	r, _, _ := pDefWindowProcW.Call(hwnd, m, w, l)
 	return r
+}
+
+func (a *app) barRect() rect {
+	return rect{a.s(pad), a.s(barY), a.s(W - pad), a.s(barY + 8)}
+}
+
+// setProgress setzt den Fortschritt (0…1000) und zeichnet nur den Balken neu.
+func (a *app) setProgress(v int) {
+	if v == a.progress {
+		return
+	}
+	a.progress = v
+	r := a.barRect()
+	pInvalidateRect.Call(a.hwnd, uintptr(unsafe.Pointer(&r)), 0)
+}
+
+// paint zeichnet den Kopf mit Logo und den Fortschrittsbalken.
+func (a *app) paint() {
+	var ps paintStruct
+	dc, _, _ := pBeginPaint.Call(a.hwnd, uintptr(unsafe.Pointer(&ps)))
+	defer pEndPaint.Call(a.hwnd, uintptr(unsafe.Pointer(&ps)))
+	hb := brush(colHeader)
+	fillRect(dc, rect{0, 0, a.s(W), a.s(headerH)}, hb)
+	pDeleteObject.Call(hb)
+	lb := brush(colLine)
+	fillRect(dc, rect{0, a.s(headerH) - a.s(2), a.s(W), a.s(headerH)}, lb)
+	pDeleteObject.Call(lb)
+	x := pad
+	if a.icon != 0 {
+		pDrawIconEx.Call(dc, uintptr(a.s(pad-4)), uintptr(a.s(12)), a.icon, uintptr(a.s(64)), uintptr(a.s(64)), 0, 0, diNormal)
+		x = pad + 72
+	}
+	drawText(dc, "vanilla-router", rect{a.s(x), a.s(16), a.s(W - pad), a.s(52)}, a.title, colText, dtSingleLine|dtVCenter)
+	drawText(dc, tr("heading"), rect{a.s(x), a.s(52), a.s(W - pad), a.s(76)}, a.font, colSub, dtSingleLine|dtVCenter|dtEndEllipsis)
+
+	r := a.barRect()
+	fillRect(dc, r, a.bodyBrush)
+	radius := r.Bottom - r.Top
+	roundRect(dc, r, radius, colTrack, color.NRGBA{})
+	if a.progress > 0 {
+		f := r
+		f.Right = f.Left + (r.Right-r.Left)*int32(a.progress)/1000
+		if f.Right-f.Left < radius {
+			f.Right = f.Left + radius
+		}
+		roundRect(dc, f, radius, colBar, color.NRGBA{})
+	}
+}
+
+// drawButton zeichnet die Knöpfe: „Stick erstellen“ gefüllt in Vanilleschoten-Braun, die anderen hell
+// mit Rand.
+func (a *app) drawButton(d *drawItemStruct) {
+	dc, r := d.Hdc, d.Rect
+	fillRect(dc, r, a.bodyBrush)
+	primary := d.CtlID == idCreate
+	pressed := d.ItemState&odsSelected != 0
+	disabled := d.ItemState&odsDisabled != 0
+	fill, border, text, font := colWhite, colSecBorder, colText, a.font
+	switch {
+	case disabled:
+		fill, border, text = colDisabled, color.NRGBA{}, colDisText
+	case primary && pressed:
+		fill, border, text = colPressed, color.NRGBA{}, colWhite
+	case primary:
+		fill, border, text = colPrimary, color.NRGBA{}, colWhite
+	case pressed:
+		fill = colHeader
+	}
+	if primary {
+		font = a.bold
+	}
+	roundRect(dc, r, a.s(10), fill, border)
+	drawText(dc, windowText(d.Item), r, font, text, dtCenter|dtVCenter|dtSingleLine)
+	if d.ItemState&odsFocus != 0 && d.ItemState&odsNoFocusRect == 0 && !disabled {
+		f := rect{r.Left + a.s(4), r.Top + a.s(4), r.Right - a.s(4), r.Bottom - a.s(4)}
+		pSetTextColor.Call(dc, rgb(text))
+		pDrawFocusRect.Call(dc, uintptr(unsafe.Pointer(&f)))
+	}
 }
 
 func (a *app) command(id, code int) {
@@ -324,7 +460,7 @@ func (a *app) start() {
 	a.prefix, a.shown = "", ""
 	a.st = stPreparing
 	a.updateButtons()
-	send(a.bar, pbmSetPos, 0, 0)
+	a.setProgress(0)
 	setText(a.status, tr("ph_manifest"))
 	ctx, cancel := context.WithCancel(context.Background())
 	a.j = &job{cancel: cancel}
@@ -358,7 +494,7 @@ func (a *app) poll() {
 			a.fail(s, s.wrote)
 			return
 		}
-		send(a.bar, pbmSetPos, 1000, 0)
+		a.setProgress(1000)
 		setText(a.status, tr("done"))
 		pMessageBeep.Call(mbIconInfo)
 		pSetTimer.Call(a.hwnd, timerDevices, 1500, 0)
@@ -367,7 +503,7 @@ func (a *app) poll() {
 
 func (a *app) fail(s jobState, wrote bool) {
 	a.updateButtons()
-	send(a.bar, pbmSetPos, 0, 0)
+	a.setProgress(0)
 	txt := errText(s.err, a.local != nil, wrote)
 	setText(a.status, txt)
 	icon := uint32(mbIconError)
@@ -444,9 +580,9 @@ func (a *app) show(s jobState) {
 		setText(a.status, txt)
 		a.shown = txt
 	}
-	pos := uintptr(0)
+	pos := 0
 	if s.total > 0 {
-		pos = uintptr(s.done * 1000 / s.total)
+		pos = int(s.done * 1000 / s.total)
 	}
-	send(a.bar, pbmSetPos, pos, 0)
+	a.setProgress(pos)
 }

@@ -3,6 +3,7 @@
 package main
 
 import (
+	"image/color"
 	"syscall"
 	"unicode/utf16"
 	"unsafe"
@@ -45,13 +46,30 @@ var (
 	pGetSysColorBrush       = user32.NewProc("GetSysColorBrush")
 	pAdjustWindowRectEx     = user32.NewProc("AdjustWindowRectEx")
 	pSetFocus               = user32.NewProc("SetFocus")
+	pBeginPaint             = user32.NewProc("BeginPaint")
+	pEndPaint               = user32.NewProc("EndPaint")
+	pFillRect               = user32.NewProc("FillRect")
+	pDrawTextW              = user32.NewProc("DrawTextW")
+	pInvalidateRect         = user32.NewProc("InvalidateRect")
+	pLoadImageW             = user32.NewProc("LoadImageW")
+	pDrawIconEx             = user32.NewProc("DrawIconEx")
+	pGetWindowTextW         = user32.NewProc("GetWindowTextW")
+	pGetFocus               = user32.NewProc("GetFocus")
+	pDrawFocusRect          = user32.NewProc("DrawFocusRect")
 	pGetModuleHandleW       = kernel32.NewProc("GetModuleHandleW")
+	pCreateSolidBrush       = gdi32.NewProc("CreateSolidBrush")
+	pCreatePen              = gdi32.NewProc("CreatePen")
+	pSelectObject           = gdi32.NewProc("SelectObject")
+	pRoundRect              = gdi32.NewProc("RoundRect")
+	pSetTextColor           = gdi32.NewProc("SetTextColor")
+	pGetStockObject         = gdi32.NewProc("GetStockObject")
 	pGetUserDefaultLocale   = kernel32.NewProc("GetUserDefaultLocaleName")
 	pGetUserDefaultUILang   = kernel32.NewProc("GetUserDefaultUILanguage")
 	pGetDynamicTimeZoneInfo = kernel32.NewProc("GetDynamicTimeZoneInformation")
 	pCreateFontIndirectW    = gdi32.NewProc("CreateFontIndirectW")
 	pGetDeviceCaps          = gdi32.NewProc("GetDeviceCaps")
 	pSetBkMode              = gdi32.NewProc("SetBkMode")
+	pDeleteObject           = gdi32.NewProc("DeleteObject")
 	pInitCommonControlsEx   = comctl32.NewProc("InitCommonControlsEx")
 	pGetOpenFileNameW       = comdlg32.NewProc("GetOpenFileNameW")
 	pCoInitializeEx         = ole32.NewProc("CoInitializeEx")
@@ -76,9 +94,16 @@ const (
 	ssNoPrefix      = 0x80
 	swShow          = 5
 
+	bsOwnerDraw = 0xB
+
 	wmDestroy        = 0x0002
+	wmPaint          = 0x000F
 	wmClose          = 0x0010
 	wmSetFont        = 0x0030
+	wmDrawItem       = 0x002B
+	wmKeyDown        = 0x0100
+	bmClick          = 0x00F5
+	vkReturn         = 0x0D
 	wmCommand        = 0x0111
 	wmTimer          = 0x0113
 	wmCtlColorBtn    = 0x0135
@@ -120,7 +145,90 @@ const (
 	dbtDevNodesChange = 0x0007
 	dbtArrival        = 0x8000
 	dbtRemoveComplete = 0x8004
+	smCxSmIcon        = 49
+	imageIcon         = 1
+	diNormal          = 3
+	nullPen           = 8
+	psSolid           = 0
+	dtCenter          = 0x1
+	dtVCenter         = 0x4
+	dtSingleLine      = 0x20
+	dtNoPrefix        = 0x800
+	dtEndEllipsis     = 0x8000
+	odsSelected       = 0x1
+	odsDisabled       = 0x4
+	odsFocus          = 0x10
+	odsNoFocusRect    = 0x200
 )
+
+type paintStruct struct {
+	Hdc       uintptr
+	Erase     int32
+	Paint     rect
+	Restore   int32
+	IncUpdate int32
+	Reserved  [32]byte
+}
+
+type drawItemStruct struct {
+	CtlType, CtlID, ItemID, ItemAction, ItemState uint32
+	Item, Hdc                                     uintptr
+	Rect                                          rect
+	ItemData                                      uintptr
+}
+
+// rgb macht aus einer Farbe ein COLORREF (0x00BBGGRR).
+func rgb(c color.NRGBA) uintptr { return uintptr(c.R) | uintptr(c.G)<<8 | uintptr(c.B)<<16 }
+
+func hex(v uint32) color.NRGBA { return color.NRGBA{uint8(v >> 16), uint8(v >> 8), uint8(v), 0xFF} }
+
+func brush(c color.NRGBA) uintptr {
+	b, _, _ := pCreateSolidBrush.Call(rgb(c))
+	return b
+}
+
+func fillRect(dc uintptr, r rect, br uintptr) { pFillRect.Call(dc, uintptr(unsafe.Pointer(&r)), br) }
+
+// roundRect füllt ein Rechteck mit runden Ecken, mit Rand in border (border.A == 0: ohne Rand).
+func roundRect(dc uintptr, r rect, radius int32, fill, border color.NRGBA) {
+	br := brush(fill)
+	var pen uintptr
+	if border.A != 0 {
+		pen, _, _ = pCreatePen.Call(psSolid, 1, rgb(border))
+	} else {
+		pen, _, _ = pGetStockObject.Call(nullPen)
+	}
+	oldB, _, _ := pSelectObject.Call(dc, br)
+	oldP, _, _ := pSelectObject.Call(dc, pen)
+	right, bottom := r.Right, r.Bottom
+	if border.A == 0 { // ohne Stift zeichnet RoundRect ein Pixel kleiner
+		right, bottom = right+1, bottom+1
+	}
+	pRoundRect.Call(dc, uintptr(r.Left), uintptr(r.Top), uintptr(right), uintptr(bottom), uintptr(radius), uintptr(radius))
+	pSelectObject.Call(dc, oldB)
+	pSelectObject.Call(dc, oldP)
+	pDeleteObject.Call(br)
+	if border.A != 0 {
+		pDeleteObject.Call(pen)
+	}
+}
+
+func drawText(dc uintptr, s string, r rect, font uintptr, c color.NRGBA, flags uintptr) {
+	old, _, _ := pSelectObject.Call(dc, font)
+	pSetTextColor.Call(dc, rgb(c))
+	pSetBkMode.Call(dc, transparent)
+	u := utf16.Encode([]rune(s))
+	if len(u) > 0 {
+		pDrawTextW.Call(dc, uintptr(unsafe.Pointer(&u[0])), uintptr(len(u)), uintptr(unsafe.Pointer(&r)), flags|dtNoPrefix)
+	}
+	pSelectObject.Call(dc, old)
+}
+
+func windowText(h uintptr) string {
+	buf := make([]uint16, 256)
+	pGetWindowTextW.Call(h, uintptr(unsafe.Pointer(&buf[0])), uintptr(len(buf)))
+	return syscall.UTF16ToString(buf)
+}
 
 type wndClassEx struct {
 	Size       uint32

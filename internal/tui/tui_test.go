@@ -66,6 +66,34 @@ func TestMenuAsyncAbbrechen(t *testing.T) {
 	}
 }
 
+func TestBanner(t *testing.T) {
+	p, out := prompt("")
+	p.Banner("vanilla-router 1.0", "Willkommen!")
+	want := "\n" +
+		"      _.---._  / ))\n" +
+		"     ( .  .  )/   vanilla-router 1.0\n" +
+		"    (_ . __ ._)   Willkommen!\n" +
+		"     \\/\\/\\/\\/\n" +
+		"      \\/\\/\\/\n" +
+		"       \\/\\/\n" +
+		"        \\/\n\n"
+	if out.String() != want {
+		t.Errorf("\n%s", out.String())
+	}
+	// Mit Farben: gleicher Text, sobald die Steuerfolgen entfernt sind
+	var col bytes.Buffer
+	c := New(strings.NewReader(""), &col, false)
+	c.Banner("vanilla-router 1.0", "Willkommen!")
+	c.Heading("Festplatte")
+	plain := col.String()
+	for _, s := range []string{brown, cream, bold, reset} {
+		plain = strings.ReplaceAll(plain, s, "")
+	}
+	if !strings.HasPrefix(plain, want) || !strings.Contains(plain, "━━━ Festplatte ━━━") || !strings.Contains(col.String(), brown) {
+		t.Errorf("%q", col.String())
+	}
+}
+
 func TestEOF(t *testing.T) {
 	p, _ := prompt("")
 	if _, err := p.Menu([]string{"a"}, 0); err != ErrEOF {

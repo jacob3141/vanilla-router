@@ -126,7 +126,7 @@ func runUnattended(path, rootfs string, dry bool) error {
 // welches Kabel ins Modem geht und welche Festplatte gelöscht werden darf (P-11). Bedient wird nur
 // mit Pfeiltasten und Enter. Alles andere stellt man danach in der Weboberfläche ein.
 func assistant(p *tui.Prompt, rootfs string, dry bool, lo netdetect.Options, mounts []string) error {
-	p.Say("\nWillkommen bei vanilla-router %s!\n", version)
+	p.Banner("vanilla-router "+version, "Willkommen!")
 	p.Say("Aus diesem Rechner wird jetzt ein Router. Sie müssen nur zwei Dinge tun:")
 	p.Say("  1. das Kabel vom Modem einstecken,")
 	p.Say("  2. bestätigen, auf welche Festplatte installiert wird.")

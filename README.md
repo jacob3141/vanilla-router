@@ -1,3 +1,5 @@
+<p align="center"><img src="docs/logo/logo.svg" alt="Logo: Vanilleeis im Hörnchen, die Vanilleschote ragt wie eine Router-Antenne heraus" width="160"></p>
+
 # vanilla-router
 
 **Ein Router aus einem ganz normalen Linux, für jeden Rechner mit zwei Netzwerkanschlüssen, eingerichtet von einem Boot-Stick, der dich Schritt für Schritt führt.**

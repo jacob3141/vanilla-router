@@ -1,7 +1,7 @@
 ---
 document: vanilla-router-plan
 title: "vanilla-router: Planpapier"
-version: 0.14
+version: 0.15
 status: entwurf
 license: AGPL-3.0-or-later
 updated: 2026-11-05
@@ -774,6 +774,7 @@ Spalten: ID · Priorität · Anforderung · Status. „Prototyp“ bedeutet: im 
 | Q-17 | Code-Signierung des Stick-Erstellers | ohne (SmartScreen warnt „Unbekannter Herausgeber“, Anleitung nötig) · OV/EV-Zertifikat (kostet jährlich) · Signierdienst für Open Source (z. B. SignPath Foundation) | offen. Für Laien ist die Warnung abschreckend, ein Signierdienst für Open Source wäre ideal |
 | Q-18 | Stick-Ersteller auch für macOS und Linux? | nur Windows · später alle drei | Windows zuerst (Wunsch des Projektinhabers), Kern (Download, Prüfung, Schreiben) so bauen, dass nur Fenster und Laufwerkszugriff je System neu sind |
 | Q-19 | Woher kommen die Abbilder, wer signiert? | GitHub Releases · eigener Server · beides | offen. Signierschlüssel offline halten, Manifest getrennt vom Abbild signieren |
+| Q-20 | Meldeweg für Sicherheitslücken (SECURITY.md) | eigene Adresse mit PGP · Meldefunktion der Plattform („private vulnerability reporting“) · beides | offen. Vor der Veröffentlichung festlegen. Tendenz: Meldefunktion der Plattform plus eine Adresse |
 
 ---
 
@@ -896,19 +897,26 @@ Reihenfolge so gewählt, dass jeder Schritt nur das Ergebnis des vorigen braucht
 
 ---
 
-## 10. Repo-Struktur (geplant)
+## 10. Repo-Struktur
+
+Stand 0.15. Was wo liegt und wie es zusammenhängt, erklärt [docs/architektur.md](docs/architektur.md),
+wie man damit arbeitet [docs/entwicklung.md](docs/entwicklung.md).
 
 ```
 vanilla-router/
   PLAN.md              dieses Planpapier (führend)
-  CLAUDE.md            Anleitung für KI-Agenten (Konventionen, Arbeitsweise)
-  README.md            Kurzvorstellung für Menschen
-  docs/                Entwurfsdokumente, Anleitungen, Erkenntnisse aus dem Prototyp
-  cmd/                 vr-webui, vrctl, vr-install, vr-detect, vr-stick (Windows)
-  internal/            conf (Schema, Prüfregeln, Generatoren), helper, api, sys, auth, files
-  web/                 Frontend
+  README.md            Einstieg für Menschen, Wegweiser zur Doku
+  CONTRIBUTING.md      Regeln für Code, Tests, Texte, Commits
+  SECURITY.md          Sicherheitslücken melden (Meldeweg: Q-20)
+  CLAUDE.md            Arbeitsregeln für KI-Agenten
+  docs/                architektur.md, entwicklung.md, logo/
+  cmd/                 vrctl, vr-webui, vr-install, vr-detect, vr-stick (Windows), vr-sign
+  internal/            ein Paket je Aufgabe (Überblick: docs/architektur.md, Abschnitt 10)
+  web/                 Frontend (Vanilla-JS, per go:embed eingebettet)
+  packaging/           Paket .deb, systemd-Units, Stick-Ersteller
   image/               mkosi-Konfiguration für Stick und Zielsystem
-  test/                Prüfskripte, Labor aus Namespaces (test/lab), später VM-Tests für den Installer
+  test/                check-all.sh (alle Prüfungen), check-main.sh (NF-08, NF-09), lab/ (Namespace-Labor),
+                       dev/ (Testinstanz der Oberfläche), stick/ (Test-Abbild, Vorschau des Stick-Erstellers)
 ```
 
 ---
@@ -967,6 +975,7 @@ Recherche vom 2026-11-04. Foren sind als solche gekennzeichnet und müssen vor e
 | 0.7 | 2026-11-04 | M4: Weboberfläche übernommen und auf `config.json` umgestellt (T-M4-01, T-M4-02), F-UI-07 erledigt, WAN-Einstellungen in der Oberfläche offen (T-M4-03). L-18 |
 | 0.8 | 2026-11-04 | Ablauf aus Sicht des Nutzers (Abschnitt 1, D-15) und Grundsatz P-11: Stick-Ersteller für Windows (3.12, F-STICK, D-14), Assistent auf Physisches gekürzt (3.9.2, F-INST-04 verworfen, F-INST-15 bis 18), `vr/stick.json`, Zugangsdaten und Einstellungen in der Oberfläche (3.8, F-UI-08/09). M4 erweitert (T-M4-04 bis 08), Q-17 bis Q-19, R-07 bis R-09 |
 | 0.9 | 2026-11-04 | T-M4-03 und T-M4-04 erledigt: Seite „Internet & Heimnetz“, Einrichtungsschritt Internetzugang, `wan.detected`. F-UI-03, F-UI-08, F-UI-09 erledigt (ohne Hardware-Test), Testplan 7.3 ergänzt |
+| 0.15 | 2026-11-05 | Doku für Entwickler: `docs/architektur.md` (Idee, Programme, Datenfluss, Prozesse, Pakete, Dateien, Sicherheitsmodell, Lesereihenfolge, Stand auf Hardware), `docs/entwicklung.md` (Einrichtung, Testen, Ausprobieren ohne Router, Bauen, Stick-Ersteller, häufige Probleme), `CONTRIBUTING.md`, `SECURITY.md`, README als Wegweiser. Werkzeuge: `test/check-all.sh` (alle Prüfungen mit einem Befehl), `test/dev/webui.sh` (Testinstanz ohne Root), `test/stick/test-package.sh` und `preview.sh`. Q-20 neu, Abschnitt 10 auf den echten Stand |
 | 0.14 | 2026-11-05 | Logo als Piktogramm: Kreis (Kugel) über Dreieck (Hörnchen), zwei Farben, ohne Muster. Text-Logo im Assistenten ebenso |
 | 0.13 | 2026-11-05 | Logo schlichter: nur Kugel und Hörnchen in zwei Farben (Vanille, Braun), ohne WLAN-Bezug. Stick-Ersteller und Assistent in diesen Farben |
 | 0.12 | 2026-11-05 | Projektlogo (Vanilleeis, die Vanilleschote als Antenne): `internal/logo` erzeugt SVG, PNG und Icon ohne fremde Werkzeuge (`docs/logo/`, Favicon der Oberfläche). Stick-Ersteller im Stil des Logos und mit Icon (`internal/winres` kann jetzt mehrere Ressourcen), Assistent mit Text-Logo und farbigen Überschriften. T-M4-08 mit echtem Stick geprüft |

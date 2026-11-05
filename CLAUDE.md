@@ -42,12 +42,16 @@ Sicherheit** (P-10).
   - Zeit- und Kalenderlogik immer mit Tests (L-16).
   - Die Testumgebung hat dieselbe systemd-Härtung wie der Betrieb (NF-05).
 
+## Doku für Menschen
+
+[docs/architektur.md](docs/architektur.md) (Aufbau), [docs/entwicklung.md](docs/entwicklung.md)
+(Einrichtung, Testen, Bauen), [CONTRIBUTING.md](CONTRIBUTING.md) (Regeln, ausführlich mit Begründung).
+Wer Programme, Pakete, Befehle oder Abläufe ändert, hält diese Dokumente im selben Commit aktuell.
+
 ## Prüfen vor jedem Commit
 
 ```
-gofmt -l .                      # muss leer sein
-go vet ./... && go test ./...
-test/check-main.sh              # SPDX-Zeilen (NF-08) und Pakete nur aus main (NF-09), ohne Root
+test/check-all.sh               # gofmt, go vet (Linux + Windows), go test, SPDX (NF-08), Pakete aus main (NF-09)
 sudo test/lab/netns-lab.sh test # WAN-Erkennung im Namespace-Labor (Root, siehe Kopf des Skripts)
 ```
 

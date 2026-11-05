@@ -14,6 +14,9 @@ for v in "$VR_MANIFEST_URL" "$VR_PUBLIC_KEYS"; do
 done
 [ -n "$VR_PUBLIC_KEYS" ] || echo "Warnung: kein Schlüssel, der Ersteller wird jedes Abbild ablehnen" >&2
 
+# Die .syso nur für diesen Build: Liegt sie im Paketordner, landet sie auch in Test-Binaries, und
+# „go test ./cmd/vr-stick“ verlangt unter Windows dann Administratorrechte.
+trap 'rm -f cmd/vr-stick/*.syso' EXIT
 go generate ./cmd/vr-stick
 mkdir -p dist
 GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -trimpath \

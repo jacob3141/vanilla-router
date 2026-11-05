@@ -86,24 +86,24 @@ func (p *Prompt) Heading(title string) {
 	fmt.Fprintf(p.Out, "\n%s━━━%s %s%s%s %s━━━%s\n\n", brown, reset, bold, title, reset, brown, reset)
 }
 
-// Farben der Konsole im Stil des Logos (internal/logo). Die Linux-Konsole kennt nur 16 Farben, Farbe 3
-// ist dort braun.
+// Farben der Konsole in den zwei Farben des Logos (internal/logo). Die Linux-Konsole kennt nur 16
+// Farben: Farbe 3 ist dort braun, hell (fett) gelb wie Vanille.
 const (
-	brown = "\x1b[33m"
-	cream = "\x1b[1;37m"
-	bold  = "\x1b[1m"
-	reset = "\x1b[0m"
+	brown   = "\x1b[33m"
+	vanilla = "\x1b[1;33m"
+	bold    = "\x1b[1m"
+	reset   = "\x1b[0m"
 )
 
-// banner ist das Logo als Textbild: Eiskugel, Hörnchen und die Vanilleschote als Antenne.
+// banner ist das Logo als Textbild: Eiskugel und Hörnchen.
 var banner = [][2]string{
-	{cream, `      _.---._  `}, {brown, `/ ))`},
-	{cream, `     ( .  .  )`}, {brown, `/`},
-	{cream, `    (_ . __ ._)`}, {"", ""},
-	{brown, `     \/\/\/\/ `}, {"", ""},
-	{brown, `      \/\/\/  `}, {"", ""},
-	{brown, `       \/\/   `}, {"", ""},
-	{brown, `        \/    `}, {"", ""},
+	{vanilla, `      .-~~~-.`}, {"", ""},
+	{vanilla, `     (       ) `}, {"", ""},
+	{vanilla, `    (_._._._._)`}, {"", ""},
+	{brown, `     \/\/\/\/`}, {"", ""},
+	{brown, `      \/\/\/`}, {"", ""},
+	{brown, `       \/\/`}, {"", ""},
+	{brown, `        \/`}, {"", ""},
 }
 
 // Banner zeigt das Logo mit Titel und Untertitel daneben.

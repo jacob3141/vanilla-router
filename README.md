@@ -1,4 +1,4 @@
-<p align="center"><img src="docs/logo/logo.svg" alt="Logo: Vanilleeis im Hörnchen, die Vanilleschote ragt wie eine Router-Antenne heraus" width="160"></p>
+<p align="center"><img src="docs/logo/logo.svg" alt="Logo: eine Kugel Vanilleeis im Hörnchen" width="160"></p>
 
 # vanilla-router
 

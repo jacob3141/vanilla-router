@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"encoding/xml"
+	"image/color"
 	"image/png"
 	"io"
 	"os"
@@ -47,12 +48,20 @@ func TestRender(t *testing.T) {
 	}
 	at := func(x, y float64) Pt { return tr(Pt{x, y}, 64) }
 	q := at(150, 80)
-	if c := img.NRGBAAt(int(q.X), int(q.Y)); c != Cream {
+	if c := img.NRGBAAt(int(q.X), int(q.Y)); c != Vanilla {
 		t.Errorf("Eiskugel: %v", c)
 	}
-	q = at(128, 200)
-	if c := img.NRGBAAt(int(q.X), int(q.Y)); c.A != 0xFF || c.R < 0xC0 || c.B > 0x70 {
+	q = at(128, 220)
+	if c := img.NRGBAAt(int(q.X), int(q.Y)); c != Brown {
 		t.Errorf("Hörnchen: %v", c)
+	}
+	// Das Logo hat genau zwei Farben.
+	for _, l := range Layers() {
+		for _, c := range []color.NRGBA{l.Fill, l.Stroke} {
+			if c.A != 0 && c != Vanilla && c != Brown {
+				t.Errorf("dritte Farbe %v", c)
+			}
+		}
 	}
 	if _, err := png.Decode(bytes.NewReader(PNG(32))); err != nil {
 		t.Fatal(err)

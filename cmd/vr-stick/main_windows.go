@@ -41,17 +41,17 @@ const (
 // Farben im Stil des Logos (internal/logo). Texte und Knöpfe erfüllen den Kontrast 4,5:1.
 var (
 	colBody      = hex(0xFFFDF8) // warmes Weiß
-	colHeader    = logo.Cream
-	colLine      = hex(0xEBD3A8)
-	colText      = logo.Outline
-	colSub       = hex(0x8A5626)
-	colPrimary   = hex(0x9C5F27)
-	colPressed   = hex(0x7F4C1E)
+	colHeader    = colBody       // schlicht: Kopf nur durch eine Linie in Vanille abgesetzt
+	colLine      = logo.Vanilla
+	colText      = logo.Dark
+	colSub       = logo.Brown
+	colPrimary   = logo.Brown
+	colPressed   = hex(0x6E4520)
 	colDisabled  = hex(0xEFE4D3)
 	colDisText   = hex(0x9C8B74)
 	colSecBorder = hex(0xD9BF98)
 	colTrack     = hex(0xF3E6CC)
-	colBar       = logo.Caramel
+	colBar       = logo.Brown
 	colWhite     = hex(0xFFFFFF)
 )
 
@@ -296,7 +296,7 @@ func (a *app) paint() {
 	fillRect(dc, rect{0, 0, a.s(W), a.s(headerH)}, hb)
 	pDeleteObject.Call(hb)
 	lb := brush(colLine)
-	fillRect(dc, rect{0, a.s(headerH) - a.s(2), a.s(W), a.s(headerH)}, lb)
+	fillRect(dc, rect{0, a.s(headerH) - a.s(3), a.s(W), a.s(headerH)}, lb)
 	pDeleteObject.Call(lb)
 	x := pad
 	if a.icon != 0 {
@@ -337,7 +337,7 @@ func (a *app) drawButton(d *drawItemStruct) {
 	case primary:
 		fill, border, text = colPrimary, color.NRGBA{}, colWhite
 	case pressed:
-		fill = colHeader
+		fill = logo.Cream
 	}
 	if primary {
 		font = a.bold

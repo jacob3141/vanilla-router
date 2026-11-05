@@ -70,9 +70,9 @@ func TestBanner(t *testing.T) {
 	p, out := prompt("")
 	p.Banner("vanilla-router 1.0", "Willkommen!")
 	want := "\n" +
-		"      _.---._  / ))\n" +
-		"     ( .  .  )/   vanilla-router 1.0\n" +
-		"    (_ . __ ._)   Willkommen!\n" +
+		"      .-~~~-.\n" +
+		"     (       )    vanilla-router 1.0\n" +
+		"    (_._._._._)   Willkommen!\n" +
 		"     \\/\\/\\/\\/\n" +
 		"      \\/\\/\\/\n" +
 		"       \\/\\/\n" +
@@ -86,7 +86,7 @@ func TestBanner(t *testing.T) {
 	c.Banner("vanilla-router 1.0", "Willkommen!")
 	c.Heading("Festplatte")
 	plain := col.String()
-	for _, s := range []string{brown, cream, bold, reset} {
+	for _, s := range []string{brown, vanilla, bold, reset} {
 		plain = strings.ReplaceAll(plain, s, "")
 	}
 	if !strings.HasPrefix(plain, want) || !strings.Contains(plain, "━━━ Festplatte ━━━") || !strings.Contains(col.String(), brown) {

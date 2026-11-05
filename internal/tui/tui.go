@@ -97,13 +97,13 @@ const (
 
 // banner ist das Logo als Textbild: Eiskugel und Hörnchen.
 var banner = [][2]string{
-	{vanilla, `      .-~~~-.`}, {"", ""},
-	{vanilla, `     (       ) `}, {"", ""},
-	{vanilla, `    (_._._._._)`}, {"", ""},
-	{brown, `     \/\/\/\/`}, {"", ""},
-	{brown, `      \/\/\/`}, {"", ""},
-	{brown, `       \/\/`}, {"", ""},
-	{brown, `        \/`}, {"", ""},
+	{vanilla, `     .---.`}, {"", ""},
+	{vanilla, `    (     )`}, {"", ""},
+	{vanilla, `     '---' `}, {"", ""},
+	{brown, `    \     /`}, {"", ""},
+	{brown, `     \   /`}, {"", ""},
+	{brown, `      \ /`}, {"", ""},
+	{brown, `       V`}, {"", ""},
 }
 
 // Banner zeigt das Logo mit Titel und Untertitel daneben.

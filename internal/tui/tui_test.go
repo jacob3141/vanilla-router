@@ -70,13 +70,13 @@ func TestBanner(t *testing.T) {
 	p, out := prompt("")
 	p.Banner("vanilla-router 1.0", "Willkommen!")
 	want := "\n" +
-		"      .-~~~-.\n" +
-		"     (       )    vanilla-router 1.0\n" +
-		"    (_._._._._)   Willkommen!\n" +
-		"     \\/\\/\\/\\/\n" +
-		"      \\/\\/\\/\n" +
-		"       \\/\\/\n" +
-		"        \\/\n\n"
+		"     .---.\n" +
+		"    (     )   vanilla-router 1.0\n" +
+		"     '---'    Willkommen!\n" +
+		"    \\     /\n" +
+		"     \\   /\n" +
+		"      \\ /\n" +
+		"       V\n\n"
 	if out.String() != want {
 		t.Errorf("\n%s", out.String())
 	}

@@ -1,9 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
 <!-- vanilla-router, SPDX-License-Identifier: AGPL-3.0-or-later, erzeugt von internal/logo -->
-<defs><clipPath id="cone"><path d="M 80 124 L 176 124 L 132 236 C 130 241 126 241 124 236 Z"/></clipPath></defs>
 <g transform="translate(-10.24 -22.12) scale(1.08)" stroke-linecap="round" stroke-linejoin="round">
-<path d="M 80 124 L 176 124 L 132 236 C 130 241 126 241 124 236 Z" fill="#8b5a2b"/>
-<path d="M -32 120 L 32 244 M 32 120 L -32 244 M 0 120 L 64 244 M 64 120 L 0 244 M 32 120 L 96 244 M 96 120 L 32 244 M 64 120 L 128 244 M 128 120 L 64 244 M 96 120 L 160 244 M 160 120 L 96 244 M 128 120 L 192 244 M 192 120 L 128 244 M 160 120 L 224 244 M 224 120 L 160 244 M 192 120 L 256 244 M 256 120 L 192 244" fill="none" stroke="#f0c86a" stroke-width="6" clip-path="url(#cone)"/>
-<path d="M 64 116 C 58 66 94 34 128 34 C 162 34 198 66 192 116 C 192 134 166 138 160 126 C 154 140 134 140 128 126 C 122 140 102 140 96 126 C 90 138 64 134 64 116 Z" fill="#f0c86a"/>
+<path d="M 84 141 L 172 141 L 131 241 C 130 244 126 244 125 241 Z" fill="#8b5a2b"/>
+<path d="M 78 84 C 78 56.38 100.39 34 128 34 C 155.62 34 178 56.38 178 84 C 178 111.61 155.62 134 128 134 C 100.39 134 78 111.61 78 84 Z" fill="#f0c86a"/>
 </g>
 </svg>

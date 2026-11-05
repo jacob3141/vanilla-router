@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-// Package logo beschreibt das Projektlogo (eine Kugel Vanilleeis im Hörnchen, flach in zwei Farben)
+// Package logo beschreibt das Projektlogo (Piktogramm: eine Kugel Vanilleeis im Hörnchen, zwei Farben)
 // als Geometrie und erzeugt daraus SVG, PNG und das Windows-Icon. So gibt
 // es nur eine Quelle und keine fremden Grafikwerkzeuge (D-01). Die Dateien unter docs/ und das
 // Favicon der Oberfläche werden mit „go run ./internal/logo/mklogo“ erzeugt, ein Test prüft, dass sie
@@ -83,22 +83,21 @@ func ParsePath(s string) Path {
 	return out
 }
 
-// Layers liefert das Logo von hinten nach vorn: Hörnchen mit Waffelmuster, darüber die Kugel.
-// Nur die zwei Farben Vanilla und Brown.
+// Layers liefert das Logo als Piktogramm: ein Kreis (Kugel) über einem Dreieck (Hörnchen), mit
+// einem schmalen Abstand dazwischen. Nur die zwei Farben Vanilla und Brown.
 func Layers() []Layer {
-	cone := ParsePath("M 80 124 L 176 124 L 132 236 C 130 241 126 241 124 236 Z")
-	var hatch Path
-	for i := -3; i <= 4; i++ {
-		x := 64 + float64(i)*32
-		hatch = append(hatch, Seg{'M', []Pt{p(x, 120)}}, Seg{'L', []Pt{p(x+64, 244)}})
-		hatch = append(hatch, Seg{'M', []Pt{p(x+64, 120)}}, Seg{'L', []Pt{p(x, 244)}})
+	const cx, cy, r, k = 128.0, 84.0, 50.0, 0.5523 * 50
+	scoop := Path{
+		{'M', []Pt{p(cx-r, cy)}},
+		{'C', []Pt{p(cx-r, cy-k), p(cx-k, cy-r), p(cx, cy-r)}},
+		{'C', []Pt{p(cx+k, cy-r), p(cx+r, cy-k), p(cx+r, cy)}},
+		{'C', []Pt{p(cx+r, cy+k), p(cx+k, cy+r), p(cx, cy+r)}},
+		{'C', []Pt{p(cx-k, cy+r), p(cx-r, cy+k), p(cx-r, cy)}},
+		{'Z', nil},
 	}
-	scoop := ParsePath(`M 64 116 C 58 66 94 34 128 34 C 162 34 198 66 192 116
-		C 192 134 166 138 160 126 C 154 140 134 140 128 126 C 122 140 102 140 96 126
-		C 90 138 64 134 64 116 Z`)
+	cone := ParsePath("M 84 141 L 172 141 L 131 241 C 130 244 126 244 125 241 Z")
 	return []Layer{
 		{Path: cone, Fill: Brown},
-		{Path: hatch, Stroke: Vanilla, Width: 6, Clip: cone, ClipID: "cone"},
 		{Path: scoop, Fill: Vanilla},
 	}
 }

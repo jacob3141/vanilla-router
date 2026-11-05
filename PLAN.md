@@ -1,7 +1,7 @@
 ---
 document: vanilla-router-plan
 title: "vanilla-router: Planpapier"
-version: 0.13
+version: 0.14
 status: entwurf
 license: AGPL-3.0-or-later
 updated: 2026-11-05
@@ -967,6 +967,7 @@ Recherche vom 2026-11-04. Foren sind als solche gekennzeichnet und müssen vor e
 | 0.7 | 2026-11-04 | M4: Weboberfläche übernommen und auf `config.json` umgestellt (T-M4-01, T-M4-02), F-UI-07 erledigt, WAN-Einstellungen in der Oberfläche offen (T-M4-03). L-18 |
 | 0.8 | 2026-11-04 | Ablauf aus Sicht des Nutzers (Abschnitt 1, D-15) und Grundsatz P-11: Stick-Ersteller für Windows (3.12, F-STICK, D-14), Assistent auf Physisches gekürzt (3.9.2, F-INST-04 verworfen, F-INST-15 bis 18), `vr/stick.json`, Zugangsdaten und Einstellungen in der Oberfläche (3.8, F-UI-08/09). M4 erweitert (T-M4-04 bis 08), Q-17 bis Q-19, R-07 bis R-09 |
 | 0.9 | 2026-11-04 | T-M4-03 und T-M4-04 erledigt: Seite „Internet & Heimnetz“, Einrichtungsschritt Internetzugang, `wan.detected`. F-UI-03, F-UI-08, F-UI-09 erledigt (ohne Hardware-Test), Testplan 7.3 ergänzt |
+| 0.14 | 2026-11-05 | Logo als Piktogramm: Kreis (Kugel) über Dreieck (Hörnchen), zwei Farben, ohne Muster. Text-Logo im Assistenten ebenso |
 | 0.13 | 2026-11-05 | Logo schlichter: nur Kugel und Hörnchen in zwei Farben (Vanille, Braun), ohne WLAN-Bezug. Stick-Ersteller und Assistent in diesen Farben |
 | 0.12 | 2026-11-05 | Projektlogo (Vanilleeis, die Vanilleschote als Antenne): `internal/logo` erzeugt SVG, PNG und Icon ohne fremde Werkzeuge (`docs/logo/`, Favicon der Oberfläche). Stick-Ersteller im Stil des Logos und mit Icon (`internal/winres` kann jetzt mehrere Ressourcen), Assistent mit Text-Logo und farbigen Überschriften. T-M4-08 mit echtem Stick geprüft |
 | 0.11 | 2026-11-05 | T-M4-08: Stick-Ersteller für Windows (`cmd/vr-stick`), F-STICK-01 bis 10 erledigt, Test mit echtem Stick offen. `vr-sign` für signierte Manifeste (Teil von T-M4-07) |

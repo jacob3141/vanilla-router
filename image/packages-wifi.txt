@@ -1,0 +1,8 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Wi-Fi extension (F-WIFI, D-18): downloaded through the web interface only if an adapter exists, never part of the
+# image. internal/apply/wifi.go must list the same packages (a test checks that). hostapd comes from universe,
+# see test/universe-allow.txt.
+hostapd
+iw
+wireless-regdb
+rfkill

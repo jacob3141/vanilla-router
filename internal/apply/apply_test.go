@@ -306,3 +306,129 @@ func TestDirSecrets(t *testing.T) {
 		t.Error("path with .. accepted")
 	}
 }
+
+func wifiConfig(c *config.Config) {
+	c.WiFi = &config.WiFi{Enabled: true, Interface: "wlp3s0", SSID: "Home", PasswordRef: "wifi", Country: "DE",
+		Band: config.WiFiBand24, Channel: 6, Width: 20}
+}
+
+// runnerWiFi reports what iw says about the adapter.
+type runnerWiFi struct {
+	*fakeRunner
+	iw string
+}
+
+func (r *runnerWiFi) Run(env []string, name string, args ...string) ([]byte, error) {
+	out, err := r.fakeRunner.Run(env, name, args...)
+	if name == "iw" {
+		return []byte(r.iw), err
+	}
+	if name == "journalctl" {
+		return []byte("Could not set channel for kernel driver\n"), err
+	}
+	return out, err
+}
+
+func TestWiFiApply(t *testing.T) {
+	a, r, c := setup(t)
+	a.Run = &runnerWiFi{r, "Interface wlp3s0\n\tssid Home\n\ttype AP\n"}
+	wifiConfig(c)
+	sec := memSecrets{"wifi": "a good password"}
+	res, err := a.Apply(c, sec, Options{Confirm: 5 * time.Minute})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !r.called("systemctl enable vr-hostapd.service") || !r.called("systemctl restart vr-hostapd.service") {
+		t.Errorf("access point not started: %v", r.calls)
+	}
+	if !res.Pending {
+		t.Error("a Wi-Fi change must wait for confirmation (F-WIFI-06)")
+	}
+	fi, err := os.Stat(filepath.Join(a.Root, "etc/vanilla-router/wifi/hostapd.conf"))
+	if err != nil || fi.Mode().Perm() != 0o600 {
+		t.Errorf("hostapd.conf: %v %v", err, fi)
+	}
+	if err := a.Confirm(); err != nil {
+		t.Fatal(err)
+	}
+
+	// Off: the file with the password goes away, the service stops.
+	r.calls = nil
+	c.WiFi.Enabled = false
+	if _, err := a.Apply(c, sec, Options{}); err != nil {
+		t.Fatal(err)
+	}
+	if !r.called("systemctl disable --now vr-hostapd.service") {
+		t.Errorf("access point not stopped: %v", r.calls)
+	}
+	if _, err := os.Stat(filepath.Join(a.Root, "etc/vanilla-router/wifi/hostapd.conf")); !errors.Is(err, os.ErrNotExist) {
+		t.Errorf("hostapd.conf still there: %v", err)
+	}
+}
+
+// hostapd has no check mode (D-18): what it rejects shows up after the start, and that must roll back.
+func TestWiFiFailedStartRollsBack(t *testing.T) {
+	a, r, c := setup(t)
+	a.Run = &runnerWiFi{r, "Interface wlp3s0\n\ttype managed\n"}
+	if _, err := a.Apply(c, nil, Options{}); err != nil {
+		t.Fatal(err)
+	}
+	old, _ := os.ReadFile(filepath.Join(a.Root, config.Path))
+	wifiConfig(c)
+	_, err := a.Apply(c, memSecrets{"wifi": "a good password"}, Options{})
+	if err == nil || !strings.Contains(err.Error(), "Could not set channel") {
+		t.Fatalf("expected the message from hostapd, got %v", err)
+	}
+	now, _ := os.ReadFile(filepath.Join(a.Root, config.Path))
+	if !bytes.Equal(old, now) {
+		t.Error("config.json not restored")
+	}
+	if _, err := os.Stat(filepath.Join(a.Root, "etc/vanilla-router/wifi/hostapd.conf")); !errors.Is(err, os.ErrNotExist) {
+		t.Errorf("hostapd.conf still there: %v", err)
+	}
+	if !r.called("systemctl disable --now vr-hostapd.service") {
+		t.Errorf("access point not stopped again: %v", r.calls)
+	}
+}
+
+func TestWiFiPackageSource(t *testing.T) {
+	a, _, _ := setup(t)
+	if err := a.PrepareWiFiPackages(); err == nil {
+		t.Error("a missing os-release must be an error (L-17)")
+	}
+	rel := filepath.Join(a.Root, "etc/os-release")
+	os.MkdirAll(filepath.Dir(rel), 0o755)
+	os.WriteFile(rel, []byte("NAME=\"Ubuntu\"\nVERSION_CODENAME=resolute\n"), 0o644)
+	if err := a.PrepareWiFiPackages(); err != nil {
+		t.Fatal(err)
+	}
+	src, _ := os.ReadFile(filepath.Join(a.Root, "etc/apt/sources.list.d/vr-wifi.sources"))
+	if !strings.Contains(string(src), "Suites: resolute resolute-updates resolute-security\n") || !strings.Contains(string(src), "Components: universe\n") {
+		t.Errorf("%s", src)
+	}
+	pin, _ := os.ReadFile(filepath.Join(a.Root, "etc/apt/preferences.d/vr-wifi"))
+	if !strings.Contains(string(pin), "Package: *\nPin: release c=universe\nPin-Priority: -1\n") ||
+		!strings.Contains(string(pin), "Package: hostapd\nPin: release c=universe\nPin-Priority: 500\n") {
+		t.Errorf("%s", pin)
+	}
+}
+
+// The list in the code and the list test/check-main.sh checks must agree (NF-09).
+func TestWiFiPackagesMatchList(t *testing.T) {
+	b, err := os.ReadFile("../../image/packages-wifi.txt")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var list []string
+	for _, l := range strings.Split(string(b), "\n") {
+		if l = strings.TrimSpace(l); l != "" && !strings.HasPrefix(l, "#") {
+			list = append(list, l)
+		}
+	}
+	if strings.Join(list, " ") != strings.Join(WiFiPackages, " ") {
+		t.Errorf("image/packages-wifi.txt: %v, code: %v", list, WiFiPackages)
+	}
+	if cmd := WiFiInstallCommand(); !strings.Contains(cmd, strings.Join(WiFiPackages, " ")) {
+		t.Error(cmd)
+	}
+}

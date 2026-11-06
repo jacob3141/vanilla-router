@@ -16,7 +16,7 @@ import (
 // Extensions (Docker, Samba) only appear if they are installed (unitInfos hides
 // units that do not exist).
 var manageableUnits = []string{
-	"vr-dnsmasq", "systemd-networkd", "vr-firewall", "vr-pppoe", "systemd-resolved", "chrony", "ssh",
+	"vr-dnsmasq", "systemd-networkd", "vr-firewall", "vr-pppoe", "vr-hostapd", "systemd-resolved", "chrony", "ssh",
 	"unattended-upgrades", "cron", "docker", "smbd",
 }
 

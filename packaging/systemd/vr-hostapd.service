@@ -1,0 +1,35 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Wi-Fi access point (F-WIFI, D-18). vrctl generates the configuration, the web interface turns the service on and off.
+# The package's own hostapd.service stays off. hostapd puts the adapter into the bridge lan0 itself.
+[Unit]
+Description=vanilla-router Wi-Fi access point (hostapd)
+After=systemd-networkd.service vr-firewall.service
+Wants=systemd-networkd.service
+ConditionPathExists=/etc/vanilla-router/wifi/hostapd.conf
+# A USB adapter may come later or be unplugged for a while: keep trying, without a limit
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+# "-": a missing rfkill or a card without a switch is no reason not to try
+ExecStartPre=-/usr/sbin/rfkill unblock wifi
+ExecStart=/usr/sbin/hostapd /etc/vanilla-router/wifi/hostapd.conf
+Restart=on-failure
+RestartSec=15
+
+# Hardening: hostapd speaks netlink and raw frames, and writes nothing. Deliberately no ProtectKernelTunables and no
+# PrivateDevices: it uses /dev/rfkill and may touch per-interface settings. Check against real hardware (PLAN.md 7.3).
+CapabilityBoundingSet=CAP_NET_ADMIN CAP_NET_RAW
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK AF_PACKET
+RestrictNamespaces=yes
+LockPersonality=yes
+SystemCallArchitectures=native
+
+[Install]
+WantedBy=multi-user.target

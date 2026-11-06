@@ -1,0 +1,64 @@
+{
+  "schema": 1,
+  "system": {
+    "hostname": "router",
+    "timezone": "UTC",
+    "locale": "en_US.UTF-8",
+    "keymap": "us"
+  },
+  "wan": {
+    "match_mac": "02:00:00:00:00:01",
+    "type": "dhcp",
+    "ipv6": {
+      "mode": "auto",
+      "request_prefix": 56
+    }
+  },
+  "lan": {
+    "members": [
+      "02:00:00:00:00:02",
+      "02:00:00:00:00:03"
+    ],
+    "ipv4": "192.168.42.1/24",
+    "ipv6": {
+      "ula": "fd12:3456:789a::/48",
+      "from_wan_prefix": true
+    }
+  },
+  "wifi": {
+    "enabled": false,
+    "interface": "wlp3s0",
+    "ssid": "Home",
+    "password_ref": "wifi",
+    "country": "DE",
+    "band": "2.4",
+    "channel": 1,
+    "width": 20
+  },
+  "dhcp": {
+    "pool_start": "192.168.42.100",
+    "pool_end": "192.168.42.249",
+    "lease": "12h",
+    "reservations": []
+  },
+  "dns": {
+    "domain": "home.arpa",
+    "upstreams": [],
+    "records": []
+  },
+  "firewall": {
+    "port_forwards": [],
+    "ipv6_pinholes": [],
+    "blocks": []
+  },
+  "services": {
+    "ssh": {
+      "enabled": false
+    }
+  },
+  "updates": {
+    "security_auto": true,
+    "reboot_window": "04:00",
+    "snapshots": true
+  }
+}

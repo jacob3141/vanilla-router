@@ -3,7 +3,7 @@ import { t } from '../i18n.js';
 import { h, clear, icon, badge } from '../ui.js';
 import { get } from '../api.js';
 
-const UNITS = ['', 'vr-dnsmasq', 'systemd-networkd', 'vr-firewall', 'vr-pppoe', 'systemd-resolved', 'chrony', 'ssh',
+const UNITS = ['', 'vr-dnsmasq', 'systemd-networkd', 'vr-firewall', 'vr-pppoe', 'vr-hostapd', 'systemd-resolved', 'chrony', 'ssh',
   'unattended-upgrades', 'apt-daily-upgrade', 'cron', 'vr-webui', 'vr-webui-helper', 'vr-health', 'docker', 'smbd'];
 const PRIO = [['3', 'Errors and worse'], ['4', 'warnings and worse'], ['5', 'notices and worse'], ['6', 'ab Info'], ['7', 'everything (debug)']];
 const KIND = { change: ['Change', 'info'], rejected: ['rejected', 'warn'], auth: ['Login', ''], files: ['File', 'ok'] };

@@ -30,6 +30,7 @@ type Config struct {
 	System   System   `json:"system"`
 	WAN      WAN      `json:"wan"`
 	LAN      LAN      `json:"lan"`
+	WiFi     *WiFi    `json:"wifi,omitempty"`
 	DHCP     DHCP     `json:"dhcp"`
 	DNS      DNS      `json:"dns"`
 	Firewall Firewall `json:"firewall"`

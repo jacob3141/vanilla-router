@@ -25,6 +25,7 @@ the IDs instead of repeating them.
 13. [Where to start reading](#13-where-to-start-reading)
 14. [Languages](#14-languages)
 15. [Status: what has been tested for real](#15-status-what-has-been-tested-for-real)
+16. [Wi-Fi access point](#16-wi-fi-access-point)
 
 ## 1. The idea in five sentences
 
@@ -97,7 +98,7 @@ strict: unknown fields are an error. `Validate` checks **all** values and return
 (`config.Errors`, one plain-language text per field). After that the generators need no checks of their
 own.
 
-Secrets (the PPPoE password) are not in `config.json`, but in files under
+Secrets (the PPPoE and Wi-Fi passwords) are not in `config.json`, but in files under
 `/etc/vanilla-router/secrets/` (0600). `config.json` only refers to them (`password_ref`). This makes the
 configuration safe to export.
 
@@ -120,6 +121,7 @@ be tested with golden files: for each example configuration under
 | `firewall` | `/etc/vanilla-router/nft/vr.nft` (own tables, never `flush ruleset`, D-03) | `vrctl firewall-load` |
 | `dnsmasq` | `/etc/vanilla-router/dnsmasq.conf` (DNS, DHCPv4, reservations, local names) | restart `vr-dnsmasq` |
 | `ppp` | `/etc/ppp/peers/vr-wan`, `chap-secrets`, `pap-secrets` | restart `vr-pppoe` |
+| `wifi` | `/etc/vanilla-router/wifi/hostapd.conf` (0600, only while the access point is on, section 16) | enable and restart or disable `vr-hostapd` |
 | `sysctl`, `resolved`, `ssh`, `apt` | forwarding, resolved without stub listener, sshd, unattended-upgrades | selectively per group |
 
 Fixed names (PLAN.md 3.4): `wan0` is the internet port, `lan0` a bridge over all other ports (even if there
@@ -307,7 +309,7 @@ finds the consequences with `grep -rln '"vanilla-router/internal/config"'`.
 | `helper` | privileged actions | dry run |
 | `api` | HTTP, middleware, endpoints | `httptest` |
 | `auth` | password, sessions, login throttle | unit |
-| `sys` | values from `/proc`, leases, history, online monitor, native ICMP | fake files |
+| `sys` | values from `/proc`, leases, history, online monitor, native ICMP, Wi-Fi adapters and `iw` output | fake files |
 | `files` | file service with `os.Root` | real directories, escape attempts |
 | `install`, `disk` | installation, disks | fake sysfs, runner recording |
 | `netdetect`, `probe`, `wandetect` | WAN detection | fake kernel messages and frames, artificial clock |
@@ -324,6 +326,7 @@ finds the consequences with `grep -rln '"vanilla-router/internal/config"'`.
 | `/etc/vanilla-router/config.json` | **the** configuration |
 | `/etc/vanilla-router/secrets/` | secrets (0700), e.g. the PPPoE password |
 | `/etc/vanilla-router/nft/vr.nft`, `dnsmasq.conf` | generated |
+| `/etc/vanilla-router/wifi/hostapd.conf` | generated, contains the Wi-Fi password (0600), only while the access point is on |
 | `/etc/vanilla-router/tls/` | certificate of the web interface (self-signed, Q-09) |
 | `/etc/systemd/network/*-vr-*` | generated |
 | `/var/lib/vanilla-router/generations/` | backups before every change |
@@ -338,6 +341,7 @@ finds the consequences with `grep -rln '"vanilla-router/internal/config"'`.
 | `vr-firewall-reload.timer` | daily reload (time-based blocks, daylight saving) |
 | `vr-dnsmasq.service` | dnsmasq from `dnsmasq-base` (*main*), hardened |
 | `vr-pppoe.service` | pppd, only if PPPoE is configured |
+| `vr-hostapd.service` | Wi-Fi access point, only if it is switched on (section 16) |
 | `vr-webui-helper.service`, `vr-webui.service` | web interface |
 | `vr-health.service` | health check after start |
 | `vr-installer.service` | stick only: assistant instead of a login on tty1 |
@@ -403,3 +407,38 @@ Honestly: not much yet. The exact status per task is in PLAN.md 7.
 | Installation | complete run in a Hyper-V VM, including the restart without the stick and the start from the disk with Secure Boot. **Not yet on real hardware** |
 | Namespace lab | all 5 scenarios pass (WSL2, real netlink, raw sockets, VLAN 7) |
 | Rollback after an update, PPPoE on a real line | **untested**, test plan in PLAN.md 7.3 |
+| Wi-Fi access point | unit tests, golden files, the real `hostapd` reads the generated files, apt pinning, page against the test instance with a simulated adapter. **Never run with a real radio**, see section 16 |
+
+## 16. Wi-Fi access point
+
+An optional extension (F-WIFI, D-18): a Wi-Fi adapter in the router becomes a port of the home network.
+
+```
+config.json "wifi" ─▶ gen ─▶ /etc/vanilla-router/wifi/hostapd.conf ─▶ vr-hostapd.service
+secrets/wifi-<id> ───┘                                                   │ bridge=lan0
+                                                                         ▼
+                           Wi-Fi devices ──▶ wlp3s0 ──▶ lan0 ──▶ DHCP, DNS, firewall as on a cable
+```
+
+- **Bridge:** `hostapd` puts the adapter into `lan0` itself, because the kernel only allows that once the adapter is in
+  access point mode. networkd leaves the adapter alone (`30-vr-wifi.network`, `Unmanaged=yes`). The firewall and dnsmasq
+  know nothing about Wi-Fi, device blocks by MAC apply as usual.
+- **Adapter name:** the kernel's own name (`wlp3s0`, `wlx…`) in `wifi.interface`. A `.link` file like the ports have would
+  only take effect after a restart.
+- **Password:** under `secrets/wifi-<id>`, a new password gets a new name, so a rollback finds the old one (as with PPPoE).
+  The browser only learns whether there is one. `hostapd.conf` exists only while the access point is on.
+- **Checking:** `hostapd` has no check mode, an exception to P-05. `config.Validate` restricts the values, the helper compares
+  them with what the adapter reports (`iw phy`), and after the start apply checks that `iw dev … info` reports an access point.
+  If not, it rolls back and passes on the last lines from `hostapd`. Every change waits 5 minutes for confirmation, because
+  whoever is on Wi-Fi has to reconnect first.
+- **Channels:** deliberately without DFS channels and without automatic selection (F-WIFI-09), 2.4 GHz only with 20 MHz, on
+  5 GHz up to 80 MHz. Before the first start the kernel knows no country, so much of 5 GHz is reported as "no IR". The helper
+  therefore lets those channels through and the start decides.
+- **Packages (NF-09):** `hostapd` is in *universe*, the image only has *main*. "Download Wi-Fi software" on the page first writes
+  `/etc/apt/sources.list.d/vr-wifi.sources` and `/etc/apt/preferences.d/vr-wifi`, which forbids everything from *universe* except
+  `hostapd`, then runs `apt-get` as the unit `vr-wifi-install`. Routers without an adapter never do this. `image/packages-wifi.txt`
+  is the list that `test/check-main.sh` checks, `test/universe-allow.txt` holds the exception.
+- **Without hardware (F-WIFI-04):** `features.wifi` in `/api/state` comes from sysfs (`internal/sys/wifi.go`). No adapter: no menu
+  item, and opened directly the page explains why. A PCI card of class `0x0280` without a wireless device: firmware is still
+  missing, it comes with `vrctl complete` (D-17) and takes effect after a restart. If `/var/lib/vanilla-router/online-complete` already exists, the page says instead that Linux probably has no driver for this card. A USB adapter without firmware cannot be told
+  apart, it stays invisible until it works. An access point that is set up keeps the page visible even if its adapter is gone.

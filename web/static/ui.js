@@ -46,6 +46,7 @@ export function clear(el) { while (el.firstChild) el.removeChild(el.firstChild);
 
 // --- Icons (paths in the Lucide style, 24 grid) --------------------------------------
 const ICONS = {
+  wifi: 'M2 8.5a15 15 0 0 1 20 0M5 12a10.5 10.5 0 0 1 14 0M8.5 15.5a5.5 5.5 0 0 1 7 0M12 19h.01',
   dashboard: 'M3 13h8V3H3zM13 21h8V11h-8zM3 21h8v-6H3zM13 3v6h8V3z',
   devices: 'M4 6h16v10H4zM2 20h20M9 16v4M15 16v4',
   dns: 'M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zM2 12h20M12 2a15 15 0 0 1 0 20M12 2a15 15 0 0 0 0 20',

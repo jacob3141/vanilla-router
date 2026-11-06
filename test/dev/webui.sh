@@ -10,6 +10,7 @@
 #
 # Usage: test/dev/webui.sh [port]          default 9443, then open http://127.0.0.1:9443
 #        VR_DETECTED=pppoe test/dev/webui.sh   pretend the assistant detected PPPoE over VLAN 7
+#        VR_WIFI=1 test/dev/webui.sh           simulate a Wi-Fi adapter, the page appears (F-WIFI-04)
 # Stop with Ctrl+C. Work folder: test/dev/work (recreated at every start).
 set -euo pipefail
 export CGO_ENABLED=0 # the project is pure Go, do not depend on a C toolchain
@@ -44,17 +45,20 @@ if [ ! -s "$PW_FILE" ]; then
 fi
 { cat "$PW_FILE"; echo; } | "$WORK/bin/vr-webui" set-password --data "$WORK/data" 2>/dev/null
 
+FAKE_WIFI=()
+[ -n "${VR_WIFI:-}" ] && FAKE_WIFI=(--fake-wifi)
+
 cleanup() { kill $(jobs -p) 2>/dev/null || true; rm -rf "$SOCKS"; }
 trap cleanup EXIT INT TERM
 
 "$WORK/bin/vr-webui" helper --dry-run --root "$WORK/root" --allow-user "$(id -un)" \
-	--socket "$SOCKS/helper.sock" >"$WORK/helper.log" 2>&1 &
+	--socket "$SOCKS/helper.sock" "${FAKE_WIFI[@]}" >"$WORK/helper.log" 2>&1 &
 for _ in $(seq 50); do [ -S "$SOCKS/helper.sock" ] && break; sleep 0.1; done
 [ -S "$SOCKS/helper.sock" ] || { cat "$WORK/helper.log"; exit 1; }
 
 "$WORK/bin/vr-webui" serve --dev --config "$CFG" --data "$WORK/data" --helper "$SOCKS/helper.sock" \
 	--files "$SOCKS/files.sock" --listen "127.0.0.1:$PORT" --redirect off \
-	--origins "http://127.0.0.1:$PORT,http://localhost:$PORT" >"$WORK/serve.log" 2>&1 &
+	--origins "http://127.0.0.1:$PORT,http://localhost:$PORT" "${FAKE_WIFI[@]}" >"$WORK/serve.log" 2>&1 &
 
 for _ in $(seq 50); do
 	if (exec 3<>"/dev/tcp/127.0.0.1/$PORT") 2>/dev/null; then break; fi

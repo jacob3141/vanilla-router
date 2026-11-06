@@ -46,6 +46,8 @@ type Config struct {
 	RouterIP string
 	Name     string // full name of the router, e.g. router.home.arpa
 	WANIf    string // uplink interface: wan0, with PPPoE ppp0
+	// FakeWiFi shows the Wi-Fi page without hardware (test instance only, F-WIFI-04)
+	FakeWiFi bool
 }
 
 type Server struct {
@@ -81,6 +83,7 @@ func New(cfg Config) *Server {
 	s.registerNetstat()
 	s.registerAdmin()
 	s.registerSettings()
+	s.registerWiFi()
 	return s
 }
 

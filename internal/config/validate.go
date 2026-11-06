@@ -130,6 +130,7 @@ func (c *Config) Validate() error {
 	c.validateDNS(v)
 	c.validateFirewall(v, lanNet, routerIP)
 	c.validateServices(v)
+	c.validateWiFi(v)
 	if c.Updates.RebootWindow != "" && !hhmmRe.MatchString(c.Updates.RebootWindow) {
 		v.add("updates.reboot_window", "please give the time as HH:MM")
 	}

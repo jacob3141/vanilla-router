@@ -9,6 +9,7 @@ const WARN = {
   'systemd-networkd': 'The network is set up again. Internet and home network may briefly go down.',
   'vr-firewall': 'The firewall is reloaded (IPv4 and IPv6).',
   'vr-pppoe': 'The internet connection is established again. That takes a few seconds, the IPv4 address may change.',
+  'vr-hostapd': 'Wi-Fi is gone for a few seconds, devices reconnect by themselves.',
 };
 
 export default {

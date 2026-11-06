@@ -5,6 +5,9 @@ package api
 import (
 	"net/http"
 	"os"
+
+	"vanilla-router/internal/gen"
+	"vanilla-router/internal/sys"
 )
 
 // AuditScript is the check script of the security audit extension (F-SEC-08).
@@ -18,6 +21,8 @@ func (s *Server) features() map[string]bool {
 		"containers": exists("/usr/bin/docker"),
 		"files":      exists(s.cfg.Files),
 		"audit":      exists(AuditScript),
+		// An access point that is set up stays visible even if its adapter is gone, so the page can explain that.
+		"wifi": s.cfg.FakeWiFi || sys.WiFiPresent("/") || exists(gen.WiFiConf),
 	}
 }
 

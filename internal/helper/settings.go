@@ -403,20 +403,23 @@ func (s *Server) registerSettings() {
 	})
 }
 
-// pruneSecrets deletes PPPoE passwords the confirmed configuration no longer refers to.
+// pruneSecrets deletes PPPoE and Wi-Fi passwords the confirmed configuration no longer refers to.
 func (s *Server) pruneSecrets() {
 	c, err := s.loadConfig()
 	if err != nil {
 		return
 	}
-	keep := ""
+	keep := map[string]bool{}
 	if c.WAN.PPPoE != nil {
-		keep = c.WAN.PPPoE.PasswordRef
+		keep[c.WAN.PPPoE.PasswordRef] = true
+	}
+	if c.WiFi != nil {
+		keep[c.WiFi.PasswordRef] = true
 	}
 	dir := s.secrets().Dir
 	ents, _ := os.ReadDir(dir)
 	for _, e := range ents {
-		if n := e.Name(); (n == "pppoe" || strings.HasPrefix(n, "pppoe-")) && n != keep {
+		if n := e.Name(); (n == "pppoe" || strings.HasPrefix(n, "pppoe-") || strings.HasPrefix(n, wifiRef)) && !keep[n] {
 			os.Remove(filepath.Join(dir, n))
 		}
 	}

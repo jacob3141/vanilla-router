@@ -75,11 +75,25 @@ func cases(t *testing.T) map[string]*config.Config {
 	pin.Firewall.Pinholes = []config.Pinhole{{InterfaceID: "::1a2b:3c4d:5e6f:7890", Proto: "tcp", Port: 443, Comment: "Web server"}}
 	pin.LAN.IPv6.FromWANPrefix = true
 
-	return map[string]*config.Config{"dhcp": dhcp, "pppoe-vlan7": pppoe, "static-full": full, "ipv6-pinhole": pin}
+	wifi24 := base(t)
+	wifi24.WiFi = &config.WiFi{Enabled: true, Interface: "wlx020000000030", SSID: "Küche WLAN", PasswordRef: "wifi", Country: "DE", Band: config.WiFiBand24, Channel: 6, Width: 20}
+
+	wifi5 := base(t)
+	wifi5.WiFi = &config.WiFi{Enabled: true, Interface: "wlp3s0", SSID: "Home", PasswordRef: "wifi", Country: "AT", Band: config.WiFiBand5, Channel: 40, Width: 80}
+
+	wifi5ht := base(t)
+	wifi5ht.WiFi = &config.WiFi{Enabled: true, Interface: "wlp3s0", SSID: "Home", PasswordRef: "wifi", Country: "US", Band: config.WiFiBand5, Channel: 157, Width: 40}
+
+	// Switched off: the settings stay in config.json, but nothing is generated.
+	wifiOff := base(t)
+	wifiOff.WiFi = &config.WiFi{Interface: "wlp3s0", SSID: "Home", PasswordRef: "wifi", Country: "DE", Band: config.WiFiBand24, Channel: 1, Width: 20}
+
+	return map[string]*config.Config{"dhcp": dhcp, "pppoe-vlan7": pppoe, "static-full": full, "ipv6-pinhole": pin,
+		"wifi-24": wifi24, "wifi-5-80": wifi5, "wifi-5-40": wifi5ht, "wifi-off": wifiOff}
 }
 
 func TestGolden(t *testing.T) {
-	sec := secrets{"pppoe": "secret-123"}
+	sec := secrets{"pppoe": "secret-123", "wifi": "secret-123 wifi"}
 	for name, c := range cases(t) {
 		t.Run(name, func(t *testing.T) {
 			files, err := Render(c, sec)
@@ -133,7 +147,7 @@ func write(t *testing.T, p string, b []byte) {
 }
 
 func TestProperties(t *testing.T) {
-	sec := secrets{"pppoe": "secret-123"}
+	sec := secrets{"pppoe": "secret-123", "wifi": "secret-123 wifi"}
 	for name, c := range cases(t) {
 		files, err := Render(c, sec)
 		if err != nil {
@@ -196,6 +210,7 @@ func TestIsManaged(t *testing.T) {
 		"/etc/vanilla-router/nft/own.conf":         false,
 		"/etc/ppp/peers/vr-wan":                    true,
 		"/etc/ppp/peers/provider":                  false,
+		"/etc/vanilla-router/wifi/hostapd.conf":    true,
 	} {
 		if _, got := IsManaged(p); got != want {
 			t.Errorf("IsManaged(%s) = %v", p, got)
@@ -209,5 +224,47 @@ func TestNftDays(t *testing.T) {
 	}
 	if got := nftDays(nil, 1); got != "" {
 		t.Errorf("%q", got)
+	}
+}
+
+func TestWiFiPasswordCheck(t *testing.T) {
+	c := cases(t)["wifi-24"]
+	for _, pw := range []string{"", "short", "umläute-sind-nicht-erlaubt", "line\nbreak1", strings.Repeat("a", 64)} {
+		if _, err := Render(c, secrets{"wifi": pw}); err == nil {
+			t.Errorf("password %q accepted", pw)
+		}
+	}
+	if _, err := Render(c, secrets{}); err == nil {
+		t.Error("missing password not noticed")
+	}
+	if _, err := Render(c, nil); err == nil {
+		t.Error("missing secrets not noticed")
+	}
+}
+
+// With the access point off no password may end up anywhere.
+func TestWiFiOffGeneratesNothing(t *testing.T) {
+	files, err := Render(cases(t)["wifi-off"], nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, f := range files {
+		if strings.Contains(f.Path, "wifi") {
+			t.Errorf("%s generated although the access point is off", f.Path)
+		}
+	}
+}
+
+func TestWiFiChannelPairs(t *testing.T) {
+	for ch, want := range map[int]string{36: "[HT40+]", 40: "[HT40-]", 44: "[HT40+]", 48: "[HT40-]",
+		149: "[HT40+]", 153: "[HT40-]", 157: "[HT40+]", 161: "[HT40-]"} {
+		if got := ht40(ch); got != want {
+			t.Errorf("channel %d: %s", ch, got)
+		}
+	}
+	for ch, want := range map[int]int{36: 42, 48: 42, 149: 155, 161: 155} {
+		if got := vht80Center(ch); got != want {
+			t.Errorf("channel %d: %d", ch, got)
+		}
 	}
 }

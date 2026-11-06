@@ -1,7 +1,7 @@
 ---
 document: vanilla-router-plan
 title: "vanilla-router: planning document"
-version: 0.20
+version: 0.21
 status: draft
 license: AGPL-3.0-or-later
 updated: 2026-11-06
@@ -85,7 +85,7 @@ does not exist.** vanilla-router wants to fill this gap.
 ### 1.4 Non-goals (for now)
 
 - No replacement for enterprise firewalls (HA clusters, IDS/IPS, deep packet inspection).
-- No Wi-Fi access point of its own in version 1 (see Q-06). Recommendation: external access points.
+- No Wi-Fi mesh, roaming or guest SSIDs, and no Wi-Fi client mode. A Wi-Fi adapter in the router can be an access point in the home network (F-WIFI, D-18). External access points keep working as before.
 - No support for ARM single-board computers in version 1 (x86-64 first, see Q-08).
 - No modem: DSL, cable and fiber modems stay separate devices (bridge mode or a router in front).
 
@@ -254,6 +254,7 @@ This is the list of what the installer has to automate:
     | `fail2ban` | universe | **replace** with a throttle of its own in routerui (exists in the prototype) and nft rate limiting. SSH is off by default (F-SEC-04) |
     | `snapper` | universe | rollback with a small tool of its own through `btrfs subvolume snapshot`, or an exception with a reason (Q-03) |
     | `isc-dhcp-server` | universe, discontinued | dropped (D-05) |
+    | `hostapd` | universe | **exception for the Wi-Fi extension only** (D-18), never part of the base system, pinned |
   - Rule for the package vanilla-router: **dependencies only from *main***. Exceptions from *universe* only with a reason in a
     D-NN and only for extensions (F-ADD). A CI check enforces this (T-M1-08).
   - Ubuntu Pro (free for private users, covers *universe*) is offered, but **not required**.
@@ -517,7 +518,7 @@ See F-INST-12 to F-INST-14.
 ### 3.10 Extensions (secondary roles)
 
 Optional modules, installable later through the web interface: NAS (Samba with a file browser, trash folder, backup), containers (Docker or
-Podman), VPN server (WireGuard), DNS filter (block lists), guest network (VLAN or a port of its own). Modules must not endanger the router
+Podman), VPN server (WireGuard), DNS filter (block lists), guest network (VLAN or a port of its own), Wi-Fi access point (F-WIFI). Modules must not endanger the router
 function: own units, own firewall tables, resource limits through systemd.
 
 ### 3.11 Taking over the prototype's code
@@ -701,6 +702,23 @@ Columns: ID · priority · requirement · status. "Prototype" means: exists in t
 | NF-08 | MUST | Every source file starts with `SPDX-License-Identifier: AGPL-3.0-or-later` (D-11) | open |
 | NF-09 | MUST | Package dependencies of the base system only from Ubuntu *main* (D-10), checked by CI | open |
 
+### 4.9 Wi-Fi (F-WIFI)
+
+New in 0.21 (D-18, Q-06). "Untested on radio" means: tested with unit tests, golden files and the test instance, never with a real Wi-Fi adapter (T-M4-09).
+
+| ID | Prio | Requirement | Status |
+|---|---|---|---|
+| F-WIFI-01 | MUST | A Wi-Fi adapter in the router runs as an access point through `hostapd` and is a port of the bridge `lan0`, so DHCP, DNS and firewall apply unchanged | done, untested on radio |
+| F-WIFI-02 | MUST | The web interface sets network name, password, band, channel, channel width, country and on/off | done, untested on radio |
+| F-WIFI-03 | MUST | The web interface shows whether the access point runs, on which channel, and the connected devices | done, untested on radio |
+| F-WIFI-04 | MUST | Without Wi-Fi hardware the page does not appear in the navigation, and opened directly it explains why. A PCI Wi-Fi card without a working driver gets its own explanation (firmware comes with `vrctl complete`, D-17) | done, checked in the test instance |
+| F-WIFI-05 | MUST | The password is a secret (`apply.DirSecrets`), not in `config.json`, and is never sent back to the browser. The generated `hostapd.conf` has mode 0600 | done |
+| F-WIFI-06 | MUST | Changes go through `internal/apply`: backup, start, health check, confirmation within 5 minutes, otherwise automatic rollback. `hostapd` has no check mode, so a rejected configuration shows up at the start (D-18) | done, untested on radio |
+| F-WIFI-07 | MUST | The Wi-Fi packages are only downloaded when an adapter exists and the owner asks for it. From *universe* only `hostapd` is reachable (apt pinning) | done, untested on an installed router |
+| F-WIFI-08 | SHOULD | WPA2 and WPA3 at the same time, protected management frames where the device supports them | done, untested on radio |
+| F-WIFI-09 | MAY | Automatic channel selection and DFS channels (5 GHz, 52–144) | open: not offered, because they cannot be tested without hardware |
+| F-WIFI-10 | MAY | Wi-Fi 6 (802.11ax), guest network on its own SSID (with F-NET-10), several adapters at once | open |
+
 ---
 
 ## 5. Decisions
@@ -723,6 +741,7 @@ Columns: ID · priority · requirement · status. "Prototype" means: exists in t
 | D-14 | **A stick creator of our own for Windows** in Go (Win32 through `syscall`), downloads a signed image, no third-party libraries (3.12) | Third-party writing programs are a hurdle for non-experts (which image, which drive, which settings). A program of our own can offer only USB sticks, verify the image itself and bring defaults from Windows. Go with `GOOS=windows` keeps the project at one language (D-01). A small `.exe` plus download instead of a 2 GB `.exe`, so the program does not have to be downloaded again with every new version. Win32 instead of WebView, because WebView would need third-party code. | open (proposal) |
 | D-15 | **Flow from the user's point of view** (section 1): stick creator without questions, assistant only for physical things (WAN port, disk), everything else in the web interface (P-11) | The project owner's decision on 2026-11-04. In a browser it is more comfortable to type and read help than on a console with an unknown keyboard layout. Fewer questions mean fewer errors. Consequence: PPPoE input moves from the assistant to the web interface (F-INST-04 rejected, F-UI-08), F-UI-03 and T-M4-03 are prerequisites for the first version. | done (2026-11-04) |
 | D-16 | **English everywhere, German as a translation**: code, comments, documentation, PLAN.md and everything on GitHub in English. The product is English by default, German can be chosen. One catalog `internal/i18n/de.json`, translated at the point of display (`internal/tui`, `h()` in the frontend), the language follows `system.locale` | The project owner's decision on 2026-11-05/06 (Q-07): the project is public and speaks English on GitHub, and contributors should be able to read everything. German stays selectable because the target group includes non-experts in Germany. Translating at the point of display keeps the call sites simple: error messages from the helper stay plain strings. | done (2026-11-06) |
+| D-18 | **Wi-Fi access point through `hostapd`, as an optional extension** with a justified exception to NF-09: only `hostapd` comes from *universe* (F-WIFI). The adapter keeps its kernel name in `config.json` (`wifi.interface`), `hostapd` puts it into the bridge `lan0` itself. Downloaded through the web interface only if an adapter exists | The project owner's decision on 2026-11-06 (Q-06), replaces "external access points only" as the only option. Alternative `wpa_supplicant` in AP mode (in *main*) rejected: unusual, few guides (P-10), no DFS and no automatic channel selection as far as known, bridge behavior not verifiable without hardware. Why the exception is acceptable: `hostapd` and `wpasupplicant` (*main*) are built from the same source package `wpa`, and the security pockets of 22.04 and 24.04 carry identical versions of both [S-18]. That is observed practice, not a promise: Canonical's security commitment only covers *main*. The target image only has *main* as a source, so the download adds a *universe* source and pins it to `hostapd` (`/etc/apt/preferences.d/vr-wifi`). Routers without Wi-Fi never get the package, so the base system stays *main* only. Own unit `vr-hostapd.service`, the package's `hostapd.service` is disabled. No `.link` file, because renaming needs a restart and an adapter name like `wlx…` or `wlp…` is stable anyway. `hostapd` has no check mode (P-05): `config.Validate` restricts the values, and the health check after the start (`iw dev … info` reports an access point) triggers the rollback | done (code), hardware test open |
 
 ---
 
@@ -735,7 +754,7 @@ Columns: ID · priority · requirement · status. "Prototype" means: exists in t
 | Q-03 | Rollback of updates | btrfs + snapper + grub-btrfs · A/B partitions · systemd-sysupdate | **implemented: a tool of our own** (btrfs snapshot + GRUB state on the ESP, D-13), hardware test open. Earlier assessment: btrfs snapshots fit P-01 best. snapper is in *universe* on Ubuntu, grub-btrfs is missing entirely [S-15]: either a small tool of our own (`btrfs subvolume snapshot` + apt hook) or snapper as a justified exception. Bootability of snapshots and the automatic rollback are unresolved (3.7), hence a spike in M5. |
 | Q-04 | Who does IPv6 in the LAN (RA, DHCPv6)? | systemd-networkd · dnsmasq | **implemented: systemd-networkd** (RA, SLAAC, PD, one source), dnsmasq only DHCPv4 + DNS. Confirmation by the project owner open |
 | Q-05 | Assistant as a text interface on the screen or as a web interface from a phone? | TUI on tty1 · web through a LAN port · both | **TUI on tty1**, since D-15 only three screens without text input. Everything with input runs through the web interface anyway |
-| Q-06 | Wi-Fi access point in the router? | no (external APs) · hostapd for supported cards | no in version 1 |
+| Q-06 | Wi-Fi access point in the router? | no (external APs) · hostapd for supported cards | **done: hostapd for supported cards, as an optional extension** (D-18, 2026-11-06). External APs keep working |
 | Q-07 | Language of the project (code, documentation, interface) | German · English · both | **done: D-16** (2026-11-06) |
 | Q-08 | ARM (Raspberry Pi 5 and the like)? | later · never | later |
 | Q-09 | TLS for the web interface without a warning | self-signed + instructions · own local CA with an installation aid · HTTP only in the LAN | open |
@@ -809,6 +828,7 @@ Code and unit tests finished (10 packages, all pass on Ubuntu 26.04). Generated 
 | T-M4-06 | Show the address and setup code on tty1 after every start, until the web interface is set up (F-INST-17) | `vr-webui prepare` writes `/run/issue.d/50-vanilla-router.issue` (agetty shows it before login), without a code after the first password (`console.setup_done`). QR code still missing | done except for QR |
 | T-M4-07 | Image with reserved `vr/stick.json` and signed manifest (3.9.1, 3.12) | `image/build.sh`, signing tool | tool `cmd/vr-sign` done (keygen, manifest with search for the reservation, verify), image open |
 | T-M4-08 | Stick creator for Windows (F-STICK-01 to 10) | `cmd/vr-stick`: window with Win32 through `syscall` (list, buttons, progress, file choice), manifest as a resource through `internal/winres` (own .syso, no third-party tool), `packaging/build-stick-exe.sh`. `internal/windisk` (USB bus only, system, program and cache drive excluded, lock and dismount volumes, NO_BUFFERING), `internal/stickwrite` (verify before writing, partition table last, enter `stick.json`, read back), `internal/manifest`, `internal/windefaults` (CLDR `windowsZones`). Download with resume, cache, offline fallback. Tests on Linux and Windows, window checked as a preview. Checked with a real stick and a signed test image (2026-11-05). Since 0.12 in the logo's style: header with logo, custom buttons and progress bar, logo as the program icon | done |
+| T-M4-09 | Wi-Fi access point (F-WIFI, D-18) | `config.WiFi` (schema stays 1, the block is optional), `gen` (`/etc/vanilla-router/wifi/hostapd.conf`, networkd leaves the adapter alone), group `wifi` in `apply` with confirmation and health check, `apply.PrepareWiFiPackages`, helper actions `wifi.*`, `sys` reads adapters from sysfs and parses `iw`, page `web/static/views/wifi.js`, test instance with `VR_WIFI=1` and a simulated adapter. Checked: unit tests, golden files, apt pinning with `apt-cache policy`, the page in the browser against the test instance. **Not checked: anything with a real radio** (test plan 7.3, step 8) | done (untested on hardware) |
 | T-M5-01 | Snapshot before each apt run, GRUB entry "state before the update", state on the ESP | `internal/snapshot`, `packaging/grub.d`, apt hook | done (untested on hardware) |
 | T-M5-02 | Health check after start, automatic rollback | `vr-health.service`, `panic=10`, watchdog. Restart only on an attempt after an update (no restart loop) | done (untested on hardware) |
 
@@ -829,6 +849,7 @@ The order is chosen so that each step only needs the result of the previous one.
    the new name.
 7. **Rollback after an update**: `vrctl snapshot pre-update`, then deliberately break `vr-dnsmasq` (e.g. `systemctl mask vr-dnsmasq`), restart → vr-health
    restarts, GRUB takes the snapshot, afterwards the old state runs and stays after another restart.
+8. **Wi-Fi** (F-WIFI, needs a Wi-Fi adapter, a Hyper-V VM has none): the page appears, "Download Wi-Fi software" works and `apt-cache policy` shows only `hostapd` from *universe*. Switch on with 2.4 GHz → a phone connects with WPA2 and with WPA3, gets an address from the home network, appears in the list of devices, reaches the internet and a device on a cable, and a device block applies to it. 5 GHz with 80 MHz. Wrong channel for the country → error message and the old state. Change the password without confirming → the old one is back after 5 minutes. Reboot → the access point comes up by itself. Check whether the hardening of `vr-hostapd.service` is too tight.
 
 ---
 
@@ -865,6 +886,7 @@ The order is chosen so that each step only needs the result of the previous one.
 | R-07 | The stick creator overwrites the wrong disk | USB bus only, never the system drive, size limit with additional confirmation, name and size in the warning (F-STICK-03) |
 | R-08 | SmartScreen or virus scanners warn about the stick creator, non-experts give up | code signing (Q-17), reproducible build, checksums on the download page, instructions with screenshots |
 | R-09 | The computer does not start from the stick (boot order, Secure Boot, old BIOS computers) | note on boot menu keys (F-STICK-10), shim for Secure Boot (Q-16), list of tested devices |
+| R-10 | Wi-Fi adapters differ widely: many built-in cards refuse an access point on 5 GHz or do not support it at all, and nothing here has run on a real radio yet | The page shows what the adapter reports (`iw phy`), a failed start rolls back with the message from `hostapd`, external access points stay the recommended way for good coverage |
 
 ---
 
@@ -931,6 +953,7 @@ Research from 2026-11-04. Forums are marked as such and must be confirmed in the
 | S-15 | `apt-cache show` on the prototype (Ubuntu 26.04, 2026-11-04) | *main*: dnsmasq-base, nftables, ppp, btrfs-progs, kea-dhcp4-server. *universe*: dnsmasq, fail2ban, snapper, mkosi. grub-btrfs: no package |
 | S-16 | https://www.gnu.org/licenses/agpl-3.0.txt | license text AGPL version 3 (November 19, 2007), in the repo as `LICENSE` |
 | S-17 | https://www.tmdn.org/tmview/ (search "vanilla", classes 9/38/42, offices DE/EM/WO/AT/CH/BX, 2026-11-05) · https://euipo.europa.eu/eSearch/#details/trademarks/018129708 | Trademark search for the name (Q-13): 18 hits, no trademark "vanilla router"; "VANILLA" by Cinnamon B.V. with class 42 |
+| S-18 | `apt-cache policy` in Ubuntu 26.04 (2026-11-06) · http://archive.ubuntu.com/ubuntu/dists/noble-security/ · http://archive.ubuntu.com/ubuntu/dists/jammy-security/ | `hostapd` is in *universe*, `iw`, `wireless-regdb`, `rfkill` and `wpasupplicant` in *main*. `hostapd` and `wpasupplicant` share the source package `wpa`. Security pockets: noble both `2:2.10-21ubuntu0.2`, jammy both `2:2.10-6ubuntu2.2` |
 
 ---
 
@@ -958,3 +981,4 @@ Research from 2026-11-04. Forums are marked as such and must be confirmed in the
 | 0.19 | 2026-11-06 | Installer: the final unmount no longer fails on the busy cgroup mount under /sys, the restart no longer needs programs from the unplugged stick (both found in the VM). First complete installation in a VM: the installed system boots and shows the address and setup code. Assistant: spinner with seconds while waiting and during installation (L-21), clean console (screen cleared, machine-id set on the stick so systemd no longer tries first-boot presets). Lab fixed for WSL (VLAN setup, FIFOs under /tmp, pure Go build), first complete run: 5 of 5 passed (T-M1-01). Translation: single-line patterns no longer match across lines |
 | 0.18 | 2026-11-06 | Everything in English (D-16, Q-07 done): code, comments, documentation, this document (`docs/architecture.md`, `docs/development.md`). The product is English by default, German is selectable through `internal/i18n` (F-UI-05, F-INST-10). The language question comes first in the assistant. First build of the boot stick with mkosi, starts in VirtualBox (T-M3-04): fixes for the signed boot loader, services after the presets, `fdisk` on the stick and a tool check at build time (L-19, L-20). Q-21 new |
 | 0.20 | 2026-11-06 | Pre-release 0.0.2. Tested on Hyper-V (Generation 2, Secure Boot on): the stick boots, cable detection, installation (17 s), restart without the stick and the start from the disk work without any workaround; the project owner set up the router and used the web interface by hand ("basically works", no systematic checklist). The source link of the web interface was still a placeholder, now GitHub, tagged per version (F-UI-07). F-UPD-02 and 03 statuses brought in line with T-M5. Q-22 (self-update), `CHANGELOG.md` |
+| 0.21 | 2026-11-06 | Wi-Fi access point as an optional extension through `hostapd` (D-18, Q-06 done, F-WIFI, T-M4-09, R-10, S-18, non-goal in 1.4 narrowed). Exception to NF-09 for this one package, decided by the project owner. Done in code, not tested with a real radio |

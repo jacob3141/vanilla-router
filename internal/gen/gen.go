@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 // Package gen generates all service files from a validated configuration (P-04, M2):
-// systemd-networkd, nftables, dnsmasq, pppd, sysctl, sshd, resolved and unattended-upgrades.
+// systemd-networkd, nftables, dnsmasq, pppd, hostapd, sysctl, sshd, resolved and unattended-upgrades.
 // Generating is a pure function without access to the system, so it can be tested with golden
 // files (NF-04). internal/apply does the applying.
 package gen
@@ -27,6 +27,7 @@ const (
 	GroupResolved = "resolved"
 	GroupSSH      = "ssh"
 	GroupAPT      = "apt"
+	GroupWiFi     = "wifi"
 )
 
 // File is a generated file.
@@ -45,6 +46,7 @@ var Managed = []struct{ Dir, Glob, Group string }{
 	{"/etc/systemd/network", "*-vr-*.network", GroupNetworkd},
 	{"/etc/vanilla-router/nft", "*.nft", GroupFirewall},
 	{"/etc/ppp/peers", "vr-*", GroupPPP},
+	{"/etc/vanilla-router/wifi", "*.conf", GroupWiFi},
 }
 
 // Header is in every generated text file.
@@ -112,6 +114,11 @@ func Render(c *config.Config, sec Secrets) ([]File, error) {
 		return nil, err
 	}
 	add(ppp...)
+	wifi, err := wifiFiles(c, sec)
+	if err != nil {
+		return nil, err
+	}
+	add(wifi...)
 	add(misc(c)...)
 
 	sort.Slice(files, func(i, j int) bool { return files[i].Path < files[j].Path })

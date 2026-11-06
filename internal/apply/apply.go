@@ -187,7 +187,7 @@ func (a *Applier) Apply(c *config.Config, sec gen.Secrets, opt Options) (*Result
 		a.logf("error after applying: %v. Rolling back …", err)
 		return nil, errors.Join(err, a.restore(genID))
 	}
-	if opt.Confirm > 0 && (groups[gen.GroupNetworkd] || groups[gen.GroupFirewall] || groups[gen.GroupPPP]) {
+	if opt.Confirm > 0 && (groups[gen.GroupNetworkd] || groups[gen.GroupFirewall] || groups[gen.GroupPPP] || groups[gen.GroupWiFi]) {
 		if err := a.schedule(genID, opt); err != nil {
 			a.logf("rollback timer not started (%v), rolling back immediately …", err)
 			return nil, errors.Join(err, a.restore(genID))
@@ -398,6 +398,9 @@ func (a *Applier) reload(groups map[string]bool, c *config.Config) ([]string, er
 			run("pppoe", nil, "systemctl", "disable", "--now", "vr-pppoe.service")
 		}
 	}
+	if groups[gen.GroupWiFi] {
+		reloadWiFi(c, run)
+	}
 	if groups[gen.GroupDNSmasq] {
 		run("dnsmasq", nil, "systemctl", "restart", "vr-dnsmasq.service")
 	}
@@ -499,6 +502,9 @@ func (a *Applier) health(groups map[string]bool, c *config.Config) error {
 			}
 			return nil
 		})
+	}
+	if groups[gen.GroupWiFi] && gen.WiFiOn(c) {
+		checks = append(checks, func() error { return a.wifiHealthy(c) })
 	}
 	deadline := a.now().Add(timeout)
 	for {

@@ -228,6 +228,14 @@ through the assistant and the installation, with stalls of several minutes, but 
 The home network adapter needs `--nicpromisc2 allow-all`: the bridge `lan0` has a MAC of its own, and VirtualBox otherwise
 only passes frames for the adapter's MAC. ARP answers then arrive, but nothing else does.
 
+**Wi-Fi** needs a real adapter, and neither Hyper-V nor the WSL kernel offer one (the WSL kernel has no `mac80211_hwsim`). The
+test plan is step 8 in PLAN.md 7.3. What works without a radio: `VR_WIFI=1 test/dev/webui.sh` for the page, and the real `hostapd`
+for the syntax of a generated file. It reports unknown options first and only then fails at the missing adapter:
+
+```bash
+hostapd internal/gen/testdata/wifi-5-80/out/etc/vanilla-router/wifi/hostapd.conf
+```
+
 ## 6. Trying it out without a router
 
 ### 6.1 Web interface
@@ -250,9 +258,13 @@ randomly created at the first start and only applies to this test instance.
 | another port | `test/dev/webui.sh 9500` |
 | test setup after detected PPPoE | `VR_DETECTED=pppoe test/dev/webui.sh` |
 | see the German translation | `VR_LOCALE=de_DE.UTF-8 test/dev/webui.sh` |
+| Wi-Fi page without hardware | `VR_WIFI=1 test/dev/webui.sh` (simulated adapter, before and after the download, with two devices) |
 | see what a change generates | `test/dev/work/root/etc/…` after saving in the web interface |
 | debugging | `test/dev/work/helper.log`, `test/dev/work/serve.log` |
 | frontend changed | restart the script (the files are embedded in the binary) |
+
+Run the script from a Linux file system when you save passwords: on a Windows drive under WSL (`/mnt/e`) every file
+has mode 777, and secrets are rejected for that.
 
 Live values (traffic, devices) come from the development machine itself. Interfaces like `wan0` do not exist
 there, so those displays stay empty. That is not an error.

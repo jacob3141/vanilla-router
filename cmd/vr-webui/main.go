@@ -137,6 +137,7 @@ func cmdServe(args []string) error {
 	fsock := fl.String("files", filesSock, "socket of the file service")
 	origins := fl.String("origins", "", "allowed origins, comma-separated (default from the configuration)")
 	dev := fl.Bool("dev", false, "test instance: HTTP instead of HTTPS, only for 127.0.0.1 through an SSH tunnel")
+	fakeWiFi := fl.Bool("fake-wifi", false, "test instance: show the Wi-Fi page without hardware")
 	fl.Parse(args)
 
 	ni, err := loadNet(*cfgPath)
@@ -202,6 +203,7 @@ func cmdServe(args []string) error {
 
 	srv := api.New(api.Config{
 		Dev:       *dev,
+		FakeWiFi:  *dev && *fakeWiFi,
 		Origins:   orig,
 		Static:    static,
 		Store:     store,
@@ -309,6 +311,7 @@ func cmdHelper(args []string) error {
 	allow := fl.String("allow-user", webUser, "user allowed to call the helper")
 	dryRun := fl.Bool("dry-run", false, "dry run: write files under --root, apply nothing")
 	root := fl.String("root", "", "root for the dry run")
+	fakeWiFi := fl.Bool("fake-wifi", false, "dry run: simulate a Wi-Fi adapter")
 	fl.Parse(args)
 
 	// In a dry run it works without root (development): the checks with nft and dnsmasq are then skipped.
@@ -329,7 +332,7 @@ func cmdHelper(args []string) error {
 	defer cancel()
 	return helper.NewServer(helper.Config{
 		Socket: *sock, AllowUID: uid, SocketGID: gid,
-		DryRun: *dryRun, Root: *root, Log: logger(),
+		DryRun: *dryRun, Root: *root, Log: logger(), FakeWiFi: *fakeWiFi,
 	}).Run(ctx)
 }
 

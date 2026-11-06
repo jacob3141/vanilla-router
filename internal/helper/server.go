@@ -28,6 +28,7 @@ type Config struct {
 	AllowUID   int    // besides root only this user may connect
 	SocketGID  int    // group of the socket
 	DryRun     bool   // dry run: write files only under Root, apply nothing
+	FakeWiFi   bool   // only with DryRun: simulate a Wi-Fi adapter for the test instance
 	Root       string // root for files written in a dry run, otherwise "/"
 	SecretsDir string // secrets for vrctl apply (PPPoE), default /etc/vanilla-router/secrets
 	Log        *slog.Logger
@@ -38,6 +39,7 @@ type Server struct {
 	handlers map[string]Handler
 	mu       sync.Mutex // protects state.json and the managed files
 	pending  *pendingChange
+	wifi     wifiHW
 }
 
 func NewServer(cfg Config) *Server {
@@ -47,7 +49,10 @@ func NewServer(cfg Config) *Server {
 	if cfg.SecretsDir == "" {
 		cfg.SecretsDir = "/etc/vanilla-router/secrets"
 	}
-	s := &Server{cfg: cfg, handlers: map[string]Handler{}}
+	s := &Server{cfg: cfg, handlers: map[string]Handler{}, wifi: realWiFi{}}
+	if cfg.DryRun && cfg.FakeWiFi {
+		s.wifi = fakeWiFi{mu: &installFlag{}}
+	}
 	s.registerAll()
 	return s
 }
@@ -224,5 +229,6 @@ func (s *Server) registerAll() {
 	s.registerSysinfo()
 	s.registerExtras()
 	s.registerSettings()
+	s.registerWiFi()
 	s.registerConsole()
 }

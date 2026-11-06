@@ -2,6 +2,13 @@
 
 Pre-releases: **not ready for production use**. See [the status](docs/architecture.md#15-status-what-has-been-tested-for-real).
 
+## Unreleased
+
+### Added
+
+- Wi-Fi access point as an optional extension (F-WIFI, D-18): a Wi-Fi adapter in the router joins the home network, so addresses, names and firewall work as on a cable. The new page sets network name, password, band, channel, channel width, country and on/off, and shows the connected devices. Changes roll back without confirmation within 5 minutes. **Never tested with a real radio so far.**
+- `hostapd` comes from Ubuntu's *universe* and is downloaded on request only if an adapter exists. Apt is limited to this one package from *universe*.
+
 ## 0.0.2 (2026-11-06)
 
 First release with a boot stick image and a complete installation, tested in a virtual machine.

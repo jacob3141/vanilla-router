@@ -27,6 +27,7 @@ First release with a boot stick image and a complete installation, tested in a v
 ### Known limits
 
 - The image and the package are **not signed**. Compare them with `SHA256SUMS` from this release page.
+- The image is split into two parts, because GitHub allows at most 2 GiB per file. Join them before use: `cat vanilla-router-stick-0.0.2.raw.gz.part* > vanilla-router-stick-0.0.2.raw.gz` on Linux, `copy /b vanilla-router-stick-0.0.2.raw.gz.part1 + vanilla-router-stick-0.0.2.raw.gz.part2 vanilla-router-stick-0.0.2.raw.gz` in the Windows command prompt.
 - An installed router cannot update vanilla-router itself yet. Ubuntu's security updates do work.
 - Rollback after a broken update has only been tested with a fake system.
 - Never tested on real router hardware, nor with a real PPPoE line.

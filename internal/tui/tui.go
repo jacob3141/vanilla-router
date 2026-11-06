@@ -264,7 +264,7 @@ func (p *Prompt) MenuAsync(options []string, def int) (<-chan int, func()) {
 						p.draw(options, sel, true)
 					}
 				case KeyEnter:
-					fmt.Fprintf(p.Out, "  → %s\n", options[sel])
+					fmt.Fprintf(p.Out, "  → %s\n", i18n.T(options[sel]))
 					out <- sel
 					return
 				}
@@ -304,7 +304,7 @@ func (p *Prompt) draw(options []string, sel int, redraw bool) {
 	if !p.Plain {
 		b.WriteString("\r\x1b[K")
 	}
-	b.WriteString("  (arrow keys ↑ ↓, Enter)\n")
+	b.WriteString(i18n.T("  (arrow keys ↑ ↓, Enter)\n"))
 	io.WriteString(p.Out, b.String())
 }
 

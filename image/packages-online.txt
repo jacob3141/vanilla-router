@@ -1,0 +1,3 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Fetched by the router as soon as it is online (vrctl complete, D-17): the rest of Ubuntu Server (D-12).
+ubuntu-server

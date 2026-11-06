@@ -28,6 +28,8 @@ install -Dm644 -t "$STAGE/usr/lib/systemd/system" packaging/systemd/*
 install -Dm644 packaging/sysusers.d/vanilla-router.conf "$STAGE/usr/lib/sysusers.d/vanilla-router.conf"
 install -Dm644 packaging/tmpfiles.d/vanilla-router.conf "$STAGE/usr/lib/tmpfiles.d/vanilla-router.conf"
 install -Dm644 LICENSE "$STAGE/usr/share/doc/vanilla-router/copyright"
+mkdir -p "$STAGE/usr/share/vanilla-router"
+grep -v '^\s*#' image/packages-online.txt >"$STAGE/usr/share/vanilla-router/online-packages"
 install -Dm644 packaging/system.conf.d/vanilla-router.conf "$STAGE/usr/lib/systemd/system.conf.d/vanilla-router.conf"
 # Under /etc: configuration files of the package (conffiles), may be adapted
 install -Dm755 packaging/grub.d/42_vanilla_router "$STAGE/etc/grub.d/42_vanilla_router"

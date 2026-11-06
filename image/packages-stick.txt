@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 # Boot stick: a small system for the assistant (vr-install) and the installation tools.
-linux-generic
+linux-image-generic
 linux-firmware
 shim-signed
 grub-efi-amd64-signed

@@ -1,0 +1,11 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Tries again until the router is online. PPPoE lines only get internet after the credentials are entered.
+[Unit]
+Description=vanilla-router try to complete the system
+
+[Timer]
+OnBootSec=1min
+OnUnitInactiveSec=3min
+
+[Install]
+WantedBy=timers.target

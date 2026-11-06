@@ -12,6 +12,8 @@ cd "$(dirname "$0")/.."
 command -v mkosi >/dev/null || { echo "mkosi is missing (sudo apt install mkosi)" >&2; exit 1; }
 VERSION=${1:-0.0.0~dev$(date -u +%Y%m%d%H%M)}
 
+# Only this version: apt would otherwise pick the highest version in the folder, and 0.1~dev sorts below 0.1.
+rm -f dist/vanilla-router_*.deb
 bash packaging/build-deb.sh "$VERSION"
 # The local package folder needs an index
 (cd dist && dpkg-scanpackages --multiversion . /dev/null > Packages)

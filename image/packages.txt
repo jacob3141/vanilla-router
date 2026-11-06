@@ -1,7 +1,10 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-# Packages of the target system (PLAN.md 3.2, D-10, D-12). One line per package, # for comments.
+# Base system from the stick, works without internet (PLAN.md 3.2, D-10, D-17). One line per package, # for comments.
+# The rest of Ubuntu Server is in packages-online.txt.
 # test/check-main.sh checks that these packages and all their dependencies come from Ubuntu main (NF-09).
-ubuntu-server
+ubuntu-minimal
+systemd-resolved
+ca-certificates
 nftables
 dnsmasq-base
 ppp

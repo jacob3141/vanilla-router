@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 # Additionally in the image of the target system (not a dependency of the package): kernel, boot loader, language.
-linux-generic
+linux-image-generic
+initramfs-tools
 shim-signed
 grub-efi-amd64-signed
 grub-efi-amd64

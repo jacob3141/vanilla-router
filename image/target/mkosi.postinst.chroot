@@ -5,3 +5,11 @@ set -e
 locale-gen en_US.UTF-8 de_DE.UTF-8 de_AT.UTF-8 de_CH.UTF-8
 # Leave machine-id empty: each installed device creates its own at the first start
 : > /etc/machine-id
+# Fail the build, not the user's start: without an initrd the kernel cannot mount btrfs and panics.
+ls /boot/vmlinuz-* /boot/initrd.img-* >/dev/null || { echo "target system has no kernel or initrd" >&2; exit 1; }
+# Only the firmware of network cards stays, the rest is most of the image's size.
+# The stick needs nothing else, the router restores it with vrctl complete (D-17).
+if [ -d /usr/lib/firmware ]; then
+	find /usr/lib/firmware -mindepth 1 -maxdepth 1 \
+		! -name rtl_nic ! -name intel ! -name bnx2 ! -name bnx2x ! -name tigon -exec rm -rf {} +
+fi

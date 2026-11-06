@@ -1,0 +1,12 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Fetches what the small base system from the stick does not contain, once the router is online (D-17).
+[Unit]
+Description=vanilla-router complete the system from the internet
+After=network-online.target vr-firewall.service
+ConditionPathExists=!/var/lib/vanilla-router/online-complete
+
+[Service]
+Type=oneshot
+ExecStart=/usr/sbin/vrctl complete
+TimeoutStartSec=2h
+Nice=10

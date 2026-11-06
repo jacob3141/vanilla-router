@@ -14,6 +14,7 @@
 //	vrctl setup [--dry-run]           adjust Ubuntu Server once (D-12)
 //	vrctl snapshot pre-update|list    snapshots (M5), the apt hook calls pre-update
 //	vrctl health [--mark-good] [--timeout 10m] [--reboot-on-fail]
+//	vrctl complete                    fetch the rest of the system once online (D-17)
 package main
 
 import (
@@ -65,6 +66,8 @@ func main() {
 		err = cmdSnapshot(args)
 	case "health":
 		err = cmdHealth(args)
+	case "complete":
+		err = applier().Complete()
 	case "-h", "--help", "help":
 		usage()
 	default:
@@ -86,7 +89,7 @@ func main() {
 }
 
 func usage() {
-	fmt.Fprint(os.Stderr, `vrctl validate | render | apply | confirm | rollback | status | default | secret | firewall-load | setup | snapshot | health
+	fmt.Fprint(os.Stderr, `vrctl validate | render | apply | confirm | rollback | status | default | secret | firewall-load | setup | snapshot | health | complete
 Help for a command: vrctl <command> -h
 `)
 	os.Exit(2)

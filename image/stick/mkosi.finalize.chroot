@@ -6,6 +6,12 @@ set -e
 for tool in blkid btrfs chroot mkfs.btrfs mkfs.vfat mount sfdisk sync systemctl tar udevadm umount wipefs zstd; do
 	command -v "$tool" >/dev/null || { echo "stick image lacks $tool" >&2; exit 1; }
 done
+# Only the firmware of network cards stays, the rest is most of the image's size.
+# The stick needs nothing else, the router restores it with vrctl complete (D-17).
+if [ -d /usr/lib/firmware ]; then
+	find /usr/lib/firmware -mindepth 1 -maxdepth 1 \
+		! -name rtl_nic ! -name intel ! -name bnx2 ! -name bnx2x ! -name tigon -exec rm -rf {} +
+fi
 # With an empty machine-id, systemd treats every start as the first boot and tries to apply presets on
 # the read-only stick, which fills the console with errors.
 tr -d - </proc/sys/kernel/random/uuid >/etc/machine-id

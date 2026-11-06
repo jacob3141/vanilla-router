@@ -86,9 +86,11 @@ func (a *Applier) Setup(dryRun bool, offline string) ([]string, error) {
 		os.Remove(p)
 		return os.Symlink("../run/systemd/resolve/resolv.conf", p)
 	})
-	step("turn off unneeded services: snapd, multipathd, iscsid, NetworkManager", soft("disable", "--now",
-		"snapd.socket", "snapd.service", "snapd.seeded.service", "multipathd.socket", "multipathd.service",
-		"iscsid.socket", "open-iscsi.service", "NetworkManager.service"))
+	step("turn off unneeded services: snapd, multipathd, iscsid, NetworkManager, ModemManager, VM tools, LXD installer", soft("disable", "--now",
+		"snapd.socket", "snapd.service", "snapd.seeded.service", "snapd.apparmor.service", "snapd.autoimport.service",
+		"snapd.core-fixup.service", "snapd.recovery-chooser-trigger.service", "snapd.snap-repair.timer",
+		"multipathd.socket", "multipathd.service", "iscsid.socket", "open-iscsi.service", "NetworkManager.service",
+		"ModemManager.service", "open-vm-tools.service", "lxd-installer.socket"))
 	step("turn on network services: systemd-networkd, vr-firewall, vr-dnsmasq, health check", hard("enable",
 		"systemd-networkd.service", "vr-firewall.service", "vr-firewall-reload.timer", "vr-dnsmasq.service",
 		"vr-health.service", "vr-webui-helper.service", "vr-webui.service", "vr-complete.timer"))

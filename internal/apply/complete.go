@@ -14,8 +14,9 @@ import (
 const (
 	// OnlinePackagesFile lists the packages to fetch, one per line (image/packages-online.txt).
 	OnlinePackagesFile = "/usr/share/vanilla-router/online-packages"
-	// CompleteStamp marks a finished system. vr-complete.service does not run once it exists.
-	CompleteStamp = "/var/lib/vanilla-router/online-complete"
+	// CompleteStamp marks a finished system. vr-complete.service does not run once it exists. It lies on the root
+	// subvolume, not in the state folder: a rollback takes the packages away, so it must take the stamp as well.
+	CompleteStamp = "/var/lib/vanilla-router-online-complete"
 )
 
 // aptEnv makes apt run without questions and keep local configuration files.
@@ -52,9 +53,23 @@ func (a *Applier) Complete() error {
 	if err := apt(append([]string{"install"}, append(dpkg, pkgs...)...)...); err != nil {
 		return err
 	}
-	// The image only keeps the firmware of network cards (image/target/mkosi.postinst.chroot).
-	if err := apt(append([]string{"install", "--reinstall"}, append(dpkg, "linux-firmware")...)...); err != nil {
-		return err
+	// The image only keeps the firmware of network cards (image/target/mkosi.postinst.chroot). Ubuntu splits
+	// the firmware into linux-firmware-*, the package linux-firmware alone would restore almost nothing.
+	out, err := a.Run.Run(aptEnv, "dpkg-query", "-W", "-f=${db:Status-Abbrev} ${Package}\n", "linux-firmware*")
+	if err != nil {
+		return fmt.Errorf("dpkg-query: %v", err)
+	}
+	// The pattern also lists packages that dpkg only knows by name, such as linux-firmware-raspi2.
+	var fw []string
+	for _, line := range strings.Split(string(out), "\n") {
+		if f := strings.Fields(line); len(f) == 2 && f[0] == "ii" {
+			fw = append(fw, f[1])
+		}
+	}
+	if len(fw) > 0 {
+		if err := apt(append([]string{"install", "--reinstall"}, append(dpkg, fw...)...)...); err != nil {
+			return err
+		}
 	}
 	if _, err := a.Setup(false, ""); err != nil {
 		return err

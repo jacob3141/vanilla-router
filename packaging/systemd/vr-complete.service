@@ -3,7 +3,7 @@
 [Unit]
 Description=vanilla-router complete the system from the internet
 After=network-online.target vr-firewall.service
-ConditionPathExists=!/var/lib/vanilla-router/online-complete
+ConditionPathExists=!/var/lib/vanilla-router-online-complete
 
 [Service]
 Type=oneshot

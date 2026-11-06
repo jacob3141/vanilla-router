@@ -205,9 +205,11 @@ because the bridge `lan0` has a MAC of its own). The stick becomes a second SCSI
 `VBoxManage convertfromraw` or `qemu-img` to VHD, `Convert-VHD` to VHDX. `Disconnect-VMNetworkAdapter` and
 `Connect-VMNetworkAdapter` are the cables, `Remove-VMHardDiskDrive` unplugs the stick while the VM runs.
 
-Before connecting the home network adapter, give the Windows side of the internal switch a fixed address **without a
-gateway** (`192.168.42.2/24`, needs an elevated shell). Otherwise Windows gets a lease and a default route from the VM,
-and because that adapter often has the lower metric, the PC's own traffic goes through the test router.
+**Keep the test router away from your PC's name resolution.** The safest home network is a *private* switch without a
+Windows adapter, with a second VM as the client. If Windows has to reach the VM over an internal switch, first turn IPv6
+off on that adapter and give it a fixed address **without a gateway** (both need an elevated shell). Otherwise the VM's
+DHCP lease and IPv6 router advertisements give Windows a route and a DNS server, and the name `router.home.arpa` then
+points to the test router instead of your real one.
 
 The boot stick can also be tried in VirtualBox: a VM with EFI, a 32 GB SATA disk and two network adapters, the
 first as NAT (the "modem"), the second as host-only (the "home network", without VirtualBox's DHCP server, with

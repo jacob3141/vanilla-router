@@ -173,14 +173,17 @@ func PartPath(dev string, n int) string {
 
 // GPT types: EFI system partition and Linux root x86-64 per the Discoverable Partitions Specification.
 const (
-	TypeESP      = "C12A7328-F81F-11D2-BA4B-00A0C93EC93B"
-	TypeRootX64  = "4F68BCE3-E8CD-4DB1-96E7-FBCAF984B709"
-	ESPSizeMiB   = 1024
-	RootLabel    = "vanilla-router"
-	ESPLabel     = "EFI"
-	SubvolRoot   = "@"
-	SubvolLog    = "@log"
-	SubvolSnaps  = "@snapshots"
+	TypeESP     = "C12A7328-F81F-11D2-BA4B-00A0C93EC93B"
+	TypeRootX64 = "4F68BCE3-E8CD-4DB1-96E7-FBCAF984B709"
+	ESPSizeMiB  = 1024
+	RootLabel   = "vanilla-router"
+	ESPLabel    = "EFI"
+	SubvolRoot  = "@"
+	SubvolLog   = "@log"
+	SubvolSnaps = "@snapshots"
+	// Outside of @, so that rolling back an update keeps password, configuration and secrets (F-UPD-08).
+	SubvolConfig = "@config"
+	SubvolState  = "@state"
 	MountOptions = "compress=zstd:1,noatime"
 )
 

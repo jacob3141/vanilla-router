@@ -7,6 +7,8 @@ locale-gen en_US.UTF-8 de_DE.UTF-8 de_AT.UTF-8 de_CH.UTF-8
 : > /etc/machine-id
 # Fail the build, not the user's start: without an initrd the kernel cannot mount btrfs and panics.
 ls /boot/vmlinuz-* /boot/initrd.img-* >/dev/null || { echo "target system has no kernel or initrd" >&2; exit 1; }
+# Without a package source the router silently gets no security updates (F-SEC-05).
+grep -q '^Suites:.*-security' /etc/apt/sources.list.d/ubuntu.sources || { echo "target system has no package source" >&2; exit 1; }
 # Only the firmware of network cards stays, the rest is most of the image's size.
 # The stick needs nothing else, the router restores it with vrctl complete (D-17).
 if [ -d /usr/lib/firmware ]; then

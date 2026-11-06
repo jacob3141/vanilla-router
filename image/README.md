@@ -2,7 +2,7 @@
 
 | Folder | Result | Content |
 |---|---|---|
-| `target/` | `rootfs.tar.zst` | Ubuntu Server 26.04 (package set of `ubuntu-server`, D-12) with vanilla-router, kernel, shim + GRUB |
+| `target/` | `rootfs.tar.zst` | small base system of Ubuntu 26.04 (D-17) with vanilla-router, kernel, shim + GRUB, the router fetches the rest of `ubuntu-server` once online |
 | `stick/` | `vanilla-router-stick.raw` | a small Ubuntu, assistant `vr-install` on tty1, containing `rootfs.tar.zst` |
 
 Building: `image/build.sh [version]` (mkosi, root or user namespaces, internet). It needs a real Linux file system
@@ -10,7 +10,7 @@ Building: `image/build.sh [version]` (mkosi, root or user namespaces, internet).
 `zstd`, `systemd-repart` and `btrfs-progs` on the build machine.
 
 **Status 2026-11-06:** built with mkosi 26 on Ubuntu 26.04. In a Hyper-V Generation 2 VM with Secure Boot on, the stick
-boots, the installation completes and the installed system starts from its disk (Ubuntu's signed shim + GRUB, fstab
+boots, the installation completes and the installed system starts from its disk and completes itself online (Ubuntu's signed shim + GRUB, fstab
 with subvolumes). Still to check: real hardware.
 
 Notes from the first build:

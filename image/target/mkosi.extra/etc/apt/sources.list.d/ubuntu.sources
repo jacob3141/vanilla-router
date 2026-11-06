@@ -1,0 +1,7 @@
+# Written by vanilla-router. Without this file the system gets no updates at all, not even security updates.
+# Only main, the rule for the target system (NF-09). Extensions that need more add their own file (D-18).
+Types: deb
+URIs: http://archive.ubuntu.com/ubuntu
+Suites: resolute resolute-updates resolute-security
+Components: main
+Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg

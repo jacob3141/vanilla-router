@@ -257,6 +257,14 @@ unattended-upgrades applies security updates. So that a broken update does not t
 3. Healthy: confirm the start. Not healthy: restart, GRUB takes the snapshot. Renaming the subvolumes makes
    the rollback permanent.
 4. It restarts **only** after an update attempt. Otherwise a permanent failure would cause a restart loop.
+5. `/etc/vanilla-router` and `/var/lib/vanilla-router` are subvolumes of their own (`@config`, `@state`), so a rollback
+   keeps password, configuration and secrets (F-UPD-08). Files generated from them outside these folders go back to
+   the snapshot's state until the next change is applied.
+
+The stick only installs a small base system (D-17). `vr-complete.timer` runs `vrctl complete` until it succeeds: it
+fetches `ubuntu-server` and restores all firmware packages (the image keeps only the firmware of network cards), then
+runs `vrctl setup` again, because the new packages bring services. This goes through the same apt hook, so it is
+covered by the snapshot and the health check.
 
 vanilla-router itself does **not update yet**: there is no package source for it, so an installed router keeps its
 version (F-UPD-04, design question Q-22 in PLAN.md).
@@ -406,7 +414,9 @@ Honestly: not much yet. The exact status per task is in PLAN.md 7.
 | Boot stick (mkosi) | built, starts in Hyper-V with Secure Boot on; the assistant detects the cable and offers only the right disk |
 | Installation | complete run in a Hyper-V VM, including the restart without the stick and the start from the disk with Secure Boot. **Not yet on real hardware** |
 | Namespace lab | all 5 scenarios pass (WSL2, real netlink, raw sockets, VLAN 7) |
-| Rollback after an update, PPPoE on a real line | **untested**, test plan in PLAN.md 7.3 |
+| Online step (`vrctl complete`) | runs in the VM in about 5 minutes; snapshot, next start and confirmation work |
+| DHCP and DNS on the installed router | offer seen by a network-boot client in the VM; no complete lease yet |
+| Rollback after a **broken** update, PPPoE on a real line | **untested**, test plan in PLAN.md 7.3 |
 | Wi-Fi access point | unit tests, golden files, the real `hostapd` reads the generated files, apt pinning, page against the test instance with a simulated adapter. **Never run with a real radio**, see section 16 |
 
 ## 16. Wi-Fi access point

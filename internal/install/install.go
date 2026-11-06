@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 // Package install writes the target system to the disk (PLAN.md 3.9.2 S8, 3.9.4):
-// partitions (GPT: ESP + btrfs with @, @log, @snapshots), system from the image, settings from
+// partitions (GPT: ESP + btrfs with @, @log, @snapshots, @config, @state), system from the image, settings from
 // config.json, bootloader (shim + GRUB, Secure Boot, Q-16) and services. Nothing is written to
 // the disk before this step (a principle of the assistant).
 package install
@@ -138,7 +138,7 @@ func (in *Installer) Install(p Plan) (err error) {
 	if err := run(nil, "mount", root, T); err != nil {
 		return err
 	}
-	for _, sv := range []string{disk.SubvolRoot, disk.SubvolLog, disk.SubvolSnaps} {
+	for _, sv := range []string{disk.SubvolRoot, disk.SubvolLog, disk.SubvolSnaps, disk.SubvolConfig, disk.SubvolState} {
 		if err := run(nil, "btrfs", "subvolume", "create", filepath.Join(T, sv)); err != nil {
 			run(nil, "umount", T)
 			return err
@@ -152,7 +152,10 @@ func (in *Installer) Install(p Plan) (err error) {
 		return err
 	}
 	mounted = true
-	for _, m := range []struct{ dir, sv string }{{"var/log", disk.SubvolLog}, {".snapshots", disk.SubvolSnaps}} {
+	for _, m := range []struct{ dir, sv string }{
+		{"var/log", disk.SubvolLog}, {".snapshots", disk.SubvolSnaps},
+		{"etc/vanilla-router", disk.SubvolConfig}, {"var/lib/vanilla-router", disk.SubvolState},
+	} {
 		if err := os.MkdirAll(filepath.Join(T, m.dir), 0o755); err != nil {
 			return err
 		}
@@ -254,6 +257,8 @@ func writeSystemFiles(T string, p Plan, rootUUID, espUUID string, files []gen.Fi
 UUID=%[1]s  /            btrfs  subvol=@,%[3]s          0 0
 UUID=%[1]s  /var/log     btrfs  subvol=@log,%[3]s       0 0
 UUID=%[1]s  /.snapshots  btrfs  subvol=@snapshots,%[3]s 0 0
+UUID=%[1]s  /etc/vanilla-router  btrfs  subvol=@config,%[3]s 0 0
+UUID=%[1]s  /var/lib/vanilla-router  btrfs  subvol=@state,%[3]s 0 0
 UUID=%[2]s  /boot/efi    vfat   umask=0077               0 1
 `, rootUUID, espUUID, mo)
 	hosts := fmt.Sprintf("127.0.0.1\tlocalhost\n127.0.1.1\t%s.%s %s\n::1\tlocalhost ip6-localhost ip6-loopback\n",

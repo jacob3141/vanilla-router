@@ -18,7 +18,7 @@ func (s *Server) registerAdmin() {
 	s.route("GET /api/system/hardware", s.get("hw.get"))
 	s.route("GET /api/system/update-history", s.get("updates.history.get"))
 	s.route("GET /api/fail2ban", s.get("fail2ban.status.get"))
-	s.route("POST /api/fail2ban/unban", s.forward("fail2ban.unban", "Sperre aufgehoben."))
+	s.route("POST /api/fail2ban/unban", s.forward("fail2ban.unban", "Block removed."))
 	s.route("GET /api/samba", s.get("samba.status.get"))
 	s.route("GET /api/logs/system", s.handleJournal)
 	s.route("GET /api/logs/changes", s.get("uilog.get"))
@@ -30,7 +30,7 @@ func (s *Server) registerAdmin() {
 	s.route("POST /api/tools/port", s.forward("tool.port", ""))
 }
 
-// Export: alles, was die Oberfläche verwaltet (keine Passwörter, keine Systemdateien).
+// Export: everything the web interface manages (no passwords, no system files).
 func (s *Server) handleExport(w http.ResponseWriter, r *http.Request) {
 	var info helper.NetconfInfo
 	if err := s.call(r, "netconf.get", nil, &info); err != nil {
@@ -45,7 +45,7 @@ func (s *Server) handleExport(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	s.devices.mu.Unlock()
-	w.Header().Set("Content-Disposition", `attachment; filename="vanilla-router-konfiguration-`+time.Now().Format("2006-01-02")+`.json"`)
+	w.Header().Set("Content-Disposition", `attachment; filename="vanilla-router-config-`+time.Now().Format("2006-01-02")+`.json"`)
 	b, _ := json.MarshalIndent(map[string]any{
 		"routerui_export": 1, "exported": time.Now().UTC(), "state": info.State, "device_names": meta,
 	}, "", "  ")
@@ -64,7 +64,7 @@ func (s *Server) handleImport(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if req.Export != 1 || len(req.State) == 0 {
-		writeError(w, http.StatusBadRequest, "Das ist keine Export-Datei der Oberfläche.")
+		writeError(w, http.StatusBadRequest, "This is not an export file of the web interface.")
 		return
 	}
 	var out map[string]any
@@ -77,9 +77,9 @@ func (s *Server) handleImport(w http.ResponseWriter, r *http.Request) {
 			s.devices.SetMeta(n, m.Alias, m.Note)
 		}
 	}
-	msg := "Konfiguration eingespielt."
+	msg := "Configuration applied."
 	if fw, _ := out["firewall_changed"].(bool); fw {
-		msg += " Weiterleitungen oder Sperren haben sich geändert: Bitte auf der Firewall-Seite innerhalb von 60 Sekunden bestätigen."
+		msg += " Port forwards or blocks have changed: please confirm on the firewall page within 60 seconds."
 	}
 	writeJSON(w, map[string]any{"ok": true, "message": msg, "data": out})
 }
@@ -120,15 +120,15 @@ func (s *Server) handleSessionDelete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !s.cfg.Sessions.DeleteID(req.ID) {
-		writeError(w, http.StatusNotFound, "Diese Sitzung gibt es nicht mehr.")
+		writeError(w, http.StatusNotFound, "This session no longer exists.")
 		return
 	}
 	s.cfg.Log.Info("auth: session revoked", "ip", clientIP(r))
-	writeJSON(w, map[string]any{"ok": true, "message": "Sitzung abgemeldet."})
+	writeJSON(w, map[string]any{"ok": true, "message": "Session signed out."})
 }
 
-// handleDHCPSettings zeigt die DHCP-Einstellungen aus config.json (nur lesen). Die Schlüssel heißen
-// wie im Prototyp (dhcpd), damit das Frontend unverändert bleibt.
+// handleDHCPSettings shows the DHCP settings from config.json (read-only). The keys are named
+// as in the prototype (dhcpd), so the frontend stays unchanged.
 func (s *Server) handleDHCPSettings(w http.ResponseWriter, r *http.Request) {
 	var info helper.NetconfInfo
 	if err := s.call(r, "netconf.get", nil, &info); err != nil {

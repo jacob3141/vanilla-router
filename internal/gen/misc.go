@@ -9,22 +9,22 @@ import (
 	"vanilla-router/internal/config"
 )
 
-// pppFiles erzeugt die pppd-Konfiguration für PPPoE und die Zugangsdaten (0600).
-// Ohne PPPoE werden die Secrets-Dateien leer geschrieben, damit kein altes Passwort liegen bleibt.
+// pppFiles generates the pppd configuration for PPPoE and the credentials (0600).
+// Without PPPoE the secrets files are written empty, so no old password stays behind.
 func pppFiles(c *config.Config, sec Secrets) ([]File, error) {
 	secrets := header("#")
 	var fs []File
 	if c.WAN.Type == config.WANPPPoE {
 		p := c.WAN.PPPoE
 		if sec == nil {
-			return nil, fmt.Errorf("PPPoE-Passwort %q: keine Geheimnisse verfügbar", p.PasswordRef)
+			return nil, fmt.Errorf("PPPoE password %q: no secrets available", p.PasswordRef)
 		}
 		pw, err := sec.Get(p.PasswordRef)
 		if err != nil {
-			return nil, fmt.Errorf("PPPoE-Passwort %q: %w", p.PasswordRef, err)
+			return nil, fmt.Errorf("PPPoE password %q: %w", p.PasswordRef, err)
 		}
 		if pw == "" || len(pw) > 128 || strings.ContainsAny(pw, "\"\\\n\r\x00") {
-			return nil, fmt.Errorf("Das PPPoE-Passwort ist leer, zu lang oder enthält \" bzw. \\ (das kann pppd nicht)")
+			return nil, fmt.Errorf("The PPPoE password is empty, too long, or contains \" or \\ (pppd cannot handle that)")
 		}
 		secrets += fmt.Sprintf("%q * %q *\n", p.User, pw)
 		mtu := 1492
@@ -82,14 +82,14 @@ net.ipv4.tcp_syncookies = 1
 net.netfilter.nf_conntrack_max = 262144
 `)
 
-	// resolved bleibt aktiv (Ubuntu-Standard, D-12), gibt aber Port 53 für dnsmasq frei. Bewusst ohne
-	// DNS=127.0.0.1: dnsmasq liest seine Upstreams aus /run/systemd/resolve/resolv.conf, das wäre eine
-	// Schleife. /etc/resolv.conf zeigt deshalb auf diese Datei statt auf den Stub (apply.EnsureSystem).
+	// resolved stays active (Ubuntu default, D-12), but frees port 53 for dnsmasq. Deliberately without
+	// DNS=127.0.0.1: dnsmasq reads its upstreams from /run/systemd/resolve/resolv.conf, that would be a
+	// loop. /etc/resolv.conf therefore points to this file instead of the stub (apply.EnsureSystem).
 	add("/etc/systemd/resolved.conf.d/10-vr.conf", GroupResolved, 0o644, header("#")+`[Resolve]
 DNSStubListener=no
 `)
 
-	// SSH: Konfiguration immer erzeugen, ob der Dienst läuft, entscheidet apply (F-SEC-04).
+	// SSH: always generate the configuration, apply decides whether the service runs (F-SEC-04).
 	add("/etc/ssh/sshd_config.d/10-vr.conf", GroupSSH, 0o644, header("#")+`PasswordAuthentication no
 KbdInteractiveAuthentication no
 PermitRootLogin no

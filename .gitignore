@@ -1,14 +1,14 @@
-# Lokale, umgebungsspezifische Hinweise fÃ¼r Agenten (nie committen)
+# Local, environment-specific notes for agents (never commit)
 CLAUDE.local.md
 .claude/settings.local.json
 
-# Zugangsdaten von Testinstanzen, Backups, Audit-Ergebnisse
+# Credentials of test instances, backups, audit results
 /dev/
 backups/
 audits/
 *.local.json
 
-# Build und Tests
+# Build and tests
 /dist/
 *.deb
 /out/
@@ -18,7 +18,7 @@ audits/
 test/vm/work/
 test/lab/work/
 
-# Editor und System
+# Editor and system
 .vscode/
 .idea/
 *.swp

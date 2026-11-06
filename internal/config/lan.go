@@ -7,14 +7,14 @@ import (
 	"net/netip"
 )
 
-// MoveLAN setzt eine neue Adresse für das Heimnetz (z. B. 192.168.50.1/24) und verschiebt alle
-// Adressen, die im alten Netz liegen (DHCP-Bereich, Reservierungen, DNS-Einträge, Portweiterleitungen),
-// ins neue Netz. Der hintere Teil der Adresse bleibt gleich: 192.168.42.20 wird zu 192.168.50.20.
-// Passt eine Adresse nicht ins neue Netz (kleineres Netz), gibt es einen Fehler und nichts ändert sich.
+// MoveLAN sets a new address for the home network (e.g. 192.168.50.1/24) and moves all
+// addresses in the old network (DHCP range, reservations, DNS records, port forwards)
+// into the new network. The rear part of the address stays: 192.168.42.20 becomes 192.168.50.20.
+// If an address does not fit into the new network (smaller network), there is an error and nothing changes.
 func (c *Config) MoveLAN(ipv4 string) error {
 	np, err := netip.ParsePrefix(ipv4)
 	if err != nil || !np.Addr().Is4() {
-		return fmt.Errorf("Adresse mit Präfix erwartet, z. B. 192.168.42.1/24")
+		return fmt.Errorf("address with prefix expected, e.g. 192.168.42.1/24")
 	}
 	oldNet, _, err := c.LANPrefix()
 	if err != nil {
@@ -24,15 +24,15 @@ func (c *Config) MoveLAN(ipv4 string) error {
 	move := func(s string) (string, error) {
 		a, err := netip.ParseAddr(s)
 		if err != nil || !a.Is4() || !oldNet.Contains(a) {
-			return s, nil // nicht aus dem Heimnetz (z. B. ein öffentlicher DNS-Eintrag): unverändert
+			return s, nil // not from the home network (e.g. a public DNS record): unchanged
 		}
 		host := u32(a) - u32(oldNet.Addr())
 		if host >= uint32(1)<<(32-newNet.Bits()) {
-			return "", fmt.Errorf("%s passt nicht in das kleinere Netz %s", a, newNet)
+			return "", fmt.Errorf("%s does not fit into the smaller network %s", a, newNet)
 		}
 		return addrFrom(u32(newNet.Addr()) + host).String(), nil
 	}
-	// Erst alles auf einer Kopie umrechnen, damit bei einem Fehler nichts halb geändert ist.
+	// First convert everything on a copy, so that an error leaves nothing half changed.
 	n := *c
 	n.DHCP.Reservations = append([]Reservation(nil), c.DHCP.Reservations...)
 	n.DNS.Records = append([]Record(nil), c.DNS.Records...)

@@ -34,10 +34,10 @@ func TestReadNetDev(t *testing.T) {
 		t.Fatal(err)
 	}
 	if m["wan0"].RxBytes != 883477661617 || m["wan0"].TxBytes != 74155433235 {
-		t.Errorf("wan0 falsch gelesen: %+v", m["wan0"])
+		t.Errorf("wan0 read wrongly: %+v", m["wan0"])
 	}
 	if _, ok := m["face |bytes"]; ok {
-		t.Error("Kopfzeile als Interface gelesen")
+		t.Error("header line read as an interface")
 	}
 }
 
@@ -47,7 +47,7 @@ func TestDefaultGateway(t *testing.T) {
 		"lan0\t0000000A\t00000000\t0001\t0\t0\t0\t000000FF\t0\t0\t0\n"})
 	gw, dev := DefaultGatewayV4()
 	if gw != "192.0.2.1" || dev != "wan0" {
-		t.Errorf("Gateway = %s via %s, erwartet 192.0.2.1 via wan0", gw, dev)
+		t.Errorf("gateway = %s via %s, expected 192.0.2.1 via wan0", gw, dev)
 	}
 }
 
@@ -60,7 +60,7 @@ func TestTemperaturePrefersPackage(t *testing.T) {
 	})
 	c, ok := Temperature()
 	if !ok || c != 45.5 {
-		t.Errorf("Temperatur = %v (%v), erwartet 45.5", c, ok)
+		t.Errorf("temperature = %v (%v), expected 45.5", c, ok)
 	}
 }
 
@@ -68,6 +68,6 @@ func TestMemory(t *testing.T) {
 	fakeRoot(t, map[string]string{"proc/meminfo": "MemTotal:        7450000 kB\nMemFree:          240000 kB\nMemAvailable:    5300000 kB\n"})
 	m, err := ReadMemory()
 	if err != nil || m.Total != 7450000*1024 || m.Available != 5300000*1024 {
-		t.Errorf("Speicher falsch gelesen: %+v %v", m, err)
+		t.Errorf("memory read wrongly: %+v %v", m, err)
 	}
 }

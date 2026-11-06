@@ -8,8 +8,8 @@ import (
 	"syscall"
 )
 
-// Conntrack-Tabelle direkt per Netlink lesen (NETLINK_NETFILTER, ctnetlink). Auf dem Router gibt
-// es weder das Programm conntrack noch /proc/net/nf_conntrack.
+// Read the conntrack table directly via netlink (NETLINK_NETFILTER, ctnetlink). The router has
+// neither the conntrack program nor /proc/net/nf_conntrack.
 
 const (
 	netlinkNetfilter    = 12
@@ -49,7 +49,7 @@ type Conn struct {
 	Dst      string `json:"dst"`
 	SrcPort  uint16 `json:"sport,omitempty"`
 	DstPort  uint16 `json:"dport,omitempty"`
-	ReplySrc string `json:"reply_src,omitempty"` // bei DNAT: das eigentliche Ziel im LAN
+	ReplySrc string `json:"reply_src,omitempty"` // with DNAT: the actual target in the LAN
 	State    string `json:"state,omitempty"`
 	Timeout  uint32 `json:"timeout"`
 	DNAT     bool   `json:"dnat,omitempty"`
@@ -70,7 +70,7 @@ func parseAttrs(b []byte) []nlattr {
 			break
 		}
 		out = append(out, nlattr{t & nlaTypeMask, b[4:l]})
-		adv := (l + 3) &^ 3 // Attribute sind auf 4 Byte ausgerichtet
+		adv := (l + 3) &^ 3 // attributes are aligned to 4 bytes
 		if adv > len(b) {
 			break
 		}
@@ -136,10 +136,10 @@ func protoName(p uint8) string {
 	case 58:
 		return "icmpv6"
 	}
-	return "andere"
+	return "other"
 }
 
-// parseCTMessage liest eine einzelne ctnetlink-Nachricht (ohne Netlink-Kopf, ab nfgenmsg).
+// parseCTMessage reads a single ctnetlink message (without the netlink header, from nfgenmsg).
 func parseCTMessage(b []byte) (Conn, bool) {
 	if len(b) < 4 {
 		return Conn{}, false
@@ -175,7 +175,7 @@ func parseCTMessage(b []byte) (Conn, bool) {
 	return c, true
 }
 
-// dumpConntrack liefert alle Verbindungen einer Adressfamilie (AF_INET oder AF_INET6).
+// dumpConntrack returns all connections of an address family (AF_INET or AF_INET6).
 func dumpConntrack(family uint8, limit int) ([]Conn, error) {
 	fd, err := syscall.Socket(syscall.AF_NETLINK, syscall.SOCK_RAW|syscall.SOCK_CLOEXEC, netlinkNetfilter)
 	if err != nil {

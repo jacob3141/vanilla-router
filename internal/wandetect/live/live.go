@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-// Package live verbindet den Automaten aus wandetect mit echter Hardware: Netlink-Ereignisse,
-// Einschalten der Ports und Proben. Genutzt von vr-detect und vom Installer (S3/S4).
+// Package live connects the automaton from wandetect with real hardware: netlink events,
+// turning ports on and probes. Used by vr-detect and the installer (S3/S4).
 package live
 
 import (
@@ -13,30 +13,33 @@ import (
 	"net/netip"
 	"strings"
 	"time"
+	"vanilla-router/internal/i18n"
 
 	"vanilla-router/internal/netdetect"
 	"vanilla-router/internal/probe"
 	"vanilla-router/internal/wandetect"
 )
 
-// Options steuert den Ablauf.
+// Options controls the flow.
 type Options struct {
 	ProbeTimeout time.Duration
 	RetryDelay   time.Duration
 	ListOpts     netdetect.Options
-	// Menu zeigt eine Auswahl, während die Erkennung weiterläuft (tui.Prompt.MenuAsync), bedient nur
-	// mit Pfeiltasten und Enter (P-11). nil = keine Eingaben.
+	// Menu shows a choice while detection continues (tui.Prompt.MenuAsync), operated only
+	// with arrow keys and Enter (P-11). nil = no input.
 	Menu func(options []string, def int) (<-chan int, func())
+	// Spinner shows that detection is alive while it waits (tui.Prompt.StartSpinner). nil = none.
+	Spinner func(text string) (stop func())
 }
 
-// Menüs während der Erkennung.
+// Menus during detection.
 const (
 	menuNoAnswer = "no-answer"
 	menuWaiting  = "hint-modem"
 	menuList     = "list"
 )
 
-// Output ist das Ergebnis.
+// Output is the result.
 type Output struct {
 	WAN      string            `json:"wan"`
 	WANMAC   string            `json:"wan_mac"`
@@ -44,20 +47,20 @@ type Output struct {
 	LANMACs  []string          `json:"lan_macs"`
 	Method   wandetect.Method  `json:"method"`
 	DHCP     string            `json:"dhcp_offer,omitempty"`
-	DHCPNet  string            `json:"dhcp_net,omitempty"` // Netz am WAN, das LAN muss es meiden
+	DHCPNet  string            `json:"dhcp_net,omitempty"` // network on the WAN, the LAN must avoid it
 	PPPoE    *PPPoE            `json:"pppoe,omitempty"`
 	Ports    map[string]string `json:"ports"`
 	Labels   map[string]string `json:"labels"`
 	WANLabel string            `json:"wan_label"`
 }
 
-// PPPoE beschreibt den gefundenen Zugangsserver.
+// PPPoE describes the access server found.
 type PPPoE struct {
 	VLAN   int    `json:"vlan"`
 	ACName string `json:"ac_name"`
 }
 
-// Run führt den Nutzer durch die Erkennung. Braucht Root-Rechte.
+// Run guides the user through detection. Needs root.
 func Run(ctx context.Context, out io.Writer, ports []netdetect.Port, opt Options) (Output, error) {
 	if opt.ProbeTimeout == 0 {
 		opt.ProbeTimeout = 5 * time.Second
@@ -72,7 +75,7 @@ func Run(ctx context.Context, out io.Writer, ports []netdetect.Port, opt Options
 		labels[p.Name] = p.Label()
 	}
 
-	// Erst den Watcher öffnen, dann einschalten und den Zustand lesen: So geht kein Ereignis verloren.
+	// First open the watcher, then turn on and read the state: that way no event gets lost.
 	w, err := netdetect.NewLinkWatcher()
 	if err != nil {
 		return Output{}, err
@@ -83,7 +86,7 @@ func Run(ctx context.Context, out io.Writer, ports []netdetect.Port, opt Options
 			return Output{}, err
 		}
 	}
-	time.Sleep(500 * time.Millisecond) // Treiber melden den Link oft erst kurz nach dem Einschalten
+	time.Sleep(500 * time.Millisecond) // Drivers often report the link only shortly after being turned on
 
 	cfg := wandetect.DefaultConfig
 	cfg.RetryDelay = opt.RetryDelay
@@ -101,10 +104,25 @@ func Run(ctx context.Context, out io.Writer, ports []netdetect.Port, opt Options
 		}
 	}()
 
-	// Höchstens ein Menü ist offen. Jede neue Meldung des Automaten schließt es, weil sich der
-	// Zustand geändert hat (z. B. wurde inzwischen ein Kabel eingesteckt).
+	// At most one menu is open. Each new message from the automaton closes it, because the
+	// state has changed (e.g. a cable has been plugged in in the meantime).
 	var menuCh <-chan int
 	var menuCancel func()
+	var stopSpin func()
+	spinOff := func() {
+		if stopSpin != nil {
+			stopSpin()
+			stopSpin = nil
+		}
+	}
+	defer spinOff()
+	spinOn := func() {
+		if opt.Spinner != nil && stopSpin == nil && menuCh == nil {
+			if text := statusText(m.State()); text != "" {
+				stopSpin = opt.Spinner(text)
+			}
+		}
+	}
 	menuKind, listFrom := "", ""
 	closeMenu := func() {
 		if menuCancel != nil {
@@ -115,6 +133,7 @@ func Run(ctx context.Context, out io.Writer, ports []netdetect.Port, opt Options
 	defer closeMenu()
 	openMenu := func(kind string, options []string) {
 		closeMenu()
+		spinOff()
 		if opt.Menu == nil {
 			return
 		}
@@ -126,8 +145,9 @@ func Run(ctx context.Context, out io.Writer, ports []netdetect.Port, opt Options
 		for _, p := range ports {
 			opts = append(opts, p.Label())
 		}
-		fmt.Fprintln(out, "→ Welcher Anschluss ist mit dem Modem verbunden?")
-		openMenu(menuList, append(opts, "Zurück"))
+		spinOff()
+		fmt.Fprintln(out, i18n.T("→ Which port is connected to the modem?"))
+		openMenu(menuList, append(opts, "Back"))
 	}
 
 	exec := func(acts []wandetect.Action) *wandetect.Result {
@@ -135,12 +155,13 @@ func Run(ctx context.Context, out io.Writer, ports []netdetect.Port, opt Options
 			switch a := a.(type) {
 			case wandetect.Say:
 				closeMenu()
-				fmt.Fprintln(out, "→ "+a.Text)
+				spinOff()
+				fmt.Fprintln(out, "→ "+i18n.T(a.Text))
 				switch a.ID {
 				case menuNoAnswer:
-					openMenu(menuNoAnswer, []string{"Noch einmal versuchen", "Diesen Anschluss trotzdem verwenden", "Anschluss selbst auswählen"})
+					openMenu(menuNoAnswer, []string{"Try again", "Use this port anyway", "Choose the port myself"})
 				case menuWaiting:
-					openMenu(menuWaiting, []string{"Weiter warten", "Anschluss selbst auswählen"})
+					openMenu(menuWaiting, []string{"Keep waiting", "Choose the port myself"})
 				}
 			case wandetect.StartProbe:
 				p := byName[a.Port]
@@ -153,6 +174,7 @@ func Run(ctx context.Context, out io.Writer, ports []netdetect.Port, opt Options
 					cancelProbe = nil
 				}
 			case wandetect.Finished:
+				spinOff()
 				r := a.Result
 				return &r
 			}
@@ -165,8 +187,9 @@ func Run(ctx context.Context, out io.Writer, ports []netdetect.Port, opt Options
 	}
 	for {
 		if err := ctx.Err(); err != nil {
-			return Output{}, errors.New("abgebrochen")
+			return Output{}, errors.New("cancelled")
 		}
+		spinOn()
 		var acts []wandetect.Action
 		select {
 		case pr := <-probeDone:
@@ -181,8 +204,8 @@ func Run(ctx context.Context, out io.Writer, ports []netdetect.Port, opt Options
 				listFrom = kind
 				listMenu()
 			} else if kind == menuList && ev == nil && listFrom == menuNoAnswer && m.State() == wandetect.StateNoAnswer {
-				// „Zurück“ aus der Liste: wieder die Auswahl von vorher, sonst stünde man ohne Menü da
-				openMenu(menuNoAnswer, []string{"Noch einmal versuchen", "Diesen Anschluss trotzdem verwenden", "Anschluss selbst auswählen"})
+				// "Back" from the list: the previous choice again, otherwise you would be left without a menu
+				openMenu(menuNoAnswer, []string{"Try again", "Use this port anyway", "Choose the port myself"})
 			} else if ev != nil {
 				acts = m.Handle(ev, time.Now())
 			}
@@ -213,8 +236,8 @@ func Run(ctx context.Context, out io.Writer, ports []netdetect.Port, opt Options
 	}
 }
 
-// menuEvent übersetzt eine Wahl in ein Ereignis für den Automaten. list = true: die Liste der
-// Anschlüsse zeigen. Kein Ereignis und keine Liste: nichts tun (weiter warten, zurück).
+// menuEvent translates a choice into an event for the automaton. list = true: show the list of
+// ports. No event and no list: do nothing (keep waiting, back).
 func menuEvent(kind string, choice int, ports []netdetect.Port) (wandetect.Event, bool) {
 	switch kind {
 	case menuNoAnswer:
@@ -259,11 +282,27 @@ func runProbe(ctx context.Context, p netdetect.Port, timeout time.Duration) wand
 		if po.Error != "" {
 			continue
 		}
-		if !pr.PPPoE || po.VLAN == 0 { // ohne VLAN bevorzugen, falls beides antwortet
+		if !pr.PPPoE || po.VLAN == 0 { // prefer without VLAN if both answer
 			pr.PPPoE, pr.PPPoEVLAN, pr.ACName = true, po.VLAN, po.ACName
 		}
 	}
 	return pr
+}
+
+// statusText says what the flow is waiting for, shown next to the spinner. Empty: nothing to show,
+// the user has to decide.
+func statusText(s wandetect.State) string {
+	switch s {
+	case wandetect.StateUnplug:
+		return "Waiting for the cables to be unplugged"
+	case wandetect.StateWaitModem:
+		return "Waiting for the cable"
+	case wandetect.StateSettling, wandetect.StateProbing:
+		return "Checking the connection"
+	case wandetect.StateRetryWait:
+		return "Waiting for the next attempt"
+	}
+	return ""
 }
 
 func readLinks(ports []netdetect.Port, lo netdetect.Options) (map[string]bool, error) {
@@ -304,24 +343,24 @@ func buildOutput(ports []netdetect.Port, r wandetect.Result) Output {
 	return o
 }
 
-// Summary beschreibt das Ergebnis für Laien.
+// Summary describes the result for non-experts.
 func (o Output) Summary() string {
 	var b strings.Builder
-	fmt.Fprintf(&b, "Internet-Anschluss: %s\n", o.WANLabel)
+	fmt.Fprintf(&b, "Internet port: %s\n", o.WANLabel)
 	switch {
 	case o.DHCP != "":
-		fmt.Fprintf(&b, "  Das Modem vergibt automatisch eine Adresse (%s).\n", o.DHCP)
+		fmt.Fprintf(&b, "  The modem hands out an address automatically (%s).\n", o.DHCP)
 	case o.PPPoE != nil && o.PPPoE.VLAN != 0:
-		fmt.Fprintf(&b, "  Einwahl mit Zugangsdaten (PPPoE über VLAN %d).\n", o.PPPoE.VLAN)
+		fmt.Fprintf(&b, "  Dial-up with credentials (PPPoE over VLAN %d).\n", o.PPPoE.VLAN)
 	case o.PPPoE != nil:
-		b.WriteString("  Einwahl mit Zugangsdaten (PPPoE).\n")
+		b.WriteString("  Dial-up with credentials (PPPoE).\n")
 	default:
-		b.WriteString("  Kein Modem hat geantwortet. Die Einstellungen lassen sich später ändern.\n")
+		b.WriteString("  No modem answered. You can change the settings later.\n")
 	}
 	var lan []string
 	for _, n := range o.LAN {
 		lan = append(lan, o.Labels[n])
 	}
-	fmt.Fprintf(&b, "Heimnetz: %s\n", strings.Join(lan, ", "))
-	return b.String()
+	fmt.Fprintf(&b, "Home network: %s\n", strings.Join(lan, ", "))
+	return i18n.T(b.String())
 }

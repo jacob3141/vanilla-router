@@ -1,21 +1,21 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: AGPL-3.0-or-later
 #
-# Baut den Stick-Ersteller für Windows (PLAN.md 3.12, T-M4-08) → dist/vanilla-router-stick.exe
-#   VR_MANIFEST_URL  Adresse von manifest.json (https), leer: nur lokale Abbild-Dateien (Q-19)
-#   VR_PUBLIC_KEYS   öffentliche Schlüssel (base64, mit Komma getrennt) aus „vr-sign keygen“
-# Aufruf: packaging/build-stick-exe.sh [Version]
+# Builds the stick creator for Windows (PLAN.md 3.12, T-M4-08) → dist/vanilla-router-stick.exe
+#   VR_MANIFEST_URL  URL of manifest.json (https), empty: local image files only (Q-19)
+#   VR_PUBLIC_KEYS   public keys (base64, comma-separated) from "vr-sign keygen"
+# Usage: packaging/build-stick-exe.sh [version]
 set -euo pipefail
 cd "$(dirname "$0")/.."
 VERSION=${1:-0.0.0~dev$(date -u +%Y%m%d%H%M)}
 : "${VR_MANIFEST_URL:=}" "${VR_PUBLIC_KEYS:=}"
 for v in "$VR_MANIFEST_URL" "$VR_PUBLIC_KEYS"; do
-	[[ $v =~ ^[A-Za-z0-9:/._~+=,%-]*$ ]] || { echo "ungültige Angabe: $v" >&2; exit 1; }
+	[[ $v =~ ^[A-Za-z0-9:/._~+=,%-]*$ ]] || { echo "invalid value: $v" >&2; exit 1; }
 done
-[ -n "$VR_PUBLIC_KEYS" ] || echo "Warnung: kein Schlüssel, der Ersteller wird jedes Abbild ablehnen" >&2
+[ -n "$VR_PUBLIC_KEYS" ] || echo "Warning: no key, the creator will reject every image" >&2
 
-# Die .syso nur für diesen Build: Liegt sie im Paketordner, landet sie auch in Test-Binaries, und
-# „go test ./cmd/vr-stick“ verlangt unter Windows dann Administratorrechte.
+# The .syso only for this build: if it stays in the package folder, it also ends up in test binaries,
+# and "go test ./cmd/vr-stick" then requires administrator rights on Windows.
 trap 'rm -f cmd/vr-stick/*.syso' EXIT
 go generate ./cmd/vr-stick
 mkdir -p dist

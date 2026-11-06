@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-// DHCP-Konstanten (RFC 2131, RFC 2132).
+// DHCP constants (RFC 2131, RFC 2132).
 const (
 	dhcpServerPort = 67
 	dhcpClientPort = 68
@@ -33,7 +33,7 @@ const (
 
 var dhcpMagic = []byte{99, 130, 83, 99}
 
-// Offer ist ein zerlegtes DHCPOFFER.
+// Offer is a parsed DHCPOFFER.
 type Offer struct {
 	ServerMAC net.HardwareAddr
 	YourIP    net.IP
@@ -44,7 +44,7 @@ type Offer struct {
 	Lease     time.Duration
 }
 
-// String für die Anzeige, z. B. „192.0.2.10/24 über 192.0.2.1“.
+// String for display, e.g. "192.0.2.10/24 via 192.0.2.1".
 func (o Offer) String() string {
 	s := o.YourIP.String()
 	if o.Mask != nil {
@@ -52,19 +52,19 @@ func (o Offer) String() string {
 		s += fmt.Sprintf("/%d", ones)
 	}
 	if o.Router != nil {
-		s += " über " + o.Router.String()
+		s += " via " + o.Router.String()
 	}
 	return s
 }
 
-// buildDiscover baut die BOOTP-Nutzdaten eines DHCPDISCOVER. Das Broadcast-Flag ist gesetzt,
-// weil der Port keine Adresse hat und Unicast-Antworten an die angebotene Adresse sonst
-// nicht ankommen würden. Bewusst ohne Hostname und Herstellerkennung (P-09).
+// buildDiscover builds the BOOTP payload of a DHCPDISCOVER. The broadcast flag is set,
+// because the port has no address and unicast responses to the offered address would otherwise
+// not arrive. Deliberately without host name and vendor ID (P-09).
 func buildDiscover(mac net.HardwareAddr, xid uint32) []byte {
 	b := make([]byte, 236, 300)
 	b[0] = bootRequest
 	b[1] = 1 // Ethernet
-	b[2] = 6 // MAC-Länge
+	b[2] = 6 // MAC length
 	binary.BigEndian.PutUint32(b[4:], xid)
 	binary.BigEndian.PutUint16(b[10:], 0x8000) // Broadcast
 	copy(b[28:34], mac)
@@ -72,21 +72,21 @@ func buildDiscover(mac net.HardwareAddr, xid uint32) []byte {
 	b = append(b, optMsgType, 1, dhcpDiscover)
 	b = append(b, optParamList, 4, optSubnet, optRouter, optDNS, optLease)
 	b = append(b, optEnd)
-	for len(b) < 300 { // manche Server erwarten die BOOTP-Mindestlänge
+	for len(b) < 300 { // some servers expect the BOOTP minimum length
 		b = append(b, optPad)
 	}
 	return b
 }
 
-// BuildDiscoverFrame baut den vollständigen Ethernet-Rahmen (Broadcast, 0.0.0.0:68 → 255.255.255.255:67).
+// BuildDiscoverFrame builds the complete Ethernet frame (broadcast, 0.0.0.0:68 → 255.255.255.255:67).
 func BuildDiscoverFrame(mac net.HardwareAddr, xid uint32, ipID uint16) []byte {
 	ip := buildIPv4UDP(net.IPv4zero, net.IPv4bcast, dhcpClientPort, dhcpServerPort, ipID, buildDiscover(mac, xid))
 	return buildFrame(broadcastMAC, mac, 0, etherTypeIPv4, ip)
 }
 
-var errNotOffer = errors.New("kein passendes DHCPOFFER")
+var errNotOffer = errors.New("no matching DHCPOFFER")
 
-// ParseOfferFrame prüft, ob ein Rahmen ein DHCPOFFER für unsere Anfrage (xid, MAC) ist.
+// ParseOfferFrame checks whether a frame is a DHCPOFFER for our request (xid, MAC).
 func ParseOfferFrame(frame []byte, mac net.HardwareAddr, xid uint32) (Offer, error) {
 	f, err := parseFrame(frame)
 	if err != nil || f.EtherType != etherTypeIPv4 || f.VLAN != 0 {
@@ -127,7 +127,7 @@ func parseOffer(b []byte, mac net.HardwareAddr, xid uint32) (Offer, error) {
 			continue
 		}
 		if len(opts) < 2 || len(opts) < 2+int(opts[1]) {
-			return Offer{}, errors.New("DHCP-Option abgeschnitten")
+			return Offer{}, errors.New("DHCP option truncated")
 		}
 		v := opts[2 : 2+int(opts[1])]
 		opts = opts[2+int(opts[1]):]

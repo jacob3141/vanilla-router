@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-// Package manifest beschreibt ein Stick-Abbild und prüft dessen Signatur (F-STICK-04, PLAN.md 3.12).
+// Package manifest describes a stick image and verifies its signature (F-STICK-04, PLAN.md 3.12).
 //
-// Ein Manifest ist eine JSON-Datei (manifest.json) mit einer getrennten Signatur (manifest.json.sig,
-// Ed25519 über die Bytes der Datei, base64). Der Stick-Ersteller kennt die öffentlichen Schlüssel und
-// schreibt nur Abbilder, deren Größe und SHA-256 zum Manifest passen.
+// A manifest is a JSON file (manifest.json) with a separate signature (manifest.json.sig,
+// Ed25519 over the file's bytes, base64). The stick creator knows the public keys and
+// only writes images whose size and SHA-256 match the manifest.
 package manifest
 
 import (
@@ -22,19 +22,19 @@ import (
 	"vanilla-router/internal/stick"
 )
 
-// Schema ist die einzige bekannte Fassung.
+// Schema is the only known version.
 const Schema = 1
 
-// Kompressionen der Download-Datei. Die Standardbibliothek kann nur gzip entpacken (D-01).
+// Compressions of the download file. The standard library can only decompress gzip (D-01).
 const (
 	None = "none"
 	Gzip = "gzip"
 )
 
-// MaxImage begrenzt die Größe eines Abbilds (Schutz vor unsinnigen Angaben).
+// MaxImage limits the size of an image (protection against nonsensical values).
 const MaxImage = 64 << 30
 
-// Manifest beschreibt ein Abbild.
+// Manifest describes an image.
 type Manifest struct {
 	Schema    int       `json:"schema"`
 	Name      string    `json:"name"`
@@ -45,22 +45,22 @@ type Manifest struct {
 	StickJSON StickJSON `json:"stick_json"`
 }
 
-// File ist die Datei, die heruntergeladen wird (eventuell komprimiert).
+// File is the file that is downloaded (possibly compressed).
 type File struct {
 	Name        string `json:"name"`
-	URL         string `json:"url,omitempty"` // relativ zum Manifest oder absolut (https)
+	URL         string `json:"url,omitempty"` // relative to the manifest or absolute (https)
 	Size        int64  `json:"size"`
 	SHA256      string `json:"sha256"`
 	Compression string `json:"compression"`
 }
 
-// Image ist das entpackte Abbild, so wie es auf den Stick kommt (vor dem Eintragen von stick.json).
+// Image is the unpacked image as it goes on the stick (before stick.json is added).
 type Image struct {
 	Size   int64  `json:"size"`
 	SHA256 string `json:"sha256"`
 }
 
-// StickJSON ist die Lage der reservierten Datei vr/stick.json im Abbild (3.9.1).
+// StickJSON is the location of the reserved file vr/stick.json in the image (3.9.1).
 type StickJSON struct {
 	Offset int64 `json:"offset"`
 	Size   int64 `json:"size"`
@@ -73,45 +73,45 @@ var (
 	shaRe     = regexp.MustCompile(`^[0-9a-f]{64}$`)
 )
 
-// Validate prüft alle Angaben.
+// Validate checks all values.
 func (m *Manifest) Validate() error {
 	switch {
 	case m.Schema != Schema:
-		return fmt.Errorf("unbekanntes Schema %d", m.Schema)
+		return fmt.Errorf("unknown schema %d", m.Schema)
 	case !nameRe.MatchString(m.Name):
-		return errors.New("name ungültig")
+		return errors.New("name invalid")
 	case !versionRe.MatchString(m.Version):
-		return errors.New("version ungültig")
+		return errors.New("version invalid")
 	case !fileRe.MatchString(m.File.Name):
-		return errors.New("file.name ungültig")
+		return errors.New("file.name invalid")
 	case m.File.Size <= 0 || m.File.Size > MaxImage:
-		return errors.New("file.size ungültig")
+		return errors.New("file.size invalid")
 	case !shaRe.MatchString(m.File.SHA256):
-		return errors.New("file.sha256 ungültig")
+		return errors.New("file.sha256 invalid")
 	case m.File.Compression != None && m.File.Compression != Gzip:
-		return errors.New("file.compression ungültig")
+		return errors.New("file.compression invalid")
 	case m.Image.Size <= 0 || m.Image.Size > MaxImage || m.Image.Size%512 != 0:
-		return errors.New("image.size ungültig (Vielfaches von 512)")
+		return errors.New("image.size invalid (multiple of 512)")
 	case !shaRe.MatchString(m.Image.SHA256):
-		return errors.New("image.sha256 ungültig")
+		return errors.New("image.sha256 invalid")
 	case m.File.Compression == None && (m.File.Size != m.Image.Size || m.File.SHA256 != m.Image.SHA256):
-		return errors.New("unkomprimiert: file und image müssen gleich sein")
+		return errors.New("uncompressed: file and image must be equal")
 	case m.StickJSON.Size != stick.Size:
-		return fmt.Errorf("stick_json.size muss %d sein", stick.Size)
+		return fmt.Errorf("stick_json.size must be %d", stick.Size)
 	case m.StickJSON.Offset < 1<<20 || m.StickJSON.Offset%512 != 0 || m.StickJSON.Offset+m.StickJSON.Size > m.Image.Size:
-		// Das erste MiB (Partitionstabelle) bleibt unberührt.
-		return errors.New("stick_json.offset ungültig")
+		// The first MiB (partition table) stays untouched.
+		return errors.New("stick_json.offset invalid")
 	}
 	if m.File.URL != "" {
 		u, err := url.Parse(m.File.URL)
 		if err != nil || (u.IsAbs() && u.Scheme != "https") || u.User != nil || strings.Contains(m.File.URL, "..") {
-			return errors.New("file.url ungültig")
+			return errors.New("file.url invalid")
 		}
 	}
 	return nil
 }
 
-// FileURL liefert die Adresse der Download-Datei, aufgelöst gegen die Adresse des Manifests.
+// FileURL returns the URL of the download file, resolved against the manifest's URL.
 func (m *Manifest) FileURL(manifestURL string) (string, error) {
 	base, err := url.Parse(manifestURL)
 	if err != nil {
@@ -127,24 +127,24 @@ func (m *Manifest) FileURL(manifestURL string) (string, error) {
 	}
 	u := base.ResolveReference(r)
 	if u.Scheme != "https" && !(u.Scheme == "http" && isLoopback(u.Hostname())) {
-		return "", errors.New("Abbild nur über HTTPS")
+		return "", errors.New("image over HTTPS only")
 	}
 	return u.String(), nil
 }
 
 func isLoopback(h string) bool { return h == "localhost" || h == "127.0.0.1" || h == "::1" }
 
-// ErrSignature: Die Signatur fehlt, ist kaputt oder stammt nicht von einem bekannten Schlüssel.
-var ErrSignature = errors.New("Signatur passt zu keinem bekannten Schlüssel")
+// ErrSignature: the signature is missing, broken or not from a known key.
+var ErrSignature = errors.New("signature matches no known key")
 
-// PublicKey ist ein vertrauenswürdiger Schlüssel (base64 der 32 Bytes).
+// PublicKey is a trusted key (base64 of the 32 bytes).
 type PublicKey string
 
-// Verify prüft die Signatur von data mit einem der Schlüssel und liest das Manifest.
+// Verify checks the signature of data with one of the keys and reads the manifest.
 func Verify(data, sig []byte, keys []PublicKey) (*Manifest, error) {
 	s, err := base64.StdEncoding.DecodeString(strings.TrimSpace(string(sig)))
 	if err != nil || len(s) != ed25519.SignatureSize {
-		return nil, fmt.Errorf("%w: unlesbar", ErrSignature)
+		return nil, fmt.Errorf("%w: unreadable", ErrSignature)
 	}
 	ok := false
 	for _, k := range keys {
@@ -163,13 +163,13 @@ func Verify(data, sig []byte, keys []PublicKey) (*Manifest, error) {
 	return Parse(data)
 }
 
-// Parse liest ein Manifest ohne Signaturprüfung (nur für Werkzeuge und Tests).
+// Parse reads a manifest without checking the signature (for tools and tests only).
 func Parse(data []byte) (*Manifest, error) {
 	dec := json.NewDecoder(bytes.NewReader(data))
 	dec.DisallowUnknownFields()
 	var m Manifest
 	if err := dec.Decode(&m); err != nil {
-		return nil, fmt.Errorf("Manifest unlesbar: %w", err)
+		return nil, fmt.Errorf("manifest unreadable: %w", err)
 	}
 	if err := m.Validate(); err != nil {
 		return nil, fmt.Errorf("Manifest: %w", err)
@@ -177,7 +177,7 @@ func Parse(data []byte) (*Manifest, error) {
 	return &m, nil
 }
 
-// Encode schreibt ein Manifest (eingerückt, mit Zeilenende).
+// Encode writes a manifest (indented, with a trailing newline).
 func (m *Manifest) Encode() ([]byte, error) {
 	if err := m.Validate(); err != nil {
 		return nil, err
@@ -186,20 +186,20 @@ func (m *Manifest) Encode() ([]byte, error) {
 	return append(b, '\n'), err
 }
 
-// Sign signiert data mit dem privaten Schlüssel (Seed, 32 Bytes) und liefert die Signatur-Datei.
+// Sign signs data with the private key (seed, 32 bytes) and returns the signature file.
 func Sign(data, seed []byte) ([]byte, error) {
 	if len(seed) != ed25519.SeedSize {
-		return nil, errors.New("Schlüssel ungültig")
+		return nil, errors.New("key invalid")
 	}
 	sig := ed25519.Sign(ed25519.NewKeyFromSeed(seed), data)
 	return []byte(base64.StdEncoding.EncodeToString(sig) + "\n"), nil
 }
 
-// Public liefert den öffentlichen Schlüssel zu einem Seed.
+// Public returns the public key for a seed.
 func Public(seed []byte) PublicKey {
 	pk := ed25519.NewKeyFromSeed(seed).Public().(ed25519.PublicKey)
 	return PublicKey(base64.StdEncoding.EncodeToString(pk))
 }
 
-// HexSum ist eine Hilfe für Prüfsummen.
+// HexSum is a helper for checksums.
 func HexSum(sum []byte) string { return hex.EncodeToString(sum) }

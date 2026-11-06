@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-// Package disk findet Datenträger für die Installation und plant die Partitionen (PLAN.md 3.9.4).
+// Package disk finds disks for the installation and plans the partitions (PLAN.md 3.9.4).
 package disk
 
 import (
@@ -12,11 +12,11 @@ import (
 	"strings"
 )
 
-// MinSize ist die kleinste erlaubte Größe des Ziel-Datenträgers (NF-01: „16 GB“). Hersteller rechnen
-// dezimal und ein 16-GB-Speicher hat oft etwas weniger, deshalb 15·10⁹ Byte.
+// MinSize is the smallest allowed size of the target disk (NF-01: "16 GB"). Manufacturers count
+// in decimal and a 16 GB device often has a little less, hence 15·10⁹ bytes.
 const MinSize = 15_000_000_000
 
-// Disk ist ein Datenträger.
+// Disk is a disk.
 type Disk struct {
 	Name       string // sda, nvme0n1, mmcblk0
 	Path       string // /dev/sda
@@ -24,22 +24,22 @@ type Disk struct {
 	Model      string
 	Removable  bool
 	Rotational bool
-	Transport  string // nvme, usb, sata (soweit erkennbar)
-	Boot       bool   // trägt das gerade laufende System (der Stick), nie als Ziel anbieten
+	Transport  string // nvme, usb, sata (as far as detectable)
+	Boot       bool   // carries the currently running system (the stick), never offer as a target
 }
 
-// Label für Laien: „NVMe-SSD Samsung 970 (256 GB)“.
+// Label for non-experts: "NVMe SSD Samsung 970 (256 GB)".
 func (d Disk) Label() string {
 	kind := "SSD"
 	switch {
 	case d.Transport == "nvme":
-		kind = "NVMe-SSD"
+		kind = "NVMe SSD"
 	case d.Transport == "usb" || d.Removable:
-		kind = "USB-Datenträger"
+		kind = "USB drive"
 	case d.Rotational:
-		kind = "Festplatte"
+		kind = "Hard disk"
 	case strings.HasPrefix(d.Name, "mmcblk"):
-		kind = "eMMC-Speicher"
+		kind = "eMMC storage"
 	}
 	s := kind
 	if d.Model != "" {
@@ -48,7 +48,7 @@ func (d Disk) Label() string {
 	return fmt.Sprintf("%s (%s)", s, HumanSize(d.SizeBytes))
 }
 
-// HumanSize schreibt Größen wie Hersteller (Dezimal-GB), damit sie zum Aufdruck passen.
+// HumanSize writes sizes like manufacturers do (decimal GB), so they match the printed label.
 func HumanSize(b int64) string {
 	switch {
 	case b >= 1e12:
@@ -59,7 +59,7 @@ func HumanSize(b int64) string {
 	return fmt.Sprintf("%.0f MB", float64(b)/1e6)
 }
 
-// List liest sysRoot/block. bootDisk (z. B. "sdb") wird als Boot markiert.
+// List reads sysRoot/block. bootDisk (e.g. "sdb") is marked as Boot.
 func List(sysRoot, bootDisk string) ([]Disk, error) {
 	ents, err := os.ReadDir(filepath.Join(sysRoot, "block"))
 	if err != nil {
@@ -74,7 +74,7 @@ func List(sysRoot, bootDisk string) ([]Disk, error) {
 		dir := filepath.Join(sysRoot, "block", n)
 		sectors, err := readInt(filepath.Join(dir, "size"))
 		if err != nil || sectors == 0 {
-			continue // leere Kartenleser u. ä.
+			continue // empty card readers and the like
 		}
 		d := Disk{Name: n, Path: "/dev/" + n, SizeBytes: sectors * 512, Boot: n == bootDisk}
 		d.Removable = readStr(filepath.Join(dir, "removable")) == "1"
@@ -105,10 +105,10 @@ func skipName(n string) bool {
 			return true
 		}
 	}
-	return strings.HasPrefix(n, "mmcblk") && strings.Contains(n, "boot") // eMMC-Bootpartitionen
+	return strings.HasPrefix(n, "mmcblk") && strings.Contains(n, "boot") // eMMC boot partitions
 }
 
-// Candidates liefert die Datenträger, auf die installiert werden darf, größter interner zuerst.
+// Candidates returns the disks that may be installed to, largest internal first.
 func Candidates(ds []Disk) []Disk {
 	var out []Disk
 	for _, d := range ds {
@@ -118,15 +118,15 @@ func Candidates(ds []Disk) []Disk {
 	}
 	sort.SliceStable(out, func(i, j int) bool {
 		if ui, uj := out[i].Transport == "usb", out[j].Transport == "usb"; ui != uj {
-			return uj // interne zuerst
+			return uj // internal ones first
 		}
 		return out[i].SizeBytes > out[j].SizeBytes
 	})
 	return out
 }
 
-// BootDisk findet den Datenträger, auf dem mountpoint (normal "/" oder das Live-Medium) liegt.
-// sysRoot und mountinfo sind für Tests austauschbar.
+// BootDisk finds the disk that mountpoint (normally "/" or the live medium) is on.
+// sysRoot and mountinfo can be replaced for tests.
 func BootDisk(sysRoot, mountinfo, mountpoint string) string {
 	b, err := os.ReadFile(mountinfo)
 	if err != nil {
@@ -137,7 +137,7 @@ func BootDisk(sysRoot, mountinfo, mountpoint string) string {
 		if len(f) < 10 || f[4] != mountpoint {
 			continue
 		}
-		// Felder nach " - ": Typ, Quelle
+		// fields after " - ": type, source
 		for i := 6; i < len(f)-2; i++ {
 			if f[i] == "-" {
 				src := f[i+2]
@@ -151,7 +151,7 @@ func BootDisk(sysRoot, mountinfo, mountpoint string) string {
 	return ""
 }
 
-// ParentDisk liefert zu einer Partition (sda1, nvme0n1p2) den Datenträger (sda, nvme0n1).
+// ParentDisk returns the disk (sda, nvme0n1) for a partition (sda1, nvme0n1p2).
 func ParentDisk(sysRoot, part string) string {
 	link, err := filepath.EvalSymlinks(filepath.Join(sysRoot, "class", "block", part))
 	if err != nil {
@@ -163,7 +163,7 @@ func ParentDisk(sysRoot, part string) string {
 	return part
 }
 
-// PartPath liefert den Gerätepfad der n-ten Partition: /dev/sda → /dev/sda1, /dev/nvme0n1 → /dev/nvme0n1p1.
+// PartPath returns the device path of the nth partition: /dev/sda → /dev/sda1, /dev/nvme0n1 → /dev/nvme0n1p1.
 func PartPath(dev string, n int) string {
 	if last := dev[len(dev)-1]; last >= '0' && last <= '9' {
 		return dev + "p" + strconv.Itoa(n)
@@ -171,7 +171,7 @@ func PartPath(dev string, n int) string {
 	return dev + strconv.Itoa(n)
 }
 
-// GPT-Typen: EFI-Systempartition und Linux-Root x86-64 nach der Discoverable Partitions Specification.
+// GPT types: EFI system partition and Linux root x86-64 per the Discoverable Partitions Specification.
 const (
 	TypeESP      = "C12A7328-F81F-11D2-BA4B-00A0C93EC93B"
 	TypeRootX64  = "4F68BCE3-E8CD-4DB1-96E7-FBCAF984B709"
@@ -184,7 +184,7 @@ const (
 	MountOptions = "compress=zstd:1,noatime"
 )
 
-// SfdiskScript ist die Partitionstabelle: 1 GiB ESP, Rest btrfs (PLAN.md 3.9.4).
+// SfdiskScript is the partition table: 1 GiB ESP, the rest btrfs (PLAN.md 3.9.4).
 func SfdiskScript() string {
 	return fmt.Sprintf("label: gpt\nsize=%dMiB, type=%s, name=\"%s\"\ntype=%s, name=\"%s\"\n",
 		ESPSizeMiB, TypeESP, ESPLabel, TypeRootX64, RootLabel)

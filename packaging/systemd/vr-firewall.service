@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-# Firewall vor dem Netzwerk laden (F-SEC-02). Nur eigene Tabellen, nie flush ruleset (D-03).
+# Load the firewall before the network (F-SEC-02). Own tables only, never flush ruleset (D-03).
 [Unit]
 Description=vanilla-router Firewall
 DefaultDependencies=no

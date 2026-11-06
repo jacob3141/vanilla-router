@@ -11,10 +11,10 @@ import (
 	"strings"
 )
 
-// Dienste, die die Oberfläche anzeigen und neu starten darf. Die Oberfläche selbst und ihr
-// Helper stehen bewusst nur in der Log-Liste: ein Neustart aus der Oberfläche heraus würde sie abschneiden.
-// Erweiterungen (Docker, Samba) erscheinen nur, wenn sie installiert sind (unitInfos blendet
-// nicht vorhandene Units aus).
+// Services the web interface may show and restart. The web interface itself and its
+// helper are deliberately only in the log list: a restart from within the web interface would cut it off.
+// Extensions (Docker, Samba) only appear if they are installed (unitInfos hides
+// units that do not exist).
 var manageableUnits = []string{
 	"vr-dnsmasq", "systemd-networkd", "vr-firewall", "vr-pppoe", "systemd-resolved", "chrony", "ssh",
 	"unattended-upgrades", "cron", "docker", "smbd",
@@ -105,7 +105,7 @@ type Container struct {
 func listContainers(ctx context.Context) ([]Container, error) {
 	ids, err := run(ctx, "docker", "ps", "-aq", "--no-trunc")
 	if err != nil {
-		return nil, Userf("Docker antwortet nicht.")
+		return nil, Userf("Docker is not responding.")
 	}
 	fields := strings.Fields(ids)
 	if len(fields) == 0 {
@@ -175,14 +175,14 @@ func (s *Server) registerServices() {
 			return nil, err
 		}
 		if !slices.Contains(manageableUnits, p.Unit) {
-			return nil, Userf("Der Dienst %q darf über die Oberfläche nicht neu gestartet werden.", p.Unit)
+			return nil, Userf("The service %q may not be restarted through the web interface.", p.Unit)
 		}
 		if s.cfg.DryRun {
-			s.cfg.Log.Info("probelauf: neustart übersprungen", "unit", p.Unit)
+			s.cfg.Log.Info("dry run: restart skipped", "unit", p.Unit)
 			return nil, nil
 		}
 		if err := restartUnit(ctx, p.Unit); err != nil {
-			return nil, Userf("%s ließ sich nicht neu starten: %v", p.Unit, err)
+			return nil, Userf("%s could not be restarted: %v", p.Unit, err)
 		}
 		return nil, nil
 	})
@@ -196,7 +196,7 @@ func (s *Server) registerServices() {
 			return nil, err
 		}
 		if !slices.Contains(logUnits, p.Unit) {
-			return nil, Userf("Für %q gibt es hier keine Logs.", p.Unit)
+			return nil, Userf("There are no logs for %q here.", p.Unit)
 		}
 		out, err := run(ctx, "journalctl", "-u", p.Unit+".service", "-n", clampLines(p.Lines), "--no-pager", "-o", "short-iso")
 		if err != nil {
@@ -209,17 +209,17 @@ func (s *Server) registerServices() {
 		return listContainers(ctx)
 	})
 
-	// Nur Container, die es gibt: Der Name wird gegen die aktuelle Liste geprüft
+	// Only containers that exist: the name is checked against the current list
 	knownContainer := func(ctx context.Context, name string) error {
 		if !containerNameRe.MatchString(name) {
-			return Userf("Ungültiger Containername.")
+			return Userf("Invalid container name.")
 		}
 		list, err := listContainers(ctx)
 		if err != nil {
 			return err
 		}
 		if !slices.ContainsFunc(list, func(c Container) bool { return c.Name == name }) {
-			return Userf("Den Container %s gibt es nicht.", name)
+			return Userf("The container %s does not exist.", name)
 		}
 		return nil
 	}
@@ -233,13 +233,13 @@ func (s *Server) registerServices() {
 			return nil, err
 		}
 		if p.Action != "start" && p.Action != "stop" && p.Action != "restart" {
-			return nil, Userf("Unbekannte Aktion %q.", p.Action)
+			return nil, Userf("Unknown action %q.", p.Action)
 		}
 		if err := knownContainer(ctx, p.Name); err != nil {
 			return nil, err
 		}
 		if err := s.apply(ctx, "docker", p.Action, "--", p.Name); err != nil {
-			return nil, Userf("docker %s %s ist fehlgeschlagen: %s", p.Action, p.Name, lastLines(err.Error(), 1))
+			return nil, Userf("docker %s %s failed: %s", p.Action, p.Name, lastLines(err.Error(), 1))
 		}
 		return nil, nil
 	})

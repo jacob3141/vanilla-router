@@ -26,7 +26,7 @@ func (f *fakeRunner) Run(env []string, stdin []byte, name string, args ...string
 		f.stdin[name] = string(stdin)
 	}
 	if f.fail != "" && strings.HasPrefix(call, f.fail) {
-		return []byte("kaputt"), errors.New("exit status 1")
+		return []byte("broken"), errors.New("exit status 1")
 	}
 	if name == "blkid" {
 		if strings.HasSuffix(call, "1") {
@@ -51,7 +51,7 @@ func plan(t *testing.T) (Plan, string) {
 	return Plan{Disk: "/dev/nvme0n1", Rootfs: rootfs, Config: c, SetupCode: "ABCD-EFGH", Target: T}, T
 }
 
-func TestInstallAblauf(t *testing.T) {
+func TestInstallFlow(t *testing.T) {
 	p, T := plan(t)
 	r := &fakeRunner{stdin: map[string]string{}}
 	var progress []string
@@ -60,7 +60,7 @@ func TestInstallAblauf(t *testing.T) {
 		t.Fatal(err)
 	}
 	if len(progress) != len(Steps) {
-		t.Errorf("Fortschritt %v", progress)
+		t.Errorf("progress %v", progress)
 	}
 	order := []string{
 		"wipefs --all --force /dev/nvme0n1",
@@ -75,6 +75,7 @@ func TestInstallAblauf(t *testing.T) {
 		"chroot " + T + " update-grub",
 		"systemctl --root=" + T + " enable systemd-networkd.service",
 		"chroot " + T + " useradd",
+		"umount -R -l " + T + "/sys",
 		"umount -R " + T,
 	}
 	i := 0
@@ -84,15 +85,15 @@ func TestInstallAblauf(t *testing.T) {
 		}
 	}
 	if i != len(order) {
-		t.Errorf("Reihenfolge stimmt nicht, fehlt ab %q.\nAufrufe:\n%s", order[i], strings.Join(r.calls, "\n"))
+		t.Errorf("order is wrong, missing from %q on.\nCalls:\n%s", order[i], strings.Join(r.calls, "\n"))
 	}
 	for _, c := range r.calls {
 		if strings.Contains(c, "--now") {
-			t.Errorf("--now im Offline-Modus: %s", c)
+			t.Errorf("--now in offline mode: %s", c)
 		}
 	}
 	if !strings.Contains(r.stdin["sfdisk"], "label: gpt") {
-		t.Error("Partitionstabelle nicht übergeben")
+		t.Error("partition table not passed")
 	}
 	read := func(rel string) string { b, _ := os.ReadFile(filepath.Join(T, rel)); return string(b) }
 	if f := read("etc/fstab"); !strings.Contains(f, "UUID=11111111-2222-3333-4444-555555555555  /            btrfs  subvol=@,") ||
@@ -102,42 +103,42 @@ func TestInstallAblauf(t *testing.T) {
 	if read("etc/hostname") != "router\n" || !strings.Contains(read("etc/hosts"), "router.home.arpa router") {
 		t.Error("Hostname")
 	}
-	if l, _ := os.Readlink(filepath.Join(T, "etc/localtime")); l != "../usr/share/zoneinfo/Europe/Berlin" {
+	if l, _ := os.Readlink(filepath.Join(T, "etc/localtime")); l != "../usr/share/zoneinfo/UTC" {
 		t.Errorf("localtime %q", l)
 	}
 	if !strings.Contains(read("etc/vanilla-router/nft/vr.nft"), "table inet vr_filter") {
-		t.Error("Firewall nicht geschrieben")
+		t.Error("firewall not written")
 	}
 	if _, err := config.Load(filepath.Join(T, config.Path)); err != nil {
 		t.Error(err)
 	}
 	if fi, err := os.Stat(filepath.Join(T, "etc/vanilla-router/secrets/webui-setup-code")); err != nil || fi.Mode().Perm() != 0o600 {
-		t.Errorf("Einrichtungscode: %v", err)
+		t.Errorf("setup code: %v", err)
 	}
 	if _, err := os.Stat(filepath.Join(T, "etc/cloud/cloud-init.disabled")); err != nil {
-		t.Error("cloud-init nicht abgeschaltet")
+		t.Error("cloud-init not turned off")
 	}
 }
 
-func TestFehlerVorDemLoeschen(t *testing.T) {
+func TestErrorBeforeErasing(t *testing.T) {
 	p, _ := plan(t)
 	p.Config.WAN.Type = config.WANPPPoE
 	p.Config.WAN.PPPoE = &config.PPPoE{User: "u@example.org", PasswordRef: "pppoe"}
 	r := &fakeRunner{stdin: map[string]string{}}
 	if err := (&Installer{Run: r}).Install(p); err == nil {
-		t.Fatal("fehlendes PPPoE-Passwort nicht bemerkt")
+		t.Fatal("missing PPPoE password not noticed")
 	}
 	if len(r.calls) != 0 {
-		t.Errorf("Datenträger angefasst, obwohl die Konfiguration unvollständig ist: %v", r.calls)
+		t.Errorf("disk touched although the configuration is incomplete: %v", r.calls)
 	}
 	p, _ = plan(t)
 	os.Remove(p.Rootfs)
 	if err := (&Installer{Run: r}).Install(p); err == nil || len(r.calls) != 0 {
-		t.Errorf("fehlendes Image: %v %v", err, r.calls)
+		t.Errorf("missing image: %v %v", err, r.calls)
 	}
 }
 
-func TestFehlerHaengtAus(t *testing.T) {
+func TestErrorUnmounts(t *testing.T) {
 	p, T := plan(t)
 	r := &fakeRunner{stdin: map[string]string{}, fail: "chroot " + T + " update-grub"}
 	err := (&Installer{Run: r}).Install(p)
@@ -145,6 +146,6 @@ func TestFehlerHaengtAus(t *testing.T) {
 		t.Fatalf("%v", err)
 	}
 	if last := r.calls[len(r.calls)-1]; last != "umount -R "+T {
-		t.Errorf("nicht ausgehängt, letzter Aufruf %q", last)
+		t.Errorf("not unmounted, last call %q", last)
 	}
 }

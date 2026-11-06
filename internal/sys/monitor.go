@@ -11,8 +11,8 @@ import (
 	"time"
 )
 
-// Online-Monitor: alle 30 Sekunden ein Ping an das Gateway und zwei Ziele im Internet.
-// Antworten beide Internet-Ziele nicht, gilt das Internet als ausgefallen.
+// Online monitor: every 30 seconds a ping to the gateway and two targets on the internet.
+// If both internet targets do not answer, the internet counts as down.
 
 const (
 	probeEvery   = 30 * time.Second
@@ -22,7 +22,7 @@ const (
 
 type Probe struct {
 	T   int64   `json:"t"`
-	RTT float32 `json:"rtt"` // Millisekunden, -1 = keine Antwort
+	RTT float32 `json:"rtt"` // milliseconds, -1 = no answer
 }
 
 type Target struct {
@@ -34,7 +34,7 @@ type Target struct {
 
 type Outage struct {
 	Start time.Time  `json:"start"`
-	End   *time.Time `json:"end,omitempty"` // nil = dauert an
+	End   *time.Time `json:"end,omitempty"` // nil = still ongoing
 }
 
 type Monitor struct {
@@ -75,8 +75,8 @@ func systemPing(ctx context.Context, addr string) (float64, bool) {
 	return icmpPing(ctx, addr, 2*time.Second)
 }
 
-// InternetOK prüft sofort, ob das Internet erreichbar ist (dieselben Ziele wie der Monitor, einer reicht).
-// Für die Prüfung nach einer Änderung am Internet-Anschluss (F-UI-08).
+// InternetOK checks immediately whether the internet is reachable (same targets as the monitor, one is enough).
+// For the check after a change to the internet port (F-UI-08).
 func (m *Monitor) InternetOK(ctx context.Context) bool {
 	m.mu.Lock()
 	var addrs []string
@@ -143,7 +143,7 @@ func (m *Monitor) round() {
 	m.record(now, results)
 }
 
-// record speichert die Ergebnisse einer Runde und führt das Ausfallprotokoll.
+// record saves the results of a round and keeps the outage log.
 func (m *Monitor) record(now time.Time, results []float32) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -178,11 +178,11 @@ type TargetStats struct {
 	Addr   string  `json:"addr"`
 	Last   float32 `json:"last"`
 	Avg    float32 `json:"avg"`
-	Loss   float32 `json:"loss"` // Prozent
+	Loss   float32 `json:"loss"` // percent
 	Probes []Probe `json:"probes"`
 }
 
-// Snapshot liefert Kennzahlen und Messwerte ab dem Zeitpunkt.
+// Snapshot returns key figures and measurements from the given moment.
 func (m *Monitor) Snapshot(since time.Time) map[string]any {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -223,7 +223,7 @@ func (m *Monitor) Snapshot(since time.Time) map[string]any {
 	return map[string]any{"targets": stats, "outages": outages, "internet_down": down, "interval_s": int(probeEvery.Seconds())}
 }
 
-// OutagesSince zählt Ausfälle seit dem Zeitpunkt (für die Hinweise).
+// OutagesSince counts outages since the given moment (for the hints).
 func (m *Monitor) OutagesSince(t time.Time) (count int, down bool) {
 	m.mu.Lock()
 	defer m.mu.Unlock()

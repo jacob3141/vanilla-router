@@ -21,7 +21,7 @@ import (
 	"unsafe"
 )
 
-// --- NVMe-Gesundheit (SMART-Log per ioctl, es gibt kein smartctl) ------------------------
+// --- NVMe health (SMART log via ioctl, there is no smartctl) ------------------------
 
 type nvmeAdminCmd struct {
 	Opcode      uint8
@@ -72,10 +72,10 @@ func le128(b []byte) *big.Int {
 
 func lowU64(b []byte) uint64 { return binary.LittleEndian.Uint64(b[:8]) }
 
-// parseSMARTLog liest die 512 Byte der NVMe-Logseite 0x02.
+// parseSMARTLog reads the 512 bytes of NVMe log page 0x02.
 func parseSMARTLog(d []byte) NVMeHealth {
 	unitsTB := func(b []byte) float64 {
-		// Eine Dateneinheit sind 1000 Blöcke à 512 Byte
+		// One data unit is 1000 blocks of 512 bytes
 		v := new(big.Float).SetInt(le128(b))
 		v.Mul(v, big.NewFloat(512000))
 		v.Quo(v, big.NewFloat(1e12))
@@ -109,12 +109,12 @@ func readNVMeHealth(dev string) (NVMeHealth, error) {
 		NSID:    0xffffffff,
 		Addr:    uint64(uintptr(unsafe.Pointer(&buf[0]))),
 		DataLen: uint32(len(buf)),
-		// Logseite 0x02 (SMART), Anzahl Dwords - 1 in den oberen 16 Bit
+		// Log page 0x02 (SMART), number of dwords - 1 in the upper 16 bits
 		Cdw10:     0x02 | (uint32(len(buf)/4-1) << 16),
 		TimeoutMs: 5000,
 	}
 	_, _, e := syscall.Syscall(syscall.SYS_IOCTL, f.Fd(), nvmeIoctlAdminCmd, uintptr(unsafe.Pointer(&cmd)))
-	runtime.KeepAlive(buf) // der Kernel schreibt über die Adresse in cmd.Addr hinein
+	runtime.KeepAlive(buf) // the kernel writes through the address in cmd.Addr
 	if e != 0 {
 		return NVMeHealth{}, e
 	}
@@ -150,7 +150,7 @@ func listMounts() []Mount {
 	sc := bufio.NewScanner(f)
 	for sc.Scan() {
 		fl := strings.Fields(sc.Text())
-		// Je Gerät nur der erste Eintrag: die Sandbox des Helpers bindet / mehrfach ein (/home, /root …)
+		// Only the first entry per device: the helper's sandbox bind-mounts / several times (/home, /root …)
 		if len(fl) < 3 || !strings.HasPrefix(fl[0], "/dev/") || seen[fl[0]] || strings.HasPrefix(fl[1], "/snap") || strings.Contains(fl[1], "/docker/") {
 			continue
 		}
@@ -178,7 +178,7 @@ type Jail struct {
 func fail2banJails(ctx context.Context) ([]string, error) {
 	out, err := run(ctx, "fail2ban-client", "status")
 	if err != nil {
-		return nil, Userf("fail2ban antwortet nicht.")
+		return nil, Userf("fail2ban is not responding.")
 	}
 	for _, line := range strings.Split(out, "\n") {
 		if _, list, ok := strings.Cut(line, "Jail list:"); ok {
@@ -231,7 +231,7 @@ func fail2banStatus(ctx context.Context) ([]Jail, error) {
 	return jails, nil
 }
 
-// --- Update-Verlauf (apt) --------------------------------------------------------------
+// --- Update history (apt) --------------------------------------------------------------
 
 type AptRun struct {
 	Start     string   `json:"start"`
@@ -295,16 +295,16 @@ func aptHistory(limit int) []AptRun {
 func sambaStatus(ctx context.Context) (any, error) {
 	out, err := run(ctx, "smbstatus", "--json")
 	if err != nil {
-		return nil, Userf("smbstatus antwortet nicht.")
+		return nil, Userf("smbstatus is not responding.")
 	}
 	var v any
 	if json.Unmarshal([]byte(out), &v) != nil {
-		return nil, Userf("smbstatus liefert kein JSON.")
+		return nil, Userf("smbstatus does not return JSON.")
 	}
 	return v, nil
 }
 
-// --- Aktionen ---------------------------------------------------------------------------
+// --- Actions ---------------------------------------------------------------------------
 
 func (s *Server) registerSysinfo() {
 	s.handle("disk.status.get", func(ctx context.Context, _ json.RawMessage) (any, error) {
@@ -368,11 +368,11 @@ func (s *Server) registerSysinfo() {
 			return nil, err
 		}
 		if !slices.Contains(jails, p.Jail) {
-			return nil, Userf("Unbekannte Jail %q.", p.Jail)
+			return nil, Userf("Unknown jail %q.", p.Jail)
 		}
 		ip, err := netip.ParseAddr(p.IP)
 		if err != nil {
-			return nil, Userf("Ungültige IP-Adresse.")
+			return nil, Userf("Invalid IP address.")
 		}
 		return nil, s.apply(ctx, "fail2ban-client", "set", p.Jail, "unbanip", ip.String())
 	})
@@ -409,7 +409,7 @@ func (s *Server) registerSysinfo() {
 		args := []string{"--no-pager", "-o", "short-iso", "-p", strconv.Itoa(min(max(p.Priority, 0), 7))}
 		if p.Unit != "" {
 			if !slices.Contains(logUnits, p.Unit) {
-				return nil, Userf("Für %q gibt es hier keine Logs.", p.Unit)
+				return nil, Userf("There are no logs for %q here.", p.Unit)
 			}
 			args = append(args, "-u", p.Unit+".service")
 		}
@@ -436,7 +436,7 @@ func (s *Server) registerSysinfo() {
 		return map[string]any{"lines": lines}, nil
 	})
 
-	// Änderungsprotokoll: was über die Oberfläche geändert wurde (Helper, Dateidienst, Anmeldungen)
+	// Change log: what was changed through the web interface (helper, file service, logins)
 	s.handle("uilog.get", func(ctx context.Context, _ json.RawMessage) (any, error) {
 		units := []string{"vr-webui-helper", "vr-webui", "vr-webui-files"}
 		if s.cfg.DryRun {
@@ -451,13 +451,13 @@ func (s *Server) registerSysinfo() {
 		for _, l := range strings.Split(out, "\n") {
 			var kind string
 			switch {
-			case strings.Contains(l, `msg="aktion ausgeführt"`), strings.Contains(l, "probelauf:"):
+			case strings.Contains(l, `msg="action executed"`), strings.Contains(l, "dry run:"):
 				kind = "change"
-			case strings.Contains(l, `msg="aktion abgelehnt"`):
+			case strings.Contains(l, `msg="action rejected"`):
 				kind = "rejected"
 			case strings.Contains(l, "auth: "):
 				kind = "auth"
-			case strings.Contains(l, "msg=hochgeladen"), strings.Contains(l, `msg=umbenannt`), strings.Contains(l, `msg="in den papierkorb"`), strings.Contains(l, `msg="endgültig gelöscht"`):
+			case strings.Contains(l, "msg=uploaded"), strings.Contains(l, `msg=renamed`), strings.Contains(l, `msg="moved to trash"`), strings.Contains(l, `msg="permanently deleted"`):
 				kind = "files"
 			case strings.Contains(l, "firewall:"), strings.Contains(l, "system:"), strings.Contains(l, "wake-on-lan"):
 				kind = "change"

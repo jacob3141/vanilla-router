@@ -1,7 +1,7 @@
 #!/bin/sh
 # SPDX-License-Identifier: AGPL-3.0-or-later
-# Läuft im Zielsystem beim Bau des Images.
+# Runs in the target system while the image is built.
 set -e
-locale-gen de_DE.UTF-8 en_US.UTF-8
-# machine-id leer lassen: jedes installierte Gerät erzeugt beim ersten Start eine eigene
+locale-gen en_US.UTF-8 de_DE.UTF-8 de_AT.UTF-8 de_CH.UTF-8
+# Leave machine-id empty: each installed device creates its own at the first start
 : > /etc/machine-id

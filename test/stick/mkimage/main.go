@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-// mkimage erzeugt ein kleines, nicht bootfähiges Test-Abbild für den Stick-Ersteller (siehe
-// test/stick/test-package.sh): MBR mit einer FAT16-Partition ab 1 MiB, darin vr/stick.json (4096 Leerzeichen,
-// Reservierung) und LIESMICH.TXT. Die Partition muss vorher mit mkfs.fat angelegt sein.
+// mkimage creates a small, non-bootable test image for the stick creator (see
+// test/stick/test-package.sh): MBR with a FAT16 partition from 1 MiB, containing vr/stick.json (4096 spaces,
+// reservation) and README.TXT. The partition must be created with mkfs.fat beforehand.
 //
 //	go run ./test/stick/mkimage part.img test.img
 package main
@@ -24,7 +24,7 @@ func die(f string, a ...any) { fmt.Fprintf(os.Stderr, f+"\n", a...); os.Exit(1) 
 
 func main() {
 	if len(os.Args) != 3 {
-		die("Aufruf: main part.img test.img")
+		die("Usage: main part.img test.img")
 	}
 	p, err := os.ReadFile(os.Args[1])
 	if err != nil {
@@ -37,7 +37,7 @@ func main() {
 	rootEnt := int(le.Uint16(p[17:]))
 	fatSz := int(le.Uint16(p[22:]))
 	if bps != 512 || fatSz == 0 || string(p[54:59]) != "FAT16" {
-		die("keine FAT16-Partition mit 512-Byte-Sektoren")
+		die("no FAT16 partition with 512-byte sectors")
 	}
 	clus := bps * spc
 	fatAt := reserved * bps
@@ -110,12 +110,12 @@ func main() {
 				return rootAt + 32*i
 			}
 		}
-		die("Stammverzeichnis voll")
+		die("root directory full")
 		return 0
 	}
 	const lowerName, lowerExt = 0x08, 0x10
 
-	// vr/ mit stick.json
+	// vr/ with stick.json
 	vr := alloc(clus)
 	copy(p[rootFree():], entry("VR         ", 0x10, lowerName, vr, 0))
 	d := clusAt(vr)
@@ -127,19 +127,19 @@ func main() {
 	copy(p[d+96:], entry(short, 0x20, 0, sj, 4096))
 	copy(p[clusAt(sj):], strings.Repeat(" ", 4096))
 
-	text := strings.ReplaceAll(`Test-Abbild für den Stick-Ersteller von vanilla-router.
+	text := strings.ReplaceAll(`Test image for the vanilla-router stick creator.
 
-Dieser Stick startet nichts, er dient nur zum Prüfen des Schreibvorgangs.
-In vr\stick.json stehen nach dem Schreiben Sprache, Tastatur und Zeitzone,
-die der Stick-Ersteller aus Windows übernommen hat.
+This stick boots nothing, it only serves to check the write process.
+After writing, vr\stick.json contains the language, keyboard and time zone
+the stick creator took over from Windows.
 
-Danach kann der Stick in Windows einfach neu formatiert werden.
+Afterwards you can simply reformat the stick in Windows.
 `, "\n", "\r\n")
 	lm := alloc(len(text))
-	copy(p[rootFree():], entry("LIESMICH TXT", 0x20, lowerName|lowerExt, lm, len(text)))
+	copy(p[rootFree():], entry("README  TXT", 0x20, lowerName|lowerExt, lm, len(text)))
 	copy(p[clusAt(lm):], text)
 
-	// MBR mit einer Partition (Typ 0x0E, FAT16 LBA) ab Sektor 2048.
+	// MBR with one partition (type 0x0E, FAT16 LBA) from sector 2048.
 	head := make([]byte, headBytes)
 	le.PutUint32(head[0x1B8:], 0x56524D54)
 	pe := head[0x1BE:]
@@ -154,5 +154,5 @@ Danach kann der Stick in Windows einfach neu formatiert werden.
 	if err := os.WriteFile(os.Args[2], out, 0o644); err != nil {
 		die("%v", err)
 	}
-	fmt.Printf("%s: %d Bytes, Cluster %d Bytes, stick.json bei %d\n", os.Args[2], len(out), clus, headBytes+clusAt(sj))
+	fmt.Printf("%s: %d bytes, cluster %d bytes, stick.json at %d\n", os.Args[2], len(out), clus, headBytes+clusAt(sj))
 }

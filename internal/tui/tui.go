@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-// Package tui ist die Textoberfläche des Installers. Bedient wird sie nur mit Pfeiltasten und Enter
-// (P-11, F-INST-16): Es gibt keine Texteingabe, deshalb spielt die Tastaturbelegung keine Rolle.
-// Funktioniert auf jeder Konsole (tty1, serielle Konsole), braucht keine Bibliotheken (P-08).
+// Package tui is the installer's text interface. It is operated with arrow keys and Enter only
+// (P-11, F-INST-16): there is no text input, so the keyboard layout does not matter.
+// Works on any console (tty1, serial console), needs no libraries (P-08).
 package tui
 
 import (
@@ -12,10 +12,12 @@ import (
 	"strings"
 	"sync"
 	"syscall"
+	"time"
 	"unsafe"
+	"vanilla-router/internal/i18n"
 )
 
-// Key ist ein Tastendruck.
+// Key is a keypress.
 type Key int
 
 const (
@@ -25,21 +27,21 @@ const (
 	KeyEnter
 )
 
-// Prompt zeigt Text und Menüs. Alle Tasten kommen über einen Kanal, damit ein Menü neben einer
-// laufenden Erkennung warten kann (MenuAsync).
+// Prompt shows text and menus. All keys come through a channel, so that a menu can wait next to a
+// running detection (MenuAsync).
 type Prompt struct {
 	Out  io.Writer
 	keys chan Key
 	mu   sync.Mutex
-	back []Key // zurückgelegte Tasten (ein abgebrochenes Menü hat eine Taste zu viel gelesen)
-	// Plain: keine Steuerzeichen zum Neuzeichnen (Tests, Protokolle)
+	back []Key // keys put back (a cancelled menu read one key too many)
+	// Plain: no control characters for redrawing (tests, logs)
 	Plain bool
 }
 
-// ErrEOF: Eingabe beendet.
+// ErrEOF: input ended.
 var ErrEOF = io.EOF
 
-// New liest Tasten aus r. Pfeiltasten kommen als Escape-Folgen (ESC [ A, ESC O A).
+// New reads keys from r. Arrow keys come as escape sequences (ESC [ A, ESC O A).
 func New(r io.Reader, out io.Writer, plain bool) *Prompt {
 	p := &Prompt{Out: out, keys: make(chan Key), Plain: plain}
 	go func() {
@@ -76,9 +78,10 @@ func New(r io.Reader, out io.Writer, plain bool) *Prompt {
 	return p
 }
 
-// Heading zeigt die Überschrift eines Abschnitts. Laien sehen keine Schrittnummern, weil
-// Schritte ohne Handlung nicht erscheinen (F-INST-18).
+// Heading shows the heading of a section. Non-experts see no step numbers, because
+// steps without an action do not appear (F-INST-18).
 func (p *Prompt) Heading(title string) {
+	title = i18n.T(title)
 	if p.Plain {
 		fmt.Fprintf(p.Out, "\n━━━ %s ━━━\n\n", title)
 		return
@@ -86,8 +89,8 @@ func (p *Prompt) Heading(title string) {
 	fmt.Fprintf(p.Out, "\n%s━━━%s %s%s%s %s━━━%s\n\n", brown, reset, bold, title, reset, brown, reset)
 }
 
-// Farben der Konsole in den zwei Farben des Logos (internal/logo). Die Linux-Konsole kennt nur 16
-// Farben: Farbe 3 ist dort braun, hell (fett) gelb wie Vanille.
+// Console colors in the logo's two colors (internal/logo). The Linux console only knows 16
+// colors: color 3 is brown there, bright (bold) is yellow like vanilla.
 const (
 	brown   = "\x1b[33m"
 	vanilla = "\x1b[1;33m"
@@ -95,7 +98,7 @@ const (
 	reset   = "\x1b[0m"
 )
 
-// banner ist das Logo als Textbild: Eiskugel und Hörnchen.
+// banner is the logo as a text image: scoop and cone.
 var banner = [][2]string{
 	{vanilla, `     .---.`}, {"", ""},
 	{vanilla, `    (     )`}, {"", ""},
@@ -106,14 +109,15 @@ var banner = [][2]string{
 	{brown, `       V`}, {"", ""},
 }
 
-// Banner zeigt das Logo mit Titel und Untertitel daneben.
+// Banner shows the logo with the title and subtitle next to it.
 func (p *Prompt) Banner(title, sub string) {
+	title, sub = i18n.T(title), i18n.T(sub)
 	var b strings.Builder
 	b.WriteString("\n")
 	for i := 0; i < len(banner); i += 2 {
 		row := banner[i : i+2]
 		text := map[int]string{1: title, 2: sub}[i/2]
-		if text == "" && row[1][1] == "" { // keine Leerzeichen am Zeilenende
+		if text == "" && row[1][1] == "" { // no spaces at the end of a line
 			row = [][2]string{{row[0][0], strings.TrimRight(row[0][1], " ")}}
 		}
 		for _, part := range row {
@@ -135,10 +139,52 @@ func (p *Prompt) Banner(title, sub string) {
 	io.WriteString(p.Out, b.String())
 }
 
-// Say zeigt Text.
-func (p *Prompt) Say(format string, args ...any) { fmt.Fprintf(p.Out, format+"\n", args...) }
+// StartSpinner shows that the program is alive while it waits: an animation, a text and the seconds
+// passed, on the current line. The returned function stops it and clears the line, and must be called
+// before anything else is printed. Without control characters (Plain) it does nothing.
+func (p *Prompt) StartSpinner(text string) (stop func()) {
+	if p.Plain {
+		return func() {}
+	}
+	text = i18n.T(text)
+	done, finished := make(chan struct{}), make(chan struct{})
+	go func() {
+		defer close(finished)
+		start := time.Now()
+		tick := time.NewTicker(250 * time.Millisecond)
+		defer tick.Stop()
+		for i := 0; ; i++ {
+			fmt.Fprintf(p.Out, "\r\x1b[K  %c %s (%d s)", `|/-\`[i%4], text, int(time.Since(start).Seconds()))
+			select {
+			case <-done:
+				fmt.Fprint(p.Out, "\r\x1b[K")
+				return
+			case <-tick.C:
+			}
+		}
+	}()
+	var once sync.Once
+	return func() {
+		once.Do(func() {
+			close(done)
+			<-finished
+		})
+	}
+}
 
-// next liefert die nächste Taste. ok = false: Eingabe zu Ende oder done geschlossen.
+// Clear empties the screen, so that boot messages do not stand above the first question.
+func (p *Prompt) Clear() {
+	if !p.Plain {
+		fmt.Fprint(p.Out, "\x1b[2J\x1b[H")
+	}
+}
+
+// Say shows text.
+func (p *Prompt) Say(format string, args ...any) {
+	io.WriteString(p.Out, i18n.T(fmt.Sprintf(format, args...))+"\n")
+}
+
+// next returns the next key. ok = false: end of input or done closed.
 func (p *Prompt) next(done <-chan struct{}) (Key, bool) {
 	p.mu.Lock()
 	if len(p.back) > 0 {
@@ -156,7 +202,7 @@ func (p *Prompt) next(done <-chan struct{}) (Key, bool) {
 			return 0, false
 		}
 		select {
-		case <-done: // gleichzeitig abgebrochen: Taste gehört dem nächsten Leser
+		case <-done: // cancelled at the same time: the key belongs to the next reader
 			p.mu.Lock()
 			p.back = append(p.back, k)
 			p.mu.Unlock()
@@ -167,9 +213,9 @@ func (p *Prompt) next(done <-chan struct{}) (Key, bool) {
 	}
 }
 
-// WaitEnter wartet auf Enter.
+// WaitEnter waits for Enter.
 func (p *Prompt) WaitEnter(text string) error {
-	fmt.Fprintf(p.Out, "%s\n", text)
+	fmt.Fprintf(p.Out, "%s\n", i18n.T(text))
 	for {
 		k, ok := p.next(nil)
 		if !ok {
@@ -181,7 +227,7 @@ func (p *Prompt) WaitEnter(text string) error {
 	}
 }
 
-// Menu zeigt eine Auswahl, die mit ↑ ↓ und Enter bedient wird. def ist die Vorauswahl.
+// Menu shows a choice operated with ↑ ↓ and Enter. def is the preselection.
 func (p *Prompt) Menu(options []string, def int) (int, error) {
 	ch, _ := p.MenuAsync(options, def)
 	n, ok := <-ch
@@ -191,8 +237,8 @@ func (p *Prompt) Menu(options []string, def int) (int, error) {
 	return n, nil
 }
 
-// MenuAsync zeigt ein Menü und liefert die Wahl über den Kanal, ohne zu blockieren. cancel beendet
-// das Menü (der Kanal wird dann geschlossen). Es darf immer nur ein Menü offen sein.
+// MenuAsync shows a menu and returns the choice through the channel without blocking. cancel ends
+// the menu (the channel is then closed). Only one menu may be open at a time.
 func (p *Prompt) MenuAsync(options []string, def int) (<-chan int, func()) {
 	out := make(chan int, 1)
 	done := make(chan struct{})
@@ -232,12 +278,13 @@ func (p *Prompt) MenuAsync(options []string, def int) (<-chan int, func()) {
 func (p *Prompt) draw(options []string, sel int, redraw bool) {
 	var b strings.Builder
 	if redraw && !p.Plain {
-		fmt.Fprintf(&b, "\x1b[%dA", len(options)+1) // zurück an den Anfang des Menüs
+		fmt.Fprintf(&b, "\x1b[%dA", len(options)+1) // back to the start of the menu
 	}
 	if redraw && p.Plain {
-		return // ohne Steuerzeichen nur die Wahl am Ende melden
+		return // without control characters only report the choice at the end
 	}
 	for i, o := range options {
+		o = i18n.T(o)
 		mark := "   "
 		if i == sel {
 			mark = " ▸ "
@@ -245,7 +292,7 @@ func (p *Prompt) draw(options []string, sel int, redraw bool) {
 		if !p.Plain {
 			b.WriteString("\r\x1b[K")
 			if i == sel {
-				b.WriteString("\x1b[7m") // invertiert
+				b.WriteString("\x1b[7m") // inverted
 			}
 		}
 		b.WriteString(mark + o)
@@ -257,12 +304,12 @@ func (p *Prompt) draw(options []string, sel int, redraw bool) {
 	if !p.Plain {
 		b.WriteString("\r\x1b[K")
 	}
-	b.WriteString("  (Pfeiltasten ↑ ↓, Enter)\n")
+	b.WriteString("  (arrow keys ↑ ↓, Enter)\n")
 	io.WriteString(p.Out, b.String())
 }
 
-// RawMode schaltet das Terminal auf Tastendrücke ohne Echo um (für Pfeiltasten). Liefert die
-// Funktion zum Zurücksetzen. Ohne Terminal passiert nichts.
+// RawMode switches the terminal to keypresses without echo (for arrow keys). Returns the
+// function for resetting it. Without a terminal nothing happens.
 func RawMode(fd int) func() {
 	var t syscall.Termios
 	if _, _, e := syscall.Syscall(syscall.SYS_IOCTL, uintptr(fd), syscall.TCGETS, uintptr(unsafe.Pointer(&t))); e != 0 {
@@ -272,14 +319,14 @@ func RawMode(fd int) func() {
 	t.Lflag &^= syscall.ICANON | syscall.ECHO
 	t.Cc[syscall.VMIN], t.Cc[syscall.VTIME] = 1, 0
 	syscall.Syscall(syscall.SYS_IOCTL, uintptr(fd), syscall.TCSETS, uintptr(unsafe.Pointer(&t)))
-	fmt.Print("\x1b[?25l") // Cursor ausblenden
+	fmt.Print("\x1b[?25l") // hide the cursor
 	return func() {
 		fmt.Print("\x1b[?25h")
 		syscall.Syscall(syscall.SYS_IOCTL, uintptr(fd), syscall.TCSETS, uintptr(unsafe.Pointer(&old)))
 	}
 }
 
-// IsTerminal sagt, ob fd ein Terminal ist.
+// IsTerminal says whether fd is a terminal.
 func IsTerminal(fd int) bool {
 	var t syscall.Termios
 	_, _, e := syscall.Syscall(syscall.SYS_IOCTL, uintptr(fd), syscall.TCGETS, uintptr(unsafe.Pointer(&t)))

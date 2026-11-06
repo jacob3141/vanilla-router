@@ -25,7 +25,7 @@ func (s *Server) registerNetstat() {
 	s.route("GET /api/dns/stats", s.handleDNSStats)
 }
 
-// ipJSON führt `ip -j …` aus und liefert das JSON unverändert weiter.
+// ipJSON runs `ip -j …` and passes on the JSON unchanged.
 func ipJSON(ctx context.Context, args ...string) any {
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
@@ -68,7 +68,7 @@ func (s *Server) handleNetwork(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// names ordnet IP-Adressen im LAN einen Namen zu (eigener Name, Reservierung, DHCP-Name).
+// names assigns a name to IP addresses in the LAN (custom name, reservation, DHCP name).
 func (s *Server) names(r *http.Request) map[string]string {
 	out := map[string]string{s.cfg.RouterIP: "router"}
 	var info helper.NetconfInfo
@@ -136,7 +136,7 @@ func (s *Server) handleConnections(w http.ResponseWriter, r *http.Request) {
 	}
 	sort.Slice(devices, func(i, j int) bool { return devices[i].Total > devices[j].Total })
 
-	// Für die Tabelle: gefiltert nach ?ip= und höchstens 500 Einträge
+	// For the table: filtered by ?ip= and at most 500 entries
 	filter := r.URL.Query().Get("ip")
 	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
 	if limit <= 0 || limit > 2000 {

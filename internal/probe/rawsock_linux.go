@@ -20,8 +20,8 @@ const (
 
 func htons(v uint16) uint16 { return v<<8 | v>>8 }
 
-// rawConn ist ein AF_PACKET/SOCK_RAW-Socket an genau einem Interface. Er sieht alle Rahmen,
-// auch mit VLAN-Tag, ohne dass ein VLAN-Interface angelegt werden muss. Braucht CAP_NET_RAW.
+// rawConn is an AF_PACKET/SOCK_RAW socket on exactly one interface. It sees all frames,
+// also with a VLAN tag, without a VLAN interface having to be created. Needs CAP_NET_RAW.
 type rawConn struct {
 	fd      int
 	ifindex int
@@ -32,7 +32,7 @@ type rawConn struct {
 func openRaw(ifindex int) (*rawConn, error) {
 	fd, err := syscall.Socket(syscall.AF_PACKET, syscall.SOCK_RAW|syscall.SOCK_CLOEXEC, int(htons(ethPAll)))
 	if err != nil {
-		return nil, fmt.Errorf("AF_PACKET-Socket (Root-Rechte nötig): %w", err)
+		return nil, fmt.Errorf("AF_PACKET socket (root required): %w", err)
 	}
 	if err := syscall.SetsockoptInt(fd, solPacket, packetAuxdata, 1); err != nil {
 		syscall.Close(fd)
@@ -54,8 +54,8 @@ func (c *rawConn) Send(frame []byte) error {
 	return syscall.Sendto(c.fd, frame, 0, sa)
 }
 
-// Recv liefert den nächsten empfangenen (nicht selbst gesendeten) Rahmen oder (nil, nil) nach timeout.
-// Hat der Treiber das VLAN-Tag entfernt (VLAN-Offload), wird es aus PACKET_AUXDATA wieder eingefügt.
+// Recv returns the next received (not self-sent) frame or (nil, nil) after timeout.
+// If the driver removed the VLAN tag (VLAN offload), it is put back from PACKET_AUXDATA.
 func (c *rawConn) Recv(timeout time.Duration) ([]byte, error) {
 	if timeout <= 0 {
 		timeout = time.Millisecond

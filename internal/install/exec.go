@@ -20,7 +20,7 @@ func execRun(env []string, stdin []byte, name string, args ...string) ([]byte, e
 	return out.Bytes(), err
 }
 
-// CheckRoot meldet einen Fehler, wenn das Programm nicht als root läuft.
+// CheckRoot reports an error if the program is not running as root.
 func CheckRoot() error {
 	if os.Geteuid() != 0 {
 		return errNoRoot

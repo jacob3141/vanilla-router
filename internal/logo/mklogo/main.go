@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-// mklogo schreibt die Logo-Dateien des Projekts neu (aus dem Wurzelordner des Repos aufrufen):
+// mklogo rewrites the project's logo files (run from the repo's root folder):
 //
 //	go run ./internal/logo/mklogo
 package main

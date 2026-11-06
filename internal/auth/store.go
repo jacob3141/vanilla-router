@@ -15,10 +15,10 @@ import (
 	"time"
 )
 
-// Store verwaltet das Passwort und den Einrichtungscode im Datenordner.
+// Store manages the password and setup code in the data folder.
 //
-//	auth.json    Passwort-Hash (0600)
-//	setup-code   einmaliger Code für die Einrichtungsseite, existiert nur bis zur Einrichtung
+//	auth.json    password hash (0600)
+//	setup-code   one-time code for the setup page, exists only until setup is done
 type Store struct {
 	dir string
 	mu  sync.Mutex
@@ -46,7 +46,7 @@ func (s *Store) load() (*authFile, error) {
 	return &a, nil
 }
 
-// Configured meldet, ob schon ein Passwort gesetzt ist.
+// Configured reports whether a password has been set.
 func (s *Store) Configured() bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -54,20 +54,20 @@ func (s *Store) Configured() bool {
 	return err == nil && a.Hash != ""
 }
 
-// Verify prüft das Passwort. Ohne gesetztes Passwort schlägt es immer fehl.
+// Verify checks the password. Without a password set it always fails.
 func (s *Store) Verify(pw string) bool {
 	s.mu.Lock()
 	a, err := s.load()
 	s.mu.Unlock()
 	if err != nil || a.Hash == "" {
-		// Gleich viel Arbeit wie ein echter Vergleich, damit die Antwortzeit nichts verrät
+		// As much work as a real comparison, so the response time reveals nothing
 		HashPassword(pw)
 		return false
 	}
 	return VerifyPassword(a.Hash, pw)
 }
 
-// SetPassword speichert einen neuen Hash atomar und löscht den Einrichtungscode.
+// SetPassword saves a new hash atomically and deletes the setup code.
 func (s *Store) SetPassword(pw string) error {
 	if err := ValidatePassword(pw); err != nil {
 		return err
@@ -86,8 +86,8 @@ func (s *Store) SetPassword(pw string) error {
 	return nil
 }
 
-// SetupCode liefert den Einrichtungscode und legt ihn beim ersten Aufruf an.
-// Format: XXXX-XXXX (Base32 ohne verwechselbare Füllzeichen).
+// SetupCode returns the setup code and creates it on the first call.
+// Format: XXXX-XXXX (Base32 without easily confused padding characters).
 func (s *Store) SetupCode() (string, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -96,7 +96,7 @@ func (s *Store) SetupCode() (string, error) {
 	}
 	raw := make([]byte, 5)
 	rand.Read(raw)
-	c := base32.StdEncoding.EncodeToString(raw) // 8 Zeichen
+	c := base32.StdEncoding.EncodeToString(raw) // 8 characters
 	code := c[:4] + "-" + c[4:8]
 	if err := writeFileAtomic(s.setupPath(), []byte(code+"\n"), 0o600); err != nil {
 		return "", err
@@ -104,12 +104,12 @@ func (s *Store) SetupCode() (string, error) {
 	return code, nil
 }
 
-// ImportSetupCode übernimmt den Code, den der Installer angezeigt hat (S9), solange noch kein
-// Passwort gesetzt ist. Danach gilt genau dieser Code für die erste Anmeldung.
+// ImportSetupCode takes over the code the installer displayed (S9), as long as no
+// password has been set. After that exactly this code applies to the first login.
 func (s *Store) ImportSetupCode(code string) error {
 	code = strings.ToUpper(strings.TrimSpace(code))
 	if len(strings.ReplaceAll(code, "-", "")) != 8 {
-		return errors.New("Einrichtungscode hat nicht 8 Zeichen")
+		return errors.New("setup code does not have 8 characters")
 	}
 	if s.Configured() {
 		return nil
@@ -119,7 +119,7 @@ func (s *Store) ImportSetupCode(code string) error {
 	return writeFileAtomic(s.setupPath(), []byte(code+"\n"), 0o600)
 }
 
-// CheckSetupCode vergleicht ohne Rücksicht auf Groß-/Kleinschreibung und Bindestrich.
+// CheckSetupCode compares ignoring case and hyphens.
 func (s *Store) CheckSetupCode(given string) bool {
 	s.mu.Lock()
 	b, err := os.ReadFile(s.setupPath())
@@ -136,7 +136,7 @@ func (s *Store) CheckSetupCode(given string) bool {
 
 func writeFileAtomic(path string, data []byte, mode os.FileMode) error {
 	if path == "" {
-		return errors.New("leerer Pfad")
+		return errors.New("empty path")
 	}
 	tmp, err := os.CreateTemp(filepath.Dir(path), "."+filepath.Base(path)+".*")
 	if err != nil {

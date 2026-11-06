@@ -10,12 +10,12 @@ import (
 
 var t0 = time.Date(2026, 11, 4, 12, 0, 0, 0, time.UTC)
 
-var labels = map[string]string{"eth0": "Anschluss 1", "eth1": "Anschluss 2", "eth2": "Anschluss 3"}
+var labels = map[string]string{"eth0": "Port 1", "eth1": "Port 2", "eth2": "Port 3"}
 
 var testCfg = Config{Settle: 3 * time.Second, HintAfter: 60 * time.Second, RetryDelay: 20 * time.Second, MaxProbes: 2}
 
-// step ist ein Ereignis zur Zeit at (Sekunden nach t0) mit erwartetem Zustand und erwarteten Aktionen.
-// Aktionen werden kurz geschrieben: "say:<id>", "probe:<port>", "cancel:<port>", "finish:<port>/<method>".
+// step is an event at time at (seconds after t0) with the expected state and expected actions.
+// Actions are written in short form: "say:<id>", "probe:<port>", "cancel:<port>", "finish:<port>/<method>".
 type step struct {
 	at    float64
 	ev    Event
@@ -27,13 +27,13 @@ func run(t *testing.T, start map[string]bool, startActs string, steps []step) *M
 	t.Helper()
 	m := New(testCfg, labels)
 	if got := summarize(m.Start(start, t0)); got != startActs {
-		t.Fatalf("Start: Aktionen %q, erwartet %q", got, startActs)
+		t.Fatalf("start: actions %q, expected %q", got, startActs)
 	}
 	for i, s := range steps {
 		now := t0.Add(time.Duration(s.at * float64(time.Second)))
 		got := summarize(m.Handle(s.ev, now))
 		if got != s.acts || m.State() != s.state {
-			t.Fatalf("Schritt %d (%T %+v): Zustand %v, Aktionen %q; erwartet %v, %q", i+1, s.ev, s.ev, m.State(), got, s.state, s.acts)
+			t.Fatalf("step %d (%T %+v): state %v, actions %q; expected %v, %q", i+1, s.ev, s.ev, m.State(), got, s.state, s.acts)
 		}
 	}
 	return m
@@ -59,7 +59,7 @@ func summarize(acts []Action) string {
 func up(p string) LinkChanged   { return LinkChanged{p, true} }
 func down(p string) LinkChanged { return LinkChanged{p, false} }
 
-func TestNormalfallDHCP(t *testing.T) {
+func TestNormalCaseDHCP(t *testing.T) {
 	m := run(t, map[string]bool{"eth0": true, "eth2": true}, "say:unplug", []step{
 		{1, down("eth0"), StateUnplug, "say:unplug"},
 		{2, down("eth2"), StateWaitModem, "say:plug-modem"},
@@ -67,25 +67,25 @@ func TestNormalfallDHCP(t *testing.T) {
 		{11, Tick{}, StateSettling, ""},
 		{13, Tick{}, StateProbing, "say:probing probe:eth1"},
 		{15, ProbeDone{ProbeResult{Port: "eth1", DHCP: true, Offer: "192.0.2.10/24"}}, StateDone, "say:done finish:eth1/dhcp"},
-		{16, up("eth0"), StateDone, ""}, // nach Abschluss egal
+		{16, up("eth0"), StateDone, ""}, // does not matter after completion
 	})
 	if r := m.Result(); r.Port != "eth1" || r.Method != MethodDHCP || r.Probe.Offer != "192.0.2.10/24" {
-		t.Errorf("Ergebnis %+v", r)
+		t.Errorf("result %+v", r)
 	}
 }
 
-func TestPPPoEMitVLAN(t *testing.T) {
+func TestPPPoEWithVLAN(t *testing.T) {
 	m := run(t, nil, "say:plug-modem", []step{
 		{5, up("eth0"), StateSettling, "say:settling"},
 		{8, Tick{}, StateProbing, "say:probing probe:eth0"},
 		{12, ProbeDone{ProbeResult{Port: "eth0", PPPoE: true, PPPoEVLAN: 7, ACName: "AC1"}}, StateDone, "say:done finish:eth0/pppoe"},
 	})
 	if m.Result().Probe.PPPoEVLAN != 7 {
-		t.Errorf("VLAN verloren: %+v", m.Result())
+		t.Errorf("VLAN lost: %+v", m.Result())
 	}
 }
 
-func TestMehrdeutig(t *testing.T) {
+func TestAmbiguous(t *testing.T) {
 	run(t, nil, "say:plug-modem", []step{
 		{1, up("eth0"), StateSettling, "say:settling"},
 		{2, up("eth1"), StateUnplug, "say:ambiguous say:unplug"},
@@ -95,24 +95,24 @@ func TestMehrdeutig(t *testing.T) {
 	})
 }
 
-func TestKabelWieder_abGezogenBeimWarten(t *testing.T) {
+func TestCableUnpluggedAgainWhileWaiting(t *testing.T) {
 	run(t, nil, "say:plug-modem", []step{
 		{1, up("eth0"), StateSettling, "say:settling"},
 		{2, down("eth0"), StateWaitModem, "say:plug-modem"},
-		{6, Tick{}, StateWaitModem, ""}, // kein Probe-Start nach Ablauf der Settle-Zeit
+		{6, Tick{}, StateWaitModem, ""}, // no probe start after the settle time has passed
 	})
 }
 
-func TestVerbindungWegWaehrendProbe(t *testing.T) {
+func TestConnectionLostDuringProbe(t *testing.T) {
 	run(t, nil, "say:plug-modem", []step{
 		{1, up("eth2"), StateSettling, "say:settling"},
 		{4, Tick{}, StateProbing, "say:probing probe:eth2"},
 		{5, down("eth2"), StateWaitModem, "cancel:eth2 say:lost say:plug-modem"},
-		{6, ProbeDone{ProbeResult{Port: "eth2", DHCP: true}}, StateWaitModem, ""}, // veraltet
+		{6, ProbeDone{ProbeResult{Port: "eth2", DHCP: true}}, StateWaitModem, ""}, // outdated
 	})
 }
 
-func TestZweitesKabelWaehrendProbe(t *testing.T) {
+func TestSecondCableDuringProbe(t *testing.T) {
 	run(t, nil, "say:plug-modem", []step{
 		{1, up("eth0"), StateSettling, "say:settling"},
 		{4, Tick{}, StateProbing, "say:probing probe:eth0"},
@@ -120,7 +120,7 @@ func TestZweitesKabelWaehrendProbe(t *testing.T) {
 	})
 }
 
-func TestKeineAntwortWiederholenUndBestaetigen(t *testing.T) {
+func TestNoAnswerRetryAndConfirm(t *testing.T) {
 	run(t, nil, "say:plug-modem", []step{
 		{1, up("eth0"), StateSettling, "say:settling"},
 		{4, Tick{}, StateProbing, "say:probing probe:eth0"},
@@ -136,16 +136,16 @@ func TestKeineAntwortWiederholenUndBestaetigen(t *testing.T) {
 	})
 }
 
-func TestKabelAbImZustandKeineAntwort(t *testing.T) {
+func TestCableOutInStateNoAnswer(t *testing.T) {
 	run(t, nil, "say:plug-modem", []step{
 		{1, up("eth0"), StateSettling, "say:settling"},
 		{4, Tick{}, StateProbing, "say:probing probe:eth0"},
 		{5, ProbeDone{ProbeResult{Port: "eth0"}}, StateRetryWait, "say:retry"},
-		{6, down("eth0"), StateWaitModem, "say:lost say:plug-modem"}, // keine laufende Probe, kein Abbruch
+		{6, down("eth0"), StateWaitModem, "say:lost say:plug-modem"}, // no running probe, no cancel
 	})
 }
 
-func TestTippNurEinmal(t *testing.T) {
+func TestTipOnlyOnce(t *testing.T) {
 	run(t, nil, "say:plug-modem", []step{
 		{30, Tick{}, StateWaitModem, ""},
 		{60, Tick{}, StateWaitModem, "say:hint-modem"},
@@ -153,7 +153,7 @@ func TestTippNurEinmal(t *testing.T) {
 	})
 }
 
-func TestManuelleAuswahl(t *testing.T) {
+func TestManualChoice(t *testing.T) {
 	run(t, map[string]bool{"eth0": true}, "say:unplug", []step{
 		{1, UserManual{"eth9"}, StateUnplug, "say:manual-unknown"},
 		{2, UserManual{"eth2"}, StateDone, "say:done finish:eth2/manual"},
@@ -165,26 +165,26 @@ func TestManuelleAuswahl(t *testing.T) {
 	})
 }
 
-func TestUnbekanntePortsUndDoppelteMeldungen(t *testing.T) {
+func TestUnknownPortsAndDuplicateMessages(t *testing.T) {
 	run(t, nil, "say:plug-modem", []step{
 		{1, up("docker0"), StateWaitModem, ""},
-		{2, down("eth0"), StateWaitModem, ""}, // war schon aus
+		{2, down("eth0"), StateWaitModem, ""}, // was already off
 		{3, up("eth0"), StateSettling, "say:settling"},
 		{4, up("eth0"), StateSettling, ""},
-		{6, up("eth0"), StateProbing, "say:probing probe:eth0"}, // doppelte Meldung wertet die Zeit aus
+		{6, up("eth0"), StateProbing, "say:probing probe:eth0"}, // a duplicate message evaluates the time
 	})
 }
 
-func TestTexteFuerLaien(t *testing.T) {
+func TestTextsForNonExperts(t *testing.T) {
 	m := New(testCfg, labels)
 	acts := m.Start(map[string]bool{"eth1": true, "eth0": true}, t0)
 	s := acts[0].(Say)
-	if !strings.Contains(s.Text, "Anschluss 1, Anschluss 2") {
-		t.Errorf("Text nennt die Anschlüsse nicht verständlich: %q", s.Text)
+	if !strings.Contains(s.Text, "Port 1, Port 2") {
+		t.Errorf("text does not name the ports understandably: %q", s.Text)
 	}
 	for _, w := range []string{"WAN", "LAN", "eth", "carrier", "Link"} {
 		if strings.Contains(s.Text, w) {
-			t.Errorf("Fachbegriff %q im Laientext: %q", w, s.Text)
+			t.Errorf("jargon %q in text for non-experts: %q", w, s.Text)
 		}
 	}
 }

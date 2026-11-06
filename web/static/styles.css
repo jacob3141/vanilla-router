@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: AGPL-3.0-or-later */
-/* Designsystem der Router-Oberfläche. Farben als Tokens, dunkel ist Standard. */
+/* Design system of the router web interface. Colors as tokens, dark is the default. */
 :root {
   --bg: #0d1017;
   --surface: #151a23;
@@ -67,7 +67,7 @@ h1, h2, h3 { margin: 0; font-weight: 650; letter-spacing: -.01em; }
 h1 { font-size: 22px; }
 h2 { font-size: 15px; }
 h3 { font-size: 13px; color: var(--text-2); }
-/* Standardgröße aller Icons, Bausteine überschreiben sie bei Bedarf */
+/* Default size of all icons, components override it when needed */
 svg[aria-hidden="true"] { width: 18px; height: 18px; flex: none; }
 .brand-logo svg { width: 20px; height: 20px; }
 .stat-label svg { width: 15px; height: 15px; }
@@ -77,7 +77,7 @@ code, .mono { font-family: var(--mono); font-size: 12.5px; }
 .small { font-size: 12.5px; }
 .hidden { display: none !important; }
 
-/* --- Laden ---------------------------------------------------------------- */
+/* --- Loading ---------------------------------------------------------------- */
 .boot { display: grid; place-items: center; height: 100vh; }
 .boot-spinner, .spinner {
   width: 28px; height: 28px; border-radius: 50%;
@@ -139,7 +139,7 @@ code, .mono { font-family: var(--mono); font-size: 12.5px; }
   .content { padding: 16px 16px 40px; }
 }
 
-/* --- Bausteine ------------------------------------------------------------ */
+/* --- Components ------------------------------------------------------------ */
 .grid { display: grid; gap: 16px; }
 .grid.cols-4 { grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); }
 .grid.cols-2 { grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); }
@@ -196,7 +196,7 @@ code, .mono { font-family: var(--mono); font-size: 12.5px; }
 .service .name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 550; }
 .service .state { font-size: 12px; color: var(--muted); }
 
-/* --- Diagramm ------------------------------------------------------------- */
+/* --- Chart ------------------------------------------------------------- */
 .chart { width: 100%; height: 190px; display: block; }
 .chart .grid-line { stroke: var(--border); stroke-width: 1; }
 .chart .rx-area { fill: color-mix(in srgb, var(--rx) 18%, transparent); }
@@ -211,7 +211,7 @@ code, .mono { font-family: var(--mono); font-size: 12.5px; }
 .seg button { border: 0; background: none; color: var(--text-2); padding: 4px 11px; border-radius: 7px; font: inherit; font-size: 12.5px; cursor: pointer; }
 .seg button.active { background: var(--surface); color: var(--text); box-shadow: var(--shadow); }
 
-/* --- Tabellen ------------------------------------------------------------- */
+/* --- Tables ------------------------------------------------------------- */
 .table-wrap { overflow-x: auto; margin: 0 -18px -18px; }
 table { width: 100%; border-collapse: collapse; }
 th, td { text-align: left; padding: 10px 18px; border-top: 1px solid var(--border); vertical-align: middle; }
@@ -224,7 +224,7 @@ td.actions { text-align: right; white-space: nowrap; }
 ul.list { margin: 0; padding-left: 18px; display: grid; gap: 6px; }
 ol.list { margin: 8px 0 0; padding-left: 20px; display: grid; gap: 6px; }
 
-/* Auswahl als Karten (Anschlussart) */
+/* Choice as cards (connection type) */
 .choice-list { display: grid; gap: 8px; margin-bottom: 14px; }
 .choice {
   display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; cursor: pointer;
@@ -296,7 +296,7 @@ h3.sub { margin: 0 0 8px; }
 pre.code.log.tall { height: min(65vh, 640px); }
 .nowrap { white-space: nowrap; }
 .health-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 14px; margin-top: 12px; }
-/* Schnellsuche */
+/* Quick search */
 dialog.palette { width: min(620px, calc(100vw - 24px)); margin-top: 12vh; }
 .palette-body { padding: 10px; }
 .palette-search { display: flex; align-items: center; gap: 10px; padding: 4px 8px 10px; border-bottom: 1px solid var(--border); }
@@ -332,7 +332,7 @@ pre.code.log { border: 1px solid var(--border); border-radius: var(--radius-s); 
 input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--accent); cursor: pointer; }
 .card-head .row { gap: 10px; }
 
-/* --- Formulare und Knöpfe --------------------------------------------------- */
+/* --- Forms and buttons --------------------------------------------------- */
 .btn {
   display: inline-flex; align-items: center; justify-content: center; gap: 8px;
   height: 36px; padding: 0 14px; border-radius: var(--radius-s);
@@ -370,7 +370,7 @@ textarea.input { height: auto; padding: 10px 12px; }
 .form-fields { margin-top: 14px; }
 .form-error { color: var(--crit); background: var(--crit-soft); border-radius: var(--radius-s); padding: 9px 12px; margin-bottom: 14px; font-size: 13px; }
 
-/* --- Anmeldung ------------------------------------------------------------ */
+/* --- Login ------------------------------------------------------------ */
 .auth-page {
   min-height: 100vh; display: grid; place-items: center; padding: 24px;
   background:
@@ -383,7 +383,7 @@ textarea.input { height: auto; padding: 10px 12px; }
 .auth-card h1 { margin-bottom: 6px; }
 .auth-card p.lead { color: var(--muted); margin: 0 0 22px; }
 
-/* --- Dialoge und Meldungen ------------------------------------------------- */
+/* --- Dialogs and messages ------------------------------------------------- */
 dialog {
   border: 1px solid var(--border); border-radius: var(--radius); padding: 0;
   background: var(--surface); color: var(--text); box-shadow: 0 24px 64px rgba(0,0,0,.4);

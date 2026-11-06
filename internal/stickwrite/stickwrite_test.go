@@ -18,25 +18,25 @@ import (
 	"vanilla-router/internal/stick"
 )
 
-// memDev ist ein Datenträger im Speicher, der die Regeln von FILE_FLAG_NO_BUFFERING prüft.
+// memDev is a disk in memory that checks the rules of FILE_FLAG_NO_BUFFERING.
 type memDev struct {
 	t      *testing.T
 	b      []byte
 	sector int
 	writes []int64
-	flip   int64 // > 0: dieses Byte wird beim Schreiben verfälscht
+	flip   int64 // > 0: this byte is corrupted on writing
 }
 
 func (d *memDev) check(p []byte, off int64) {
 	d.t.Helper()
 	if off%int64(d.sector) != 0 || len(p)%d.sector != 0 {
-		d.t.Fatalf("nicht ausgerichtet: off %d len %d", off, len(p))
+		d.t.Fatalf("not aligned: off %d len %d", off, len(p))
 	}
 	if uintptr(unsafe.Pointer(&p[0]))%uintptr(d.sector) != 0 {
-		d.t.Fatalf("Puffer nicht ausgerichtet")
+		d.t.Fatalf("buffer not aligned")
 	}
 	if off+int64(len(p)) > int64(len(d.b)) {
-		d.t.Fatalf("über das Ende: off %d len %d", off, len(p))
+		d.t.Fatalf("past the end: off %d len %d", off, len(p))
 	}
 }
 
@@ -69,7 +69,7 @@ func testImage(size int) []byte {
 
 func sum(b []byte) string { s := sha256.Sum256(b); return manifest.HexSum(s[:]) }
 
-// build liefert Manifest und Download-Datei.
+// build returns the manifest and download file.
 func build(t *testing.T, img []byte, compression string) (*manifest.Manifest, []byte) {
 	t.Helper()
 	file := img
@@ -102,7 +102,7 @@ func stickJSON(t *testing.T) []byte {
 	return b
 }
 
-func TestSchreibenUndKontrolle(t *testing.T) {
+func TestWriteAndVerify(t *testing.T) {
 	for _, tc := range []struct {
 		comp   string
 		size   int
@@ -119,7 +119,7 @@ func TestSchreibenUndKontrolle(t *testing.T) {
 			var phases []Phase
 			prog := func(p Phase, done, total int64) {
 				if done > total {
-					t.Fatalf("Fortschritt %d > %d", done, total)
+					t.Fatalf("progress %d > %d", done, total)
 				}
 				if len(phases) == 0 || phases[len(phases)-1] != p {
 					phases = append(phases, p)
@@ -136,29 +136,29 @@ func TestSchreibenUndKontrolle(t *testing.T) {
 			want := append([]byte(nil), img...)
 			copy(want[offset:], sj)
 			if !bytes.Equal(dev.b[:len(img)], want) {
-				t.Fatal("Inhalt falsch")
+				t.Fatal("wrong content")
 			}
-			// Die alte GPT-Sicherung am Ende ist gelöscht.
+			// The old GPT backup at the end is erased.
 			if !bytes.Equal(dev.b[len(dev.b)-head:], make([]byte, head)) {
-				t.Error("Ende nicht gelöscht")
+				t.Error("end not erased")
 			}
-			// Zuerst Anfang und Ende löschen, zuletzt die Partitionstabelle schreiben.
+			// First erase the start and end, write the partition table last.
 			if dev.writes[0] != 0 || dev.writes[1] != int64(len(dev.b)-head) || dev.writes[len(dev.writes)-1] != 0 {
-				t.Errorf("Reihenfolge %v", dev.writes)
+				t.Errorf("order %v", dev.writes)
 			}
 			for _, w := range dev.writes[2 : len(dev.writes)-1] {
 				if w < head {
-					t.Errorf("Anfang zu früh geschrieben: %d", w)
+					t.Errorf("start written too early: %d", w)
 				}
 			}
 			if fmt.Sprint(phases) != fmt.Sprint([]Phase{PhaseCheck, PhaseWrite, PhaseVerify}) {
-				t.Errorf("Phasen %v", phases)
+				t.Errorf("phases %v", phases)
 			}
 		})
 	}
 }
 
-func TestBeschaedigteDatei(t *testing.T) {
+func TestDamagedFile(t *testing.T) {
 	img := testImage(3 << 20)
 	for _, comp := range []string{manifest.None, manifest.Gzip} {
 		m, file := build(t, img, comp)
@@ -168,12 +168,12 @@ func TestBeschaedigteDatei(t *testing.T) {
 			t.Errorf("%s: %v", comp, err)
 		}
 		if err := Check(context.Background(), opener(file[:len(file)-1]), m, nil); !errors.Is(err, ErrCorrupt) {
-			t.Errorf("%s gekürzt: %v", comp, err)
+			t.Errorf("%s shortened: %v", comp, err)
 		}
 		if err := Check(context.Background(), opener(append(append([]byte(nil), file...), 0)), m, nil); !errors.Is(err, ErrCorrupt) {
-			t.Errorf("%s verlängert: %v", comp, err)
+			t.Errorf("%s lengthened: %v", comp, err)
 		}
-		// Auch beim Schreiben fällt eine inzwischen veränderte Datei auf.
+		// A file changed in the meantime also comes to light on writing.
 		dev := &memDev{t: t, b: make([]byte, 8<<20), sector: 512}
 		if err := Write(context.Background(), opener(bad), m, dev, stickJSON(t), nil); !errors.Is(err, ErrCorrupt) {
 			t.Errorf("%s Write: %v", comp, err)
@@ -181,7 +181,7 @@ func TestBeschaedigteDatei(t *testing.T) {
 	}
 }
 
-func TestReservierungFehlt(t *testing.T) {
+func TestReservationMissing(t *testing.T) {
 	img := testImage(3 << 20)
 	img[offset+100] = 'x'
 	m, file := build(t, img, manifest.None)
@@ -190,7 +190,7 @@ func TestReservierungFehlt(t *testing.T) {
 	}
 }
 
-func TestStickZuKlein(t *testing.T) {
+func TestStickTooSmall(t *testing.T) {
 	img := testImage(3 << 20)
 	m, file := build(t, img, manifest.None)
 	dev := &memDev{t: t, b: make([]byte, 3<<20-512), sector: 512}
@@ -198,11 +198,11 @@ func TestStickZuKlein(t *testing.T) {
 		t.Fatal(err)
 	}
 	if len(dev.writes) != 0 {
-		t.Error("bei zu kleinem Stick darf nichts geschrieben werden")
+		t.Error("nothing may be written on a stick that is too small")
 	}
 }
 
-func TestKontrolleErkenntFehler(t *testing.T) {
+func TestVerifyDetectsErrors(t *testing.T) {
 	img := testImage(3 << 20)
 	m, file := build(t, img, manifest.Gzip)
 	dev := &memDev{t: t, b: make([]byte, 8<<20), sector: 512, flip: 2<<20 + 77}
@@ -211,7 +211,7 @@ func TestKontrolleErkenntFehler(t *testing.T) {
 	}
 }
 
-func TestAbbruch(t *testing.T) {
+func TestAbort(t *testing.T) {
 	img := testImage(9 << 20)
 	m, file := build(t, img, manifest.None)
 	ctx, cancel := context.WithCancel(context.Background())
@@ -231,23 +231,23 @@ func TestFindReservation(t *testing.T) {
 	if off, err := FindReservation(bytes.NewReader(img)); err != nil || off != offset {
 		t.Fatalf("%d %v", off, err)
 	}
-	// Leerzeichen im ersten MiB zählen nicht.
+	// Spaces in the first MiB do not count.
 	copy(img[4096:], bytes.Repeat([]byte{' '}, stick.Size))
 	if off, err := FindReservation(bytes.NewReader(img)); err != nil || off != offset {
 		t.Fatalf("%d %v", off, err)
 	}
 	copy(img[4<<20:], bytes.Repeat([]byte{' '}, stick.Size))
 	if _, err := FindReservation(bytes.NewReader(img)); err == nil {
-		t.Error("zwei Stellen müssen scheitern")
+		t.Error("two places must fail")
 	}
 	if _, err := FindReservation(bytes.NewReader(make([]byte, 3<<20))); !errors.Is(err, ErrNotBlank) {
 		t.Error(err)
 	}
 }
 
-func TestOverlayUndRegion(t *testing.T) {
+func TestOverlayAndRegion(t *testing.T) {
 	c := []byte("0123456789")
-	overlay(c, 10, 8, []byte("abcd")) // Daten 8..12, Block 10..20
+	overlay(c, 10, 8, []byte("abcd")) // data 8..12, block 10..20
 	if string(c) != "cd23456789" {
 		t.Error(string(c))
 	}

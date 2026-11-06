@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-// Package web bettet das Frontend in das Binary ein.
+// Package web embeds the frontend in the binary.
 package web
 
 import "embed"

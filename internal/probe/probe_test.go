@@ -17,7 +17,7 @@ var (
 	acMAC    = net.HardwareAddr{0x02, 0, 0, 0, 0, 0xac}
 )
 
-// --- Gegenstelle für Tests: baut Antworten wie ein Modem bzw. ein PPPoE-Server ---
+// --- Peer for tests: builds responses like a modem or a PPPoE server ---
 
 func buildOfferFrame(t *testing.T, discover []byte, vlan int) []byte {
 	t.Helper()
@@ -74,27 +74,27 @@ func buildPADOFrame(t *testing.T, padi []byte, acName string, errTag bool) []byt
 	return buildFrame(f.Src, acMAC, f.VLAN, etherTypePPPoEDisc, append(p, out...))
 }
 
-// --- Pakete ---
+// --- Packets ---
 
-func TestChecksumGueltig(t *testing.T) {
+func TestChecksumValid(t *testing.T) {
 	fr := BuildDiscoverFrame(ourMAC, 0x01020304, 99)
 	f, _ := parseFrame(fr)
 	if checksum(f.Payload[:20]) != 0 {
-		t.Error("IPv4-Kopf-Prüfsumme ungültig")
+		t.Error("IPv4 header checksum invalid")
 	}
 	udpLen := int(binary.BigEndian.Uint16(f.Payload[24:26]))
 	pseudo := append([]byte{0, 0, 0, 0, 255, 255, 255, 255, 0, 17}, f.Payload[24:26]...)
 	pseudo = append(pseudo, f.Payload[20:20+udpLen]...)
 	if checksum(pseudo) != 0 {
-		t.Error("UDP-Prüfsumme ungültig")
+		t.Error("UDP checksum invalid")
 	}
 }
 
-func TestDiscoverAufbau(t *testing.T) {
+func TestDiscoverStructure(t *testing.T) {
 	fr := BuildDiscoverFrame(ourMAC, 0xdeadbeef, 1)
 	f, err := parseFrame(fr)
 	if err != nil || !bytes.Equal(f.Dst, broadcastMAC) || !bytes.Equal(f.Src, ourMAC) || f.EtherType != etherTypeIPv4 || f.VLAN != 0 {
-		t.Fatalf("Rahmen: %+v %v", f, err)
+		t.Fatalf("frame: %+v %v", f, err)
 	}
 	sp, dp, b, err := parseIPv4UDP(f.Payload)
 	if err != nil || sp != 68 || dp != 67 {
@@ -102,49 +102,49 @@ func TestDiscoverAufbau(t *testing.T) {
 	}
 	if len(b) < 300 || b[0] != bootRequest || binary.BigEndian.Uint32(b[4:]) != 0xdeadbeef ||
 		binary.BigEndian.Uint16(b[10:]) != 0x8000 || !bytes.Equal(b[28:34], ourMAC) {
-		t.Errorf("BOOTP-Kopf falsch: % x", b[:40])
+		t.Errorf("BOOTP header wrong: % x", b[:40])
 	}
 	if !bytes.Equal(b[236:240], dhcpMagic) || b[240] != optMsgType || b[242] != dhcpDiscover {
-		t.Errorf("Optionen falsch: % x", b[236:250])
+		t.Errorf("options wrong: % x", b[236:250])
 	}
 }
 
-func TestOfferZerlegen(t *testing.T) {
+func TestOfferParse(t *testing.T) {
 	disc := BuildDiscoverFrame(ourMAC, 42, 1)
 	off, err := ParseOfferFrame(buildOfferFrame(t, disc, 0), ourMAC, 42)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if off.String() != "192.0.2.10/24 über 192.0.2.1" || len(off.DNS) != 2 || off.Lease != time.Hour ||
+	if off.String() != "192.0.2.10/24 via 192.0.2.1" || len(off.DNS) != 2 || off.Lease != time.Hour ||
 		!off.ServerID.Equal(net.IPv4(192, 0, 2, 1)) || !bytes.Equal(off.ServerMAC, modemMAC) {
 		t.Errorf("Offer: %+v (%s)", off, off)
 	}
 	if _, err := ParseOfferFrame(buildOfferFrame(t, disc, 0), ourMAC, 43); err == nil {
-		t.Error("fremde xid angenommen")
+		t.Error("foreign xid accepted")
 	}
 	if _, err := ParseOfferFrame(buildOfferFrame(t, disc, 0), modemMAC, 42); err == nil {
-		t.Error("fremde MAC angenommen")
+		t.Error("foreign MAC accepted")
 	}
 	if _, err := ParseOfferFrame(buildOfferFrame(t, disc, 7), ourMAC, 42); err == nil {
-		t.Error("Offer auf VLAN angenommen")
+		t.Error("offer on VLAN accepted")
 	}
 }
 
-func TestPADIAufbau(t *testing.T) {
+func TestPADIStructure(t *testing.T) {
 	hu := []byte{1, 2, 3, 4, 5, 6, 7, 8}
 	f, err := parseFrame(BuildPADIFrame(ourMAC, 7, hu))
 	if err != nil || f.VLAN != 7 || f.EtherType != etherTypePPPoEDisc || !bytes.Equal(f.Dst, broadcastMAC) {
 		t.Fatalf("%+v %v", f, err)
 	}
 	if f.Payload[0] != 0x11 || f.Payload[1] != codePADI || binary.BigEndian.Uint16(f.Payload[2:]) != 0 {
-		t.Errorf("PPPoE-Kopf: % x", f.Payload[:6])
+		t.Errorf("PPPoE header: % x", f.Payload[:6])
 	}
 	if l := binary.BigEndian.Uint16(f.Payload[4:]); l != 4+4+8 {
-		t.Errorf("Länge der Tags %d", l)
+		t.Errorf("length of tags %d", l)
 	}
 }
 
-func TestPADOZerlegen(t *testing.T) {
+func TestPADOParse(t *testing.T) {
 	hu := []byte{9, 9, 9, 9, 1, 2, 3, 4}
 	padi := BuildPADIFrame(ourMAC, 7, hu)
 	p, err := ParsePADOFrame(buildPADOFrame(t, padi, "AC-TEST-1", false), ourMAC, hu)
@@ -152,18 +152,18 @@ func TestPADOZerlegen(t *testing.T) {
 		t.Fatalf("%+v %v", p, err)
 	}
 	if _, err := ParsePADOFrame(buildPADOFrame(t, padi, "x", false), ourMAC, []byte{0}); err == nil {
-		t.Error("fremdes Host-Uniq angenommen")
+		t.Error("foreign Host-Uniq accepted")
 	}
 	p, err = ParsePADOFrame(buildPADOFrame(t, padi, "x", true), ourMAC, hu)
 	if err != nil || p.Error == "" {
-		t.Errorf("Fehler-Tag nicht erkannt: %+v %v", p, err)
+		t.Errorf("error tag not recognized: %+v %v", p, err)
 	}
 }
 
-func TestVLANWiederEinfuegen(t *testing.T) {
+func TestVLANReinsert(t *testing.T) {
 	hu := []byte{1, 1, 1, 1, 1, 1, 1, 1}
 	tagged := buildPADOFrame(t, BuildPADIFrame(ourMAC, 7, hu), "AC", false)
-	// so liefert ein Treiber mit VLAN-Offload den Rahmen: Tag entfernt, steht in PACKET_AUXDATA
+	// this is how a driver with VLAN offload delivers the frame: tag removed, it is in PACKET_AUXDATA
 	stripped := append(append([]byte(nil), tagged[:12]...), tagged[16:]...)
 	p, err := ParsePADOFrame(insertVLAN(stripped, 7), ourMAC, hu)
 	if err != nil || p.VLAN != 7 {
@@ -176,7 +176,7 @@ func TestVlanFromAux(t *testing.T) {
 	binary.NativeEndian.PutUint32(data[0:], tpStatusVLANValid)
 	binary.NativeEndian.PutUint16(data[16:], 7)
 	oob := make([]byte, 0, 64)
-	hdr := make([]byte, 16) // cmsghdr: len (8), level (4), type (4) auf amd64/arm64
+	hdr := make([]byte, 16) // cmsghdr: len (8), level (4), type (4) on amd64/arm64
 	binary.NativeEndian.PutUint64(hdr[0:], uint64(16+len(data)))
 	binary.NativeEndian.PutUint32(hdr[8:], solPacket)
 	binary.NativeEndian.PutUint32(hdr[12:], packetAuxdata)
@@ -189,12 +189,12 @@ func TestVlanFromAux(t *testing.T) {
 	}
 	binary.NativeEndian.PutUint32(oob[16:], 0)
 	if _, ok := vlanFromAux(oob); ok {
-		t.Error("VLAN ohne Gültig-Bit angenommen")
+		t.Error("VLAN without valid bit accepted")
 	}
 }
 
-// Kein Absturz bei abgeschnittenen oder zufälligen Daten.
-func TestRobustGegenMuell(t *testing.T) {
+// No crash on truncated or random data.
+func TestRobustAgainstGarbage(t *testing.T) {
 	hu := []byte{1, 2, 3, 4, 5, 6, 7, 8}
 	samples := [][]byte{
 		buildOfferFrame(t, BuildDiscoverFrame(ourMAC, 1, 1), 0),
@@ -205,7 +205,7 @@ func TestRobustGegenMuell(t *testing.T) {
 			ParseOfferFrame(s[:i], ourMAC, 1)
 			ParsePADOFrame(s[:i], ourMAC, hu)
 		}
-		for i := 14; i < len(s); i++ { // Längenfelder verfälschen
+		for i := 14; i < len(s); i++ { // falsify length fields
 			m := append([]byte(nil), s...)
 			m[i] = 0xff
 			ParseOfferFrame(m, ourMAC, 1)
@@ -214,7 +214,7 @@ func TestRobustGegenMuell(t *testing.T) {
 	}
 }
 
-// --- Ablauf mit nachgebautem Socket und künstlicher Uhr ---
+// --- Flow with a fake socket and an artificial clock ---
 
 type fakeConn struct {
 	t       *testing.T
@@ -222,7 +222,7 @@ type fakeConn struct {
 	sent    [][]byte
 	queue   [][]byte
 	respond func(sent []byte) [][]byte
-	delay   int // Antworten erst ab dem n-ten gesendeten Rahmen
+	delay   int // responses only from the nth sent frame
 }
 
 func (c *fakeConn) now() time.Time { return c.clock }
@@ -250,7 +250,7 @@ func TestRunDHCP(t *testing.T) {
 	c.respond = func(b []byte) [][]byte {
 		f, _ := parseFrame(b)
 		if f.EtherType == etherTypeIPv4 {
-			return [][]byte{BuildPADIFrame(modemMAC, 0, nil), buildOfferFrame(t, b, 0)} // Rauschen + Antwort
+			return [][]byte{BuildPADIFrame(modemMAC, 0, nil), buildOfferFrame(t, b, 0)} // noise + response
 		}
 		return nil
 	}
@@ -260,11 +260,11 @@ func TestRunDHCP(t *testing.T) {
 		t.Fatalf("%+v %v", res, err)
 	}
 	if el := c.clock.Sub(time.Unix(0, 0)); el > 2*time.Second {
-		t.Errorf("nach der Antwort nicht zügig beendet: %v", el)
+		t.Errorf("not finished promptly after the response: %v", el)
 	}
-	// erste Runde: Discover + 2 PADI, zweite Runde: Discover beantwortet
+	// first round: discover + 2 PADI, second round: discover answered
 	if len(c.sent) != 6 {
-		t.Errorf("%d Rahmen gesendet, erwartet 6", len(c.sent))
+		t.Errorf("%d frames sent, expected 6", len(c.sent))
 	}
 }
 
@@ -283,7 +283,7 @@ func TestRunPPPoEVLAN7(t *testing.T) {
 	}
 }
 
-func TestRunOhneAntwort(t *testing.T) {
+func TestRunWithoutAnswer(t *testing.T) {
 	c := &fakeConn{t: t, clock: time.Unix(0, 0)}
 	o := Options{Timeout: 3 * time.Second}.withDefaults()
 	res, err := run(context.Background(), c, ourMAC, o, c.now)
@@ -291,18 +291,18 @@ func TestRunOhneAntwort(t *testing.T) {
 		t.Fatalf("%+v %v", res, err)
 	}
 	if el := c.clock.Sub(time.Unix(0, 0)); el != 3*time.Second {
-		t.Errorf("Dauer %v, erwartet 3 s", el)
+		t.Errorf("duration %v, expected 3 s", el)
 	}
-	if len(c.sent) != 9 { // 3 Runden à Discover + 2 PADI
-		t.Errorf("%d Rahmen gesendet, erwartet 9", len(c.sent))
+	if len(c.sent) != 9 { // 3 rounds of discover + 2 PADI
+		t.Errorf("%d frames sent, expected 9", len(c.sent))
 	}
 }
 
-func TestRunAbbruch(t *testing.T) {
+func TestRunAbort(t *testing.T) {
 	c := &fakeConn{t: t, clock: time.Unix(0, 0)}
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 	if _, err := run(ctx, c, ourMAC, Options{}.withDefaults(), c.now); err == nil {
-		t.Error("Abbruch nicht gemeldet")
+		t.Error("abort not reported")
 	}
 }

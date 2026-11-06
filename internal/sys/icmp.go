@@ -12,10 +12,10 @@ import (
 	"time"
 )
 
-// Ping ohne externes Programm: ICMP-Echo über einen Datagram-Socket (wie `ping` ohne root,
-// erlaubt durch net.ipv4.ping_group_range). Das Programm ping selbst lässt sich unter der
-// gehärteten Unit nicht starten: Es hat die Datei-Capability cap_net_raw, die das
-// CapabilityBoundingSet nicht enthält, deshalb lehnt der Kernel den Start ab.
+// Ping without an external program: ICMP echo over a datagram socket (like `ping` without root,
+// allowed by net.ipv4.ping_group_range). The ping program itself cannot be started under the
+// hardened unit: it has the file capability cap_net_raw, which the
+// CapabilityBoundingSet does not contain, so the kernel refuses to start it.
 
 var pingSeq atomic.Uint32
 
@@ -43,7 +43,7 @@ func icmpChecksum(b []byte) uint16 {
 	return ^uint16(sum)
 }
 
-// icmpPing schickt ein Echo und wartet auf die Antwort. Liefert die Antwortzeit in ms.
+// icmpPing sends an echo and waits for the response. Returns the response time in ms.
 func icmpPing(ctx context.Context, addr string, timeout time.Duration) (float64, bool) {
 	ip := net.ParseIP(addr).To4()
 	if ip == nil {
@@ -69,7 +69,7 @@ func icmpPing(ctx context.Context, addr string, timeout time.Duration) (float64,
 
 	seq := uint16(pingSeq.Add(1))
 	start := time.Now()
-	// Die Kennung setzt der Kernel bei Datagram-Sockets selbst, verglichen wird die Sequenznummer
+	// The kernel sets the ID itself on datagram sockets, the sequence number is compared
 	if _, err := conn.WriteTo(icmpEcho(0, seq, []byte("routerui")), &net.UDPAddr{IP: ip}); err != nil {
 		return 0, false
 	}
@@ -80,7 +80,7 @@ func icmpPing(ctx context.Context, addr string, timeout time.Duration) (float64,
 			return 0, false
 		}
 		if n < 8 || buf[0] != 0 || binary.BigEndian.Uint16(buf[6:8]) != seq {
-			continue // keine Antwort auf unser Echo
+			continue // no response to our echo
 		}
 		if ua, ok := from.(*net.UDPAddr); ok && !ua.IP.Equal(ip) {
 			continue

@@ -21,7 +21,7 @@ func (s *Server) registerMonitor() {
 	s.route("GET /api/hints", s.handleHints)
 }
 
-// rangeParam liest ?minutes= (Standard 60, höchstens 24 h).
+// rangeParam reads ?minutes= (default 60, at most 24 h).
 func rangeParam(r *http.Request) time.Time {
 	m, _ := strconv.Atoi(r.URL.Query().Get("minutes"))
 	if m <= 0 {
@@ -40,7 +40,7 @@ func (s *Server) handleHistory(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleMonitor(w http.ResponseWriter, r *http.Request) {
 	if s.cfg.Monitor == nil {
-		writeError(w, http.StatusServiceUnavailable, "Der Online-Monitor läuft nicht.")
+		writeError(w, http.StatusServiceUnavailable, "The online monitor is not running.")
 		return
 	}
 	writeJSON(w, s.cfg.Monitor.Snapshot(rangeParam(r)))
@@ -69,13 +69,13 @@ func failedUnits(ctx context.Context) []string {
 	return units
 }
 
-// handleHints sammelt alles, was Aufmerksamkeit braucht, für die Übersicht.
+// handleHints collects everything that needs attention, for the overview.
 func (s *Server) handleHints(w http.ResponseWriter, r *http.Request) {
 	hints := []hint{}
 	add := func(level, title, text, link string) { hints = append(hints, hint{level, title, text, link}) }
 
 	if s.call(r, "health", nil, nil) != nil {
-		add("crit", "Helper nicht erreichbar", "Änderungen über die Oberfläche sind gerade nicht möglich.", "#/services")
+		add("crit", "Helper not reachable", "Changes through the web interface are not possible right now.", "#/services")
 	}
 	var set struct {
 		NeedsSetup bool `json:"needs_setup"`
@@ -85,24 +85,24 @@ func (s *Server) handleHints(w http.ResponseWriter, r *http.Request) {
 	}
 	if s.call(r, "settings.get", nil, &set) == nil {
 		if set.Pending != nil {
-			add("crit", "Änderung wartet auf Bestätigung", "Ohne Bestätigung wird sie automatisch zurückgenommen.", "#/internet")
+			add("crit", "A change is waiting for confirmation", "Without confirmation it is rolled back automatically.", "#/internet")
 		}
 		if set.NeedsSetup {
-			add("warn", "Internetzugang einrichten", "Ihr Anschluss braucht noch Zugangsdaten oder die Anschlussart.", "#/internet?setup=1")
+			add("warn", "Set up internet access", "Your connection still needs credentials or the connection type.", "#/internet?setup=1")
 		}
 	}
 	if s.cfg.Monitor != nil {
 		if n, down := s.cfg.Monitor.OutagesSince(time.Now().Add(-24 * time.Hour)); down {
-			add("crit", "Internet ausgefallen", "Weder 8.8.8.8 noch 1.1.1.1 antworten.", "#/monitor")
+			add("crit", "Internet down", "Neither 8.8.8.8 nor 1.1.1.1 is answering.", "#/monitor")
 		} else if n > 0 {
-			add("warn", fmt.Sprintf("%d Internet-Ausfall/-Ausfälle in den letzten 24 Stunden", n), "", "#/monitor")
+			add("warn", fmt.Sprintf("%d internet outage(s) in the last 24 hours", n), "", "#/monitor")
 		}
 	}
 	if n := s.devices.NewSince(time.Now().Add(-24 * time.Hour)); n > 0 {
-		add("info", fmt.Sprintf("%d neue(s) Gerät(e) in den letzten 24 Stunden", n), "Unbekannte Geräte im Heimnetz lohnt es sich anzusehen.", "#/devices")
+		add("info", fmt.Sprintf("%d new device(s) in the last 24 hours", n), "Unknown devices in your home network are worth a look.", "#/devices")
 	}
 	if units := failedUnits(r.Context()); len(units) > 0 {
-		add("warn", fmt.Sprintf("%d Dienst(e) fehlgeschlagen", len(units)), strings.Join(units, ", "), "#/services")
+		add("warn", fmt.Sprintf("%d service(s) failed", len(units)), strings.Join(units, ", "), "#/services")
 	}
 	var upd struct {
 		Updates []struct {
@@ -119,12 +119,12 @@ func (s *Server) handleHints(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		if sec > 0 {
-			add("warn", fmt.Sprintf("%d Sicherheitsupdates verfügbar", sec), "", "#/system")
+			add("warn", fmt.Sprintf("%d security updates available", sec), "", "#/system")
 		} else if len(upd.Updates) > 0 {
-			add("info", fmt.Sprintf("%d Updates verfügbar", len(upd.Updates)), "", "#/system")
+			add("info", fmt.Sprintf("%d updates available", len(upd.Updates)), "", "#/system")
 		}
 		if upd.RebootRequired {
-			add("info", "Neustart nötig", strings.Join(upd.RebootPackages, ", "), "#/system")
+			add("info", "Restart required", strings.Join(upd.RebootPackages, ", "), "#/system")
 		}
 	}
 	var audit *struct {
@@ -135,7 +135,7 @@ func (s *Server) handleHints(w http.ResponseWriter, r *http.Request) {
 	}
 	if s.features()["audit"] && s.call(r, "system.audit.get", nil, &audit) == nil {
 		if audit == nil || audit.Time.IsZero() {
-			add("info", "Noch kein Sicherheits-Audit gelaufen", "", "#/system")
+			add("info", "No security audit has run yet", "", "#/system")
 		} else {
 			crit, warn := 0, 0
 			for _, c := range audit.Checks {
@@ -147,12 +147,12 @@ func (s *Server) handleHints(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 			if crit > 0 {
-				add("crit", fmt.Sprintf("Audit: %d kritische Befunde", crit), "", "#/system")
+				add("crit", fmt.Sprintf("Audit: %d critical findings", crit), "", "#/system")
 			}
 			if age := time.Since(audit.Time); age > 30*24*time.Hour {
-				add("info", fmt.Sprintf("Letztes Audit vor %d Tagen", int(age.Hours()/24)), "", "#/system")
+				add("info", fmt.Sprintf("Last audit %d days ago", int(age.Hours()/24)), "", "#/system")
 			} else if warn > 0 && crit == 0 {
-				add("info", fmt.Sprintf("Audit: %d Warnungen", warn), "", "#/system")
+				add("info", fmt.Sprintf("Audit: %d warnings", warn), "", "#/system")
 			}
 		}
 	}
@@ -160,13 +160,13 @@ func (s *Server) handleHints(w http.ResponseWriter, r *http.Request) {
 	if syscall.Statfs("/", &st) == nil && st.Blocks > 0 {
 		used := 100 - 100*float64(st.Bavail)/float64(st.Blocks)
 		if used > 90 {
-			add("crit", fmt.Sprintf("Speicher zu %.0f %% voll", used), "", "#/files")
+			add("crit", fmt.Sprintf("Storage %.0f %% full", used), "", "#/files")
 		} else if used > 80 {
-			add("warn", fmt.Sprintf("Speicher zu %.0f %% voll", used), "", "#/files")
+			add("warn", fmt.Sprintf("Storage %.0f %% full", used), "", "#/files")
 		}
 	}
 	if t, ok := sys.Temperature(); ok && t > 80 {
-		add("warn", fmt.Sprintf("CPU-Temperatur hoch: %.0f °C", t), "", "")
+		add("warn", fmt.Sprintf("CPU temperature high: %.0f °C", t), "", "")
 	}
 	writeJSON(w, map[string]any{"hints": hints})
 }

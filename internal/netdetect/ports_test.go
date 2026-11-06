@@ -9,8 +9,8 @@ import (
 	"testing"
 )
 
-// fakeSys baut einen kleinen sysfs-Baum nach, wie ihn ein Büro-PC mit eingebauter Karte,
-// Zusatzkarte, zwei USB-Adaptern, WLAN und Docker zeigt.
+// fakeSys builds a small sysfs tree as an office PC with a built-in card,
+// an add-on card, two USB adapters, Wi-Fi and Docker would show.
 type fakeSys struct {
 	t    *testing.T
 	root string
@@ -25,7 +25,7 @@ func newFakeSys(t *testing.T) *fakeSys {
 	return &fakeSys{t, root}
 }
 
-// iface legt devices/<dev>/net/<name> an. dev == "" bedeutet virtuell.
+// iface creates devices/<dev>/net/<name>. dev == "" means virtual.
 func (f *fakeSys) iface(name, dev, bus, driver string, attrs map[string]string, dirs ...string) {
 	t := f.t
 	var netDir string
@@ -100,7 +100,7 @@ func TestListPorts(t *testing.T) {
 	}
 	want := "enp2s0 eno1 enx2 enx10"
 	if strings.Join(got, " ") != want {
-		t.Fatalf("Reihenfolge = %v, erwartet %s", got, want)
+		t.Fatalf("order = %v, expected %s", got, want)
 	}
 	reasons := map[string]string{}
 	for _, s := range skipped {
@@ -108,27 +108,27 @@ func TestListPorts(t *testing.T) {
 	}
 	for name, r := range map[string]string{"lo": skipLoopback, "wlp3s0": skipWireless, "docker0": skipBridge, "veth1": skipVirtual} {
 		if reasons[name] != r {
-			t.Errorf("%s: Grund %q, erwartet %q", name, reasons[name], r)
+			t.Errorf("%s: reason %q, expected %q", name, reasons[name], r)
 		}
 	}
 
 	eno := ports[1]
 	if eno.Number != 2 || eno.Driver != "e1000e" || eno.Bus != "pci" || eno.Index != 2 ||
 		eno.Carrier != Yes || eno.SpeedMbps != 1000 || !eno.AdminUp || eno.MAC != "02:00:00:00:00:01" {
-		t.Errorf("eno1 falsch gelesen: %+v", eno)
+		t.Errorf("eno1 read wrongly: %+v", eno)
 	}
 	if eno.DevPath != "/devices/pci0000:00/0000:00:1f.6" {
 		t.Errorf("DevPath = %q", eno.DevPath)
 	}
 	if ports[0].Carrier != Unknown {
-		t.Errorf("enp2s0 ohne carrier-Datei: %v, erwartet unbekannt", ports[0].Carrier)
+		t.Errorf("enp2s0 without carrier file: %v, expected unknown", ports[0].Carrier)
 	}
-	if l := ports[3].Label(); l != "Anschluss 4 (USB-Adapter)" {
+	if l := ports[3].Label(); l != "Port 4 (USB adapter)" {
 		t.Errorf("Label = %q", l)
 	}
 }
 
-func TestListPortsVirtuellFuersLabor(t *testing.T) {
+func TestListPortsVirtualForLab(t *testing.T) {
 	f := newFakeSys(t)
 	f.iface("r1", "", "", "", ether("3", "02:00:00:00:00:02", "0"))
 	f.iface("r0", "", "", "", ether("2", "02:00:00:00:00:01", "1"))
@@ -148,8 +148,8 @@ func TestLessPath(t *testing.T) {
 		want bool
 	}{
 		{"/devices/pci0000:00/0000:00:1c.0", "/devices/pci0000:00/0000:00:1f.6", true},
-		{"/devices/pci0000:00/0000:0a:00.0", "/devices/pci0000:00/0000:01:00.0", false}, // hexadezimal
-		{"/usb2/2-2/2-2:1.0", "/usb2/2-10/2-10:1.0", true},                              // natürlich
+		{"/devices/pci0000:00/0000:0a:00.0", "/devices/pci0000:00/0000:01:00.0", false}, // hexadecimal
+		{"/usb2/2-2/2-2:1.0", "/usb2/2-10/2-10:1.0", true},                              // natural
 		{"/usb10/x", "/usb2/x", false},
 		{"/a", "/a/b", true},
 	}

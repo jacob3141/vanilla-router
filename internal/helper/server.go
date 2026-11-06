@@ -19,24 +19,24 @@ import (
 	"time"
 )
 
-// Handler führt eine Aktion aus. params sind die rohen JSON-Parameter.
+// Handler executes an action. params are the raw JSON parameters.
 type Handler func(ctx context.Context, params json.RawMessage) (any, error)
 
-// Config des Helpers.
+// Config of the helper.
 type Config struct {
 	Socket     string
-	AllowUID   int    // neben root darf nur dieser Benutzer verbinden
-	SocketGID  int    // Gruppe des Sockets
-	DryRun     bool   // Probelauf: Dateien nur unter Root schreiben, nichts anwenden
-	Root       string // Wurzel für geschriebene Dateien im Probelauf, sonst "/"
-	SecretsDir string // Geheimnisse für vrctl apply (PPPoE), Vorgabe /etc/vanilla-router/secrets
+	AllowUID   int    // besides root only this user may connect
+	SocketGID  int    // group of the socket
+	DryRun     bool   // dry run: write files only under Root, apply nothing
+	Root       string // root for files written in a dry run, otherwise "/"
+	SecretsDir string // secrets for vrctl apply (PPPoE), default /etc/vanilla-router/secrets
 	Log        *slog.Logger
 }
 
 type Server struct {
 	cfg      Config
 	handlers map[string]Handler
-	mu       sync.Mutex // schützt state.json und die verwalteten Dateien
+	mu       sync.Mutex // protects state.json and the managed files
 	pending  *pendingChange
 }
 
@@ -54,8 +54,8 @@ func NewServer(cfg Config) *Server {
 
 func (s *Server) handle(name string, h Handler) { s.handlers[name] = h }
 
-// Path übersetzt einen Systempfad in den Pfad, der wirklich geschrieben wird.
-// Im Probelauf landet alles unter cfg.Root, gelesen wird weiter vom echten System.
+// Path translates a system path into the path that is really written.
+// In a dry run everything lands under cfg.Root, reading stays from the real system.
 func (s *Server) Path(p string) string {
 	if !s.cfg.DryRun {
 		return p
@@ -63,7 +63,7 @@ func (s *Server) Path(p string) string {
 	return filepath.Join(s.cfg.Root, p)
 }
 
-// Run nimmt Verbindungen an, bis ctx endet.
+// Run accepts connections until ctx ends.
 func (s *Server) Run(ctx context.Context) error {
 	os.Remove(s.cfg.Socket)
 	ln, err := net.Listen("unix", s.cfg.Socket)
@@ -71,7 +71,7 @@ func (s *Server) Run(ctx context.Context) error {
 		return err
 	}
 	defer ln.Close()
-	if os.Geteuid() == 0 { // ohne root (Probelauf in der Entwicklung) gehört der Socket dem Aufrufer
+	if os.Geteuid() == 0 { // without root (dry run in development) the socket belongs to the caller
 		if err := os.Chown(s.cfg.Socket, 0, s.cfg.SocketGID); err != nil {
 			return err
 		}
@@ -79,7 +79,7 @@ func (s *Server) Run(ctx context.Context) error {
 	if err := os.Chmod(s.cfg.Socket, 0o660); err != nil {
 		return err
 	}
-	s.cfg.Log.Info("helper bereit", "socket", s.cfg.Socket, "dry_run", s.cfg.DryRun, "aktionen", len(s.handlers))
+	s.cfg.Log.Info("helper ready", "socket", s.cfg.Socket, "dry_run", s.cfg.DryRun, "actions", len(s.handlers))
 
 	go func() { <-ctx.Done(); ln.Close() }()
 	for {
@@ -118,45 +118,45 @@ func (s *Server) serveConn(ctx context.Context, conn *net.UnixConn) {
 	defer conn.Close()
 	uid, err := peerUID(conn)
 	if err != nil || (uid != 0 && uid != s.cfg.AllowUID) {
-		s.cfg.Log.Warn("verbindung abgelehnt", "uid", uid, "err", err)
+		s.cfg.Log.Warn("connection rejected", "uid", uid, "err", err)
 		return
 	}
-	conn.SetDeadline(time.Now().Add(30 * time.Minute)) // Updates können dauern
+	conn.SetDeadline(time.Now().Add(30 * time.Minute)) // updates can take a while
 
 	var req Request
 	dec := json.NewDecoder(bufio.NewReader(&limitedReader{conn, maxMessage}))
 	if err := dec.Decode(&req); err != nil {
-		writeResp(conn, Response{Error: "Anfrage unlesbar"})
+		writeResp(conn, Response{Error: "request unreadable"})
 		return
 	}
 	h, ok := s.handlers[req.Action]
 	if !ok {
-		s.cfg.Log.Warn("unbekannte aktion", "action", req.Action)
-		writeResp(conn, Response{Error: "Unbekannte Aktion"})
+		s.cfg.Log.Warn("unknown action", "action", req.Action)
+		writeResp(conn, Response{Error: "Unknown action"})
 		return
 	}
 
 	start := time.Now()
 	data, err := h(ctx, req.Params)
-	log := s.cfg.Log.With("action", req.Action, "dauer", time.Since(start).Round(time.Millisecond))
+	log := s.cfg.Log.With("action", req.Action, "duration", time.Since(start).Round(time.Millisecond))
 	if err != nil {
 		var ue *UserError
 		if errors.As(err, &ue) {
-			log.Warn("aktion abgelehnt", "grund", ue.Msg)
+			log.Warn("action rejected", "reason", ue.Msg)
 			writeResp(conn, Response{Error: ue.Msg})
 		} else {
-			log.Error("aktion fehlgeschlagen", "err", err)
-			writeResp(conn, Response{Error: "Interner Fehler im Helper, Details im Journal (vr-webui-helper)."})
+			log.Error("action failed", "err", err)
+			writeResp(conn, Response{Error: "Internal error in the helper, details in the journal (vr-webui-helper)."})
 		}
 		return
 	}
 	if !isReadOnly(req.Action) {
-		log.Info("aktion ausgeführt")
+		log.Info("action executed")
 	}
 	resp := Response{OK: true}
 	if data != nil {
 		if resp.Data, err = json.Marshal(data); err != nil {
-			writeResp(conn, Response{Error: "Antwort nicht serialisierbar"})
+			writeResp(conn, Response{Error: "response not serializable"})
 			return
 		}
 	}
@@ -165,18 +165,18 @@ func (s *Server) serveConn(ctx context.Context, conn *net.UnixConn) {
 
 func writeResp(c net.Conn, r Response) { json.NewEncoder(c).Encode(r) }
 
-// isReadOnly: lesende Aktionen werden nicht einzeln protokolliert, um das Journal nicht zu fluten.
+// isReadOnly: read-only actions are not logged individually, so as not to flood the journal.
 func isReadOnly(action string) bool {
 	return strings.HasSuffix(action, ".list") || strings.HasSuffix(action, ".get") ||
 		strings.HasSuffix(action, ".status") || action == "health" || strings.HasPrefix(action, "tool.")
 }
 
-// run führt ein Programm ohne Shell aus und liefert stdout+stderr.
+// run runs a program without a shell and returns stdout+stderr.
 func run(ctx context.Context, name string, args ...string) (string, error) {
 	return runTZ(ctx, "", name, args...)
 }
 
-// runTZ wie run, mit gesetzter Zeitzone (leer = Systemvorgabe).
+// runTZ like run, with a set time zone (empty = system default).
 func runTZ(ctx context.Context, tz, name string, args ...string) (string, error) {
 	cmd := exec.CommandContext(ctx, name, args...)
 	cmd.Env = []string{"PATH=/usr/sbin:/usr/bin:/sbin:/bin", "LC_ALL=C.UTF-8"}
@@ -190,10 +190,10 @@ func runTZ(ctx context.Context, tz, name string, args ...string) (string, error)
 	return string(out), nil
 }
 
-// apply führt ein Programm aus, das etwas am System ändert. Im Probelauf wird es nur protokolliert.
+// apply runs a program that changes something on the system. In a dry run it is only logged.
 func (s *Server) apply(ctx context.Context, name string, args ...string) error {
 	if s.cfg.DryRun {
-		s.cfg.Log.Info("probelauf: übersprungen", "cmd", name+" "+strings.Join(args, " "))
+		s.cfg.Log.Info("dry run: skipped", "cmd", name+" "+strings.Join(args, " "))
 		return nil
 	}
 	_, err := run(ctx, name, args...)
@@ -207,7 +207,7 @@ func decode(params json.RawMessage, v any) error {
 	dec := json.NewDecoder(strings.NewReader(string(params)))
 	dec.DisallowUnknownFields()
 	if err := dec.Decode(v); err != nil {
-		return Userf("Ungültige Parameter: %v", err)
+		return Userf("Invalid parameters: %v", err)
 	}
 	return nil
 }

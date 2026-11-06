@@ -1,4 +1,4 @@
-# Einheitlich LF, auch beim Arbeiten unter Windows (Skripte laufen auf Linux)
+# LF everywhere, even when working on Windows (scripts run on Linux)
 * text=auto eol=lf
 *.png binary
 *.jpg binary

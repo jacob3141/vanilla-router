@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-# Startet den Assistenten auf tty1 statt einer Anmeldung (PLAN.md 3.9.1).
+# Starts the assistant on tty1 instead of a login (PLAN.md 3.9.1).
 [Unit]
-Description=vanilla-router Installations-Assistent
+Description=vanilla-router installation assistant
 After=systemd-user-sessions.service systemd-udev-settle.service
 Conflicts=getty@tty1.service
 Before=getty@tty1.service
@@ -16,7 +16,7 @@ TTYPath=/dev/tty1
 TTYReset=yes
 TTYVHangup=yes
 Environment=TERM=linux
-# Nach Abbruch neu starten, damit Laien nie vor einer Anmeldung stehen
+# Restart after an abort, so that non-experts never face a login prompt
 Restart=always
 RestartSec=2
 

@@ -2,13 +2,13 @@
 
 package logo
 
-// File ist eine erzeugte Logo-Datei im Repo (Pfad relativ zum Wurzelordner).
+// File is a generated logo file in the repo (path relative to the root folder).
 type File struct {
 	Path string
 	Data func() []byte
 }
 
-// Files sind alle Logo-Dateien, die mklogo schreibt und der Test vergleicht.
+// Files are all logo files that mklogo writes and the test compares.
 func Files() []File {
 	return []File{
 		{"docs/logo/logo.svg", SVG},

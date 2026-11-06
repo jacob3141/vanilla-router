@@ -1,23 +1,26 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: AGPL-3.0-or-later
 #
-# Baut das Paket vanilla-router_<version>_amd64.deb (ohne Root, braucht go und dpkg-deb).
-# Abhängigkeiten kommen aus image/packages.txt, damit Paket und Prüfung (NF-09) übereinstimmen.
-# Aufruf: packaging/build-deb.sh [version]   → dist/vanilla-router_<version>_amd64.deb
+# Builds the package vanilla-router_<version>_amd64.deb (no root, needs go and dpkg-deb).
+# Dependencies come from image/packages.txt, so the package and the check (NF-09) agree.
+# Usage: packaging/build-deb.sh [version]   → dist/vanilla-router_<version>_amd64.deb
 set -euo pipefail
 cd "$(dirname "$0")/.."
 VERSION=${1:-0.0.0~dev$(date -u +%Y%m%d%H%M)}
 OUT=dist
+# Source of exactly this version (AGPL §13, F-UI-07), for a development build the repository itself
+SOURCE_URL=https://github.com/jacob3141/vanilla-router
+case "$VERSION" in *~*) ;; *) SOURCE_URL="$SOURCE_URL/tree/v$VERSION" ;; esac
 umask 022
 STAGE=$(mktemp -d)
-chmod 755 "$STAGE" # mktemp legt 0700 an, das würde zur Wurzel / im Paket
+chmod 755 "$STAGE" # mktemp creates 0700, that would become the root / in the package
 trap 'rm -rf "$STAGE"' EXIT
 
-echo "baue Programme …"
+echo "building programs …"
 mkdir -p "$STAGE/usr/sbin"
 for cmd in vrctl vr-detect vr-install vr-webui; do
 	[ -d "cmd/$cmd" ] || continue
-	CGO_ENABLED=0 GOFLAGS=-buildvcs=false go build -trimpath -ldflags "-s -w -X main.version=$VERSION" \
+	CGO_ENABLED=0 GOFLAGS=-buildvcs=false go build -trimpath -ldflags "-s -w -X main.version=$VERSION -X main.sourceURL=$SOURCE_URL" \
 		-o "$STAGE/usr/sbin/$cmd" "./cmd/$cmd"
 done
 
@@ -26,7 +29,7 @@ install -Dm644 packaging/sysusers.d/vanilla-router.conf "$STAGE/usr/lib/sysusers
 install -Dm644 packaging/tmpfiles.d/vanilla-router.conf "$STAGE/usr/lib/tmpfiles.d/vanilla-router.conf"
 install -Dm644 LICENSE "$STAGE/usr/share/doc/vanilla-router/copyright"
 install -Dm644 packaging/system.conf.d/vanilla-router.conf "$STAGE/usr/lib/systemd/system.conf.d/vanilla-router.conf"
-# Unter /etc: Konfigurationsdateien des Pakets (conffiles), dürfen angepasst werden
+# Under /etc: configuration files of the package (conffiles), may be adapted
 install -Dm755 packaging/grub.d/42_vanilla_router "$STAGE/etc/grub.d/42_vanilla_router"
 install -Dm644 packaging/default-grub.d/vanilla-router.cfg "$STAGE/etc/default/grub.d/vanilla-router.cfg"
 install -Dm644 packaging/apt/80vr-snapshot "$STAGE/etc/apt/apt.conf.d/80vr-snapshot"
@@ -41,10 +44,10 @@ Maintainer: vanilla-router <vanilla-router@invalid>
 Depends: $DEPENDS
 Section: net
 Priority: optional
-Homepage: https://example.org/vanilla-router
-Description: Router aus einem unveränderten Ubuntu Server
- Erzeugt Netzwerk, Firewall, DNS und DHCP aus einer einzigen Konfigurationsdatei
- (/etc/vanilla-router/config.json) und spielt Änderungen geprüft und mit Rücknahme ein.
+Homepage: https://github.com/jacob3141/vanilla-router
+Description: Router built from an unmodified Ubuntu Server
+ Generates network, firewall, DNS and DHCP from a single configuration file
+ (/etc/vanilla-router/config.json) and applies changes checked and with rollback.
 EOF
 cat >"$STAGE/DEBIAN/postinst" <<'EOF'
 #!/bin/sh
@@ -61,5 +64,5 @@ chmod 755 "$STAGE/DEBIAN/postinst"
 mkdir -p "$OUT"
 DEB="$OUT/vanilla-router_${VERSION}_amd64.deb"
 dpkg-deb --root-owner-group -Zxz --build "$STAGE" "$DEB" >/dev/null
-echo "fertig: $DEB"
+echo "done: $DEB"
 dpkg-deb --info "$DEB" | sed -n '/Package:/,/Depends:/p'

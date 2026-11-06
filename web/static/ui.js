@@ -1,17 +1,22 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// Kleine UI-Bibliothek. Alle Inhalte entstehen über h(), Text immer als Textknoten:
-// Gerätenamen und Logzeilen kommen aus dem Netz und dürfen nie als HTML interpretiert werden.
+// Small UI library. All content is created through h(), text always as text nodes:
+// device names and log lines come from the network and must never be interpreted as HTML.
+
+import { t, locale } from './i18n.js';
+
+const TEXT_ATTRS = new Set(['title', 'placeholder', 'aria-label', 'alt']);
 
 export function h(tag, attrs, ...children) {
   const el = document.createElement(tag);
   for (const [k, v] of Object.entries(attrs || {})) {
     if (v == null || v === false) continue;
     if (k === 'class') el.className = v;
-    // style nur als Objekt (CSSOM): style-Attribute würde die CSP blockieren
+    // style only as an object (CSSOM): style attributes would be blocked by the CSP
     else if (k === 'style') Object.assign(el.style, v);
     else if (k.startsWith('on') && typeof v === 'function') el.addEventListener(k.slice(2), v);
     else if (k === 'value') el.value = v;
     else if (k === 'checked') el.checked = !!v;
+    else if (TEXT_ATTRS.has(k)) el.setAttribute(k, t(String(v)));
     else el.setAttribute(k, v === true ? '' : String(v));
   }
   append(el, children);
@@ -20,16 +25,16 @@ export function h(tag, attrs, ...children) {
 
 function append(el, children) {
   for (const c of children) {
-    // "" und false sind „nichts“; 0 als Zahl wird bewusst angezeigt (Zähler)
+    // "" and false mean "nothing"; 0 as a number is shown deliberately (counters)
     if (c == null || c === false || c === '') continue;
     if (Array.isArray(c)) append(el, c);
     else if (c instanceof Node) el.appendChild(c);
-    else el.appendChild(document.createTextNode(String(c)));
+    else el.appendChild(document.createTextNode(t(String(c))));
   }
 }
 
-// every ruft fn regelmäßig auf, aber nicht, solange der Tab im Hintergrund ist; beim Zurückkehren
-// sofort einmal. Liefert die Aufräumfunktion für die Ansicht.
+// every calls fn regularly, but not while the tab is in the background; on returning
+// once immediately. Returns the cleanup function for the view.
 export function every(ms, fn) {
   const id = setInterval(() => { if (!document.hidden) fn(); }, ms);
   const onVis = () => { if (!document.hidden) fn(); };
@@ -39,7 +44,7 @@ export function every(ms, fn) {
 
 export function clear(el) { while (el.firstChild) el.removeChild(el.firstChild); return el; }
 
-// --- Icons (Pfade im Stil von Lucide, 24er Raster) --------------------------------------
+// --- Icons (paths in the Lucide style, 24 grid) --------------------------------------
 const ICONS = {
   dashboard: 'M3 13h8V3H3zM13 21h8V11h-8zM3 21h8v-6H3zM13 3v6h8V3z',
   devices: 'M4 6h16v10H4zM2 20h20M9 16v4M15 16v4',
@@ -99,9 +104,9 @@ export function icon(name, cls) {
   return svg;
 }
 
-// --- Formatierung ---------------------------------------------------------------------
-const nf1 = new Intl.NumberFormat('de-DE', { maximumFractionDigits: 1 });
-const nf0 = new Intl.NumberFormat('de-DE', { maximumFractionDigits: 0 });
+// --- Formatting ---------------------------------------------------------------------
+const nf1 = { format: (n) => new Intl.NumberFormat(locale(), { maximumFractionDigits: 1 }).format(n) };
+const nf0 = { format: (n) => new Intl.NumberFormat(locale(), { maximumFractionDigits: 0 }).format(n) };
 
 export const fmt = {
   bytes(n) {
@@ -110,7 +115,7 @@ export const fmt = {
     while (n >= 1024 && i < u.length - 1) { n /= 1024; i++; }
     return `${i ? nf1.format(n) : nf0.format(n)} ${u[i]}`;
   },
-  // Byte/s → Bit/s, wie bei Leitungsgeschwindigkeiten üblich
+  // bytes/s → bits/s, as is usual for line speeds
   rate(bytesPerSec) {
     let n = bytesPerSec * 8;
     const u = ['bit/s', 'kbit/s', 'Mbit/s', 'Gbit/s'];
@@ -120,19 +125,19 @@ export const fmt = {
   },
   duration(s) {
     const d = Math.floor(s / 86400), h = Math.floor(s % 86400 / 3600), m = Math.floor(s % 3600 / 60);
-    if (d) return `${d} T ${h} Std`;
-    if (h) return `${h} Std ${m} Min`;
-    return `${m} Min`;
+    if (d) return `${d} d ${h} h`;
+    if (h) return `${h} h ${m} min`;
+    return `${m} min`;
   },
   pct(n) { return `${nf0.format(n)} %`; },
-  num(n, digits = 1) { return new Intl.NumberFormat('de-DE', { maximumFractionDigits: digits }).format(n); },
+  num(n, digits = 1) { return new Intl.NumberFormat(locale(), { maximumFractionDigits: digits }).format(n); },
   date(iso) {
     if (!iso) return '–';
-    return new Intl.DateTimeFormat('de-DE', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(iso));
+    return new Intl.DateTimeFormat(locale(), { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(iso));
   },
 };
 
-// --- Meldungen und Dialoge ------------------------------------------------------------
+// --- Messages and dialogs ------------------------------------------------------------
 let toastBox;
 export function toast(msg, kind = 'ok') {
   if (!toastBox) { toastBox = h('div', { class: 'toasts', role: 'status', 'aria-live': 'polite' }); document.body.appendChild(toastBox); }
@@ -141,13 +146,13 @@ export function toast(msg, kind = 'ok') {
   setTimeout(() => t.remove(), kind === 'crit' ? 8000 : 4000);
 }
 
-// Bestätigungsdialog. Liefert true, wenn bestätigt.
-export function confirmDialog({ title, text, confirm = 'Bestätigen', danger = false, details }) {
+// Confirmation dialog. Returns true if confirmed.
+export function confirmDialog({ title, text, confirm = 'Confirm', danger = false, details }) {
   return new Promise((resolve) => {
     const dlg = h('dialog', null,
       h('div', { class: 'dialog-body' }, h('h2', null, title), text && h('p', null, text), details),
       h('div', { class: 'dialog-foot' },
-        h('button', { class: 'btn', value: 'cancel', onclick: () => dlg.close('cancel') }, 'Abbrechen'),
+        h('button', { class: 'btn', value: 'cancel', onclick: () => dlg.close('cancel') }, 'Cancel'),
         h('button', { class: `btn ${danger ? 'danger solid' : 'primary'}`, onclick: () => dlg.close('ok') }, confirm)));
     dlg.addEventListener('close', () => { resolve(dlg.returnValue === 'ok'); dlg.remove(); });
     document.body.appendChild(dlg);
@@ -155,9 +160,9 @@ export function confirmDialog({ title, text, confirm = 'Bestätigen', danger = f
   });
 }
 
-// Formulardialog: fields = [{name, label, value, hint, placeholder, type, options, required}]
-// onSubmit(values) wirft bei Fehlern; die Meldung erscheint im Dialog.
-export function formDialog({ title, text, fields, submit = 'Speichern', onSubmit }) {
+// Form dialog: fields = [{name, label, value, hint, placeholder, type, options, required}]
+// onSubmit(values) throws on errors; the message appears in the dialog.
+export function formDialog({ title, text, fields, submit = 'Save', onSubmit }) {
   return new Promise((resolve) => {
     const err = h('div', { class: 'form-error hidden' });
     const inputs = {};
@@ -176,7 +181,7 @@ export function formDialog({ title, text, fields, submit = 'Speichern', onSubmit
     const save = h('button', { class: 'btn primary', type: 'submit' }, submit);
     const form = h('form', { method: 'dialog' },
       h('div', { class: 'dialog-body' }, h('h2', null, title), text && h('p', null, text), h('div', { class: 'form-fields' }, err, body)),
-      h('div', { class: 'dialog-foot' }, h('button', { class: 'btn', type: 'button', onclick: () => dlg.close() }, 'Abbrechen'), save));
+      h('div', { class: 'dialog-foot' }, h('button', { class: 'btn', type: 'button', onclick: () => dlg.close() }, 'Cancel'), save));
     const dlg = h('dialog', null, form);
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -189,7 +194,7 @@ export function formDialog({ title, text, fields, submit = 'Speichern', onSubmit
         dlg.close();
         resolve(res ?? true);
       } catch (ex) {
-        err.textContent = ex.message;
+        err.textContent = t(ex.message);
         err.classList.remove('hidden');
       } finally {
         save.disabled = false;
@@ -202,19 +207,19 @@ export function formDialog({ title, text, fields, submit = 'Speichern', onSubmit
   });
 }
 
-// Log-Betrachter: load() liefert den Text, "Neu laden" ruft es erneut auf.
+// Log viewer: load() returns the text, "Reload" calls it again.
 export function logDialog(title, load) {
-  const pre = h('pre', { class: 'code log' }, 'Lädt …');
+  const pre = h('pre', { class: 'code log' }, 'Loading …');
   const refresh = async () => {
-    pre.textContent = 'Lädt …';
-    try { pre.textContent = (await load()) || '(keine Einträge)'; } catch (e) { pre.textContent = e.message; }
+    pre.textContent = t('Loading …');
+    try { pre.textContent = (await load()) || t('(no entries)'); } catch (e) { pre.textContent = t(e.message); }
     pre.scrollTop = pre.scrollHeight;
   };
   const dlg = h('dialog', { class: 'wide' },
     h('div', { class: 'dialog-body' }, h('h2', null, title), pre),
     h('div', { class: 'dialog-foot' },
-      h('button', { class: 'btn', onclick: refresh }, icon('refresh'), 'Neu laden'),
-      h('button', { class: 'btn primary', onclick: () => dlg.close() }, 'Schließen')));
+      h('button', { class: 'btn', onclick: refresh }, icon('refresh'), 'Reload'),
+      h('button', { class: 'btn primary', onclick: () => dlg.close() }, 'Close')));
   dlg.addEventListener('close', () => dlg.remove());
   document.body.appendChild(dlg);
   dlg.showModal();
@@ -231,7 +236,7 @@ export function stateKind(state) {
 }
 
 export const STATE_LABEL = {
-  active: 'läuft', inactive: 'gestoppt', failed: 'fehlgeschlagen', activating: 'startet',
-  deactivating: 'stoppt', reloading: 'lädt neu', running: 'läuft', exited: 'beendet',
-  created: 'angelegt', paused: 'pausiert', restarting: 'startet neu', dead: 'tot',
+  active: 'running', inactive: 'stopped', failed: 'failed', activating: 'starting',
+  deactivating: 'stopping', reloading: 'reloading', running: 'running', exited: 'stopped',
+  created: 'created', paused: 'paused', restarting: 'restarting', dead: 'tot',
 };

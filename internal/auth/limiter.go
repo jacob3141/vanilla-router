@@ -7,8 +7,8 @@ import (
 	"time"
 )
 
-// Limiter bremst Login-Versuche pro IP: Die ersten drei Fehlversuche sind frei, danach
-// verdoppelt sich die Wartezeit (1 s, 2 s, 4 s …) bis höchstens 15 Minuten.
+// Limiter throttles login attempts per IP: the first three failed attempts are free, after that
+// the wait doubles (1 s, 2 s, 4 s …) up to at most 15 minutes.
 type Limiter struct {
 	mu  sync.Mutex
 	m   map[string]*attempts
@@ -29,7 +29,7 @@ const (
 
 func NewLimiter() *Limiter { return &Limiter{m: map[string]*attempts{}, now: time.Now} }
 
-// Wait liefert, wie lange die IP noch warten muss (0 = darf versuchen).
+// Wait returns how long the IP still has to wait (0 = may try).
 func (l *Limiter) Wait(ip string) time.Duration {
 	l.mu.Lock()
 	defer l.mu.Unlock()
@@ -48,7 +48,7 @@ func (l *Limiter) Wait(ip string) time.Duration {
 	return 0
 }
 
-// Fail zählt einen Fehlversuch.
+// Fail counts a failed attempt.
 func (l *Limiter) Fail(ip string) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
@@ -66,7 +66,7 @@ func (l *Limiter) Fail(ip string) {
 	}
 }
 
-// Success setzt den Zähler nach einem erfolgreichen Login zurück.
+// Success resets the counter after a successful login.
 func (l *Limiter) Success(ip string) {
 	l.mu.Lock()
 	delete(l.m, ip)

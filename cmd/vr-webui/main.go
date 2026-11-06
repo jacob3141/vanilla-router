@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-// vr-webui ist die Weboberfläche von vanilla-router (M4, aus dem Prototyp routerui übernommen).
+// vr-webui is the web interface of vanilla-router (M4, taken over from the prototype routerui).
 //
-//	vr-webui serve          HTTPS-Server, läuft als Benutzer vr-webui (ohne Root)
-//	vr-webui helper         privilegierter Helper mit fester Aktionsliste, läuft als root
-//	vr-webui prepare        als root vor dem Start: TLS-Zertifikat und Einrichtungscode vom Installer
-//	vr-webui setup-code     zeigt den Einrichtungscode (bis das Passwort gesetzt ist)
-//	vr-webui set-password   setzt das Passwort, liest es von stdin (Notfall-Reset)
-//	vr-webui files          Dateidienst für eine Freigabe (Erweiterung, F-ADD)
+//	vr-webui serve          HTTPS server, runs as user vr-webui (no root)
+//	vr-webui helper         privileged helper with a fixed list of actions, runs as root
+//	vr-webui prepare        as root before start: TLS certificate and setup code from the installer
+//	vr-webui setup-code     shows the setup code (until the password is set)
+//	vr-webui set-password   sets the password, reads it from stdin (emergency reset)
+//	vr-webui files          file service for a share (extension, F-ADD)
 package main
 
 import (
@@ -50,11 +50,11 @@ const (
 	webUser    = "vr-webui"
 )
 
-// version und sourceURL setzt der Build (-ldflags -X). sourceURL zeigt auf den Quelltext genau dieser
-// Fassung (AGPL §13, F-UI-07). Wer das Programm verändert und anbietet, setzt hier seinen eigenen Ort.
+// version and sourceURL are set by the build (-ldflags -X). sourceURL points to the source of exactly
+// this version (AGPL §13, F-UI-07). Anyone who changes and offers the program sets their own location here.
 var (
 	version   = "dev"
-	sourceURL = "https://example.org/vanilla-router"
+	sourceURL = "https://github.com/jacob3141/vanilla-router"
 )
 
 func main() {
@@ -85,12 +85,12 @@ func main() {
 }
 
 func usage() {
-	fmt.Fprintln(os.Stderr, "Aufruf: vr-webui serve|helper|prepare|setup-code|set-password|files [optionen]")
+	fmt.Fprintln(os.Stderr, "Usage: vr-webui serve|helper|prepare|setup-code|set-password|files [options]")
 	os.Exit(2)
 }
 
 func logger() *slog.Logger {
-	// systemd setzt die Zeit selbst, deshalb ohne Zeitstempel
+	// systemd adds the time itself, hence no timestamp
 	return slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
 		ReplaceAttr: func(groups []string, a slog.Attr) slog.Attr {
 			if a.Key == slog.TimeKey && len(groups) == 0 {
@@ -105,13 +105,14 @@ func signalContext() (context.Context, context.CancelFunc) {
 	return signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 }
 
-// netInfo sind die Werte aus config.json, die der Webserver beim Start braucht.
+// netInfo holds the values from config.json that the web server needs at start.
 type netInfo struct {
 	router  netip.Addr
 	fqdn    string
 	wan     string
 	lan     string
 	origins []string
+	locale  string
 }
 
 func loadNet(path string) (netInfo, error) {
@@ -123,19 +124,19 @@ func loadNet(path string) (netInfo, error) {
 	_, router, _ := c.LANPrefix()
 	fqdn := c.System.Hostname + "." + c.DNS.Domain
 	return netInfo{router: router, fqdn: fqdn, wan: gen.UplinkIf(c), lan: gen.LANIf,
-		origins: []string{"https://" + fqdn, "https://" + router.String()}}, nil
+		origins: []string{"https://" + fqdn, "https://" + router.String()}, locale: c.System.Locale}, nil
 }
 
 func cmdServe(args []string) error {
 	fl := flag.NewFlagSet("serve", flag.ExitOnError)
-	cfgPath := fl.String("config", config.Path, "Konfiguration")
-	listen := fl.String("listen", "", "Adresse für HTTPS (Vorgabe: Router-Adresse im Heimnetz :443)")
-	redirect := fl.String("redirect", "", "HTTP→HTTPS-Weiterleitung (Vorgabe: Router-Adresse :80, \"aus\" = keine)")
-	data := fl.String("data", dataDir, "Datenordner")
-	sock := fl.String("helper", helperSock, "Socket des Helpers")
-	fsock := fl.String("files", filesSock, "Socket des Dateidienstes")
-	origins := fl.String("origins", "", "erlaubte Origins, kommagetrennt (Vorgabe aus der Konfiguration)")
-	dev := fl.Bool("dev", false, "Testinstanz: HTTP statt HTTPS, nur für 127.0.0.1 über SSH-Tunnel")
+	cfgPath := fl.String("config", config.Path, "configuration")
+	listen := fl.String("listen", "", "HTTPS address (default: router address in the home network :443)")
+	redirect := fl.String("redirect", "", "HTTP→HTTPS redirect (default: router address :80, \"off\" = none)")
+	data := fl.String("data", dataDir, "data folder")
+	sock := fl.String("helper", helperSock, "socket of the helper")
+	fsock := fl.String("files", filesSock, "socket of the file service")
+	origins := fl.String("origins", "", "allowed origins, comma-separated (default from the configuration)")
+	dev := fl.Bool("dev", false, "test instance: HTTP instead of HTTPS, only for 127.0.0.1 through an SSH tunnel")
 	fl.Parse(args)
 
 	ni, err := loadNet(*cfgPath)
@@ -148,7 +149,7 @@ func cmdServe(args []string) error {
 	if *redirect == "" {
 		*redirect = net.JoinHostPort(ni.router.String(), "80")
 	}
-	if *redirect == "aus" {
+	if *redirect == "off" {
 		*redirect = ""
 	}
 	orig := ni.origins
@@ -160,9 +161,9 @@ func cmdServe(args []string) error {
 	store := auth.NewStore(*data)
 	if !store.Configured() {
 		if _, err := store.SetupCode(); err != nil {
-			return fmt.Errorf("Einrichtungscode: %w", err)
+			return fmt.Errorf("setup code: %w", err)
 		}
-		log.Info("noch kein Passwort gesetzt: Einrichtungscode mit 'sudo vr-webui setup-code' anzeigen")
+		log.Info("no password set yet: show the setup code with 'sudo vr-webui setup-code'")
 	}
 
 	static, err := fs.Sub(web.Files, "static")
@@ -215,6 +216,7 @@ func cmdServe(args []string) error {
 		Log:       log,
 		Version:   version,
 		SourceURL: sourceURL,
+		Locale:    ni.locale,
 		RouterIP:  ni.router.String(),
 		Name:      ni.fqdn,
 		WANIf:     ni.wan,
@@ -232,7 +234,7 @@ func cmdServe(args []string) error {
 		IdleTimeout:       120 * time.Second,
 		MaxHeaderBytes:    32 << 10,
 		ErrorLog:          slog.NewLogLogger(log.Handler(), slog.LevelWarn),
-		// Anfragen erben den Signal-Kontext: Live-Streams (SSE) enden beim Herunterfahren sofort
+		// Requests inherit the signal context: live streams (SSE) end immediately on shutdown
 		BaseContext: func(net.Listener) context.Context { return ctx },
 	}
 	ln, err := listenFreebind(*listen)
@@ -242,11 +244,11 @@ func cmdServe(args []string) error {
 
 	errc := make(chan error, 2)
 	if *dev {
-		log.Info("testinstanz (HTTP)", "listen", *listen)
+		log.Info("test instance (HTTP)", "listen", *listen)
 		go func() { errc <- hs.Serve(ln) }()
 	} else {
 		hs.TLSConfig = &tls.Config{MinVersion: tls.VersionTLS12}
-		log.Info("weboberfläche bereit", "listen", *listen, "name", ni.fqdn)
+		log.Info("web interface ready", "listen", *listen, "name", ni.fqdn)
 		go func() {
 			errc <- hs.ServeTLS(ln, filepath.Join(tlsDir, "cert.pem"), filepath.Join(tlsDir, "key.pem"))
 		}()
@@ -265,13 +267,13 @@ func cmdServe(args []string) error {
 	shutdown, c2 := context.WithTimeout(context.Background(), 5*time.Second)
 	defer c2()
 	if err := hs.Shutdown(shutdown); err != nil {
-		log.Warn("nicht alle Verbindungen rechtzeitig beendet", "err", err)
+		log.Warn("not all connections ended in time", "err", err)
 		hs.Close()
 	}
 	return nil
 }
 
-// listenFreebind erlaubt das Binden an die Router-Adresse, auch wenn lan0 beim Start noch keine hat.
+// listenFreebind allows binding to the router address even if lan0 has none yet at start.
 func listenFreebind(addr string) (net.Listener, error) {
 	lc := net.ListenConfig{Control: func(_, _ string, c syscall.RawConn) error {
 		var serr error
@@ -294,7 +296,7 @@ func serveRedirect(addr string, ni netInfo) error {
 			host = h
 		}
 		if host != ni.fqdn && host != ni.router.String() {
-			host = ni.fqdn // nie auf fremde Namen umleiten (Open Redirect)
+			host = ni.fqdn // never redirect to foreign names (open redirect)
 		}
 		http.Redirect(w, r, "https://"+host+"/", http.StatusMovedPermanently)
 	})
@@ -304,17 +306,17 @@ func serveRedirect(addr string, ni netInfo) error {
 func cmdHelper(args []string) error {
 	fl := flag.NewFlagSet("helper", flag.ExitOnError)
 	sock := fl.String("socket", helperSock, "Socket")
-	allow := fl.String("allow-user", webUser, "Benutzer, der den Helper aufrufen darf")
-	dryRun := fl.Bool("dry-run", false, "Probelauf: Dateien unter --root schreiben, nichts anwenden")
-	root := fl.String("root", "", "Wurzel für den Probelauf")
+	allow := fl.String("allow-user", webUser, "user allowed to call the helper")
+	dryRun := fl.Bool("dry-run", false, "dry run: write files under --root, apply nothing")
+	root := fl.String("root", "", "root for the dry run")
 	fl.Parse(args)
 
-	// Im Probelauf geht es ohne root (Entwicklung): Prüfungen mit nft und dnsmasq entfallen dann.
+	// In a dry run it works without root (development): the checks with nft and dnsmasq are then skipped.
 	if os.Geteuid() != 0 && !*dryRun {
-		return fmt.Errorf("der Helper muss als root laufen")
+		return fmt.Errorf("the helper must run as root")
 	}
 	if *dryRun && *root == "" {
-		return fmt.Errorf("--dry-run braucht --root")
+		return fmt.Errorf("--dry-run needs --root")
 	}
 	u, err := user.Lookup(*allow)
 	if err != nil {
@@ -331,12 +333,12 @@ func cmdHelper(args []string) error {
 	}).Run(ctx)
 }
 
-// cmdPrepare läuft als root vor dem Webserver (ExecStartPre=+): legt das TLS-Zertifikat an bzw. erneuert
-// es, wenn Name oder Adresse nicht mehr passen, und übernimmt den Einrichtungscode des Installers.
+// cmdPrepare runs as root before the web server (ExecStartPre=+): creates or renews the TLS certificate
+// when the name or address no longer match, and takes over the installer's setup code.
 func cmdPrepare(args []string) error {
 	fl := flag.NewFlagSet("prepare", flag.ExitOnError)
-	cfgPath := fl.String("config", config.Path, "Konfiguration")
-	data := fl.String("data", dataDir, "Datenordner")
+	cfgPath := fl.String("config", config.Path, "configuration")
+	data := fl.String("data", dataDir, "data folder")
 	fl.Parse(args)
 	ni, err := loadNet(*cfgPath)
 	if err != nil {
@@ -350,10 +352,10 @@ func cmdPrepare(args []string) error {
 	gid, _ := strconv.Atoi(u.Gid)
 	made, err := ensureCert(tlsDir, ni.fqdn, ni.router, gid)
 	if err != nil {
-		return fmt.Errorf("TLS-Zertifikat: %w", err)
+		return fmt.Errorf("TLS certificate: %w", err)
 	}
 	if made {
-		fmt.Println("Neues TLS-Zertifikat für", ni.fqdn, "und", ni.router)
+		fmt.Println("New TLS certificate for", ni.fqdn, "and", ni.router)
 	}
 	if err := os.MkdirAll(*data, 0o700); err != nil {
 		return err
@@ -367,7 +369,7 @@ func cmdPrepare(args []string) error {
 		}
 		os.Chown(filepath.Join(*data, "setup-code"), uid, gid)
 		if store.Configured() {
-			os.Remove("/etc/vanilla-router/secrets/webui-setup-code") // erfüllt, nicht aufheben
+			os.Remove("/etc/vanilla-router/secrets/webui-setup-code") // fulfilled, do not keep it
 		}
 	} else if !errors.Is(err, os.ErrNotExist) {
 		return err
@@ -380,19 +382,19 @@ func cmdPrepare(args []string) error {
 		}
 		os.Chown(filepath.Join(*data, "setup-code"), uid, gid)
 	}
-	if err := helper.WriteIssue(helper.IssueFile, ni.fqdn, ni.router.String(), setupCode); err != nil {
-		fmt.Fprintln(os.Stderr, "Hinweis auf der Konsole:", err) // nicht wichtig genug, um den Start zu verhindern
+	if err := helper.WriteIssue(helper.IssueFile, ni.fqdn, ni.router.String(), setupCode, ni.locale); err != nil {
+		fmt.Fprintln(os.Stderr, "Note on the console:", err) // not important enough to prevent the start
 	}
 	return nil
 }
 
 func cmdSetupCode(args []string) error {
 	fl := flag.NewFlagSet("setup-code", flag.ExitOnError)
-	data := fl.String("data", dataDir, "Datenordner")
+	data := fl.String("data", dataDir, "data folder")
 	fl.Parse(args)
 	store := auth.NewStore(*data)
 	if store.Configured() {
-		return fmt.Errorf("die Oberfläche ist bereits eingerichtet, es gibt keinen Einrichtungscode mehr")
+		return fmt.Errorf("the web interface is already set up, there is no setup code anymore")
 	}
 	code, err := store.SetupCode()
 	if err != nil {
@@ -402,16 +404,16 @@ func cmdSetupCode(args []string) error {
 	return nil
 }
 
-// cmdFiles ist der Dateidienst für eine Freigabe (Erweiterung NAS, F-ADD). Er läuft als Besitzer der
-// Freigabe und ist nur über einen Unix-Socket für den Benutzer vr-webui erreichbar.
+// cmdFiles is the file service for a share (NAS extension, F-ADD). It runs as the owner of the
+// share and is reachable only through a Unix socket for the user vr-webui.
 func cmdFiles(args []string) error {
 	fl := flag.NewFlagSet("files", flag.ExitOnError)
-	root := fl.String("root", "", "Ordner der Freigabe (Pflicht)")
+	root := fl.String("root", "", "folder of the share (required)")
 	sock := fl.String("socket", filesSock, "Socket")
-	allow := fl.String("allow-user", webUser, "Benutzer, der verbinden darf")
+	allow := fl.String("allow-user", webUser, "user allowed to connect")
 	fl.Parse(args)
 	if *root == "" {
-		return errors.New("--root fehlt")
+		return errors.New("--root is missing")
 	}
 
 	log := logger()
@@ -431,12 +433,12 @@ func cmdFiles(args []string) error {
 		return err
 	}
 	if err := os.Chown(*sock, -1, gid); err != nil {
-		return fmt.Errorf("Gruppe des Sockets: %w", err)
+		return fmt.Errorf("group of the socket: %w", err)
 	}
 	if err := os.Chmod(*sock, 0o660); err != nil {
 		return err
 	}
-	log.Info("dateidienst bereit", "root", *root, "socket", *sock)
+	log.Info("file service ready", "root", *root, "socket", *sock)
 
 	ctx, cancel := signalContext()
 	defer cancel()
@@ -450,15 +452,15 @@ func cmdFiles(args []string) error {
 
 func cmdSetPassword(args []string) error {
 	fl := flag.NewFlagSet("set-password", flag.ExitOnError)
-	data := fl.String("data", dataDir, "Datenordner")
+	data := fl.String("data", dataDir, "data folder")
 	fl.Parse(args)
 	line, err := bufio.NewReader(os.Stdin).ReadString('\n')
 	if err != nil && line == "" {
-		return fmt.Errorf("kein Passwort auf stdin")
+		return fmt.Errorf("no password on stdin")
 	}
 	if err := auth.NewStore(*data).SetPassword(strings.TrimRight(line, "\r\n")); err != nil {
 		return err
 	}
-	fmt.Fprintln(os.Stderr, "Passwort gesetzt. Laufende Sitzungen enden beim nächsten Neustart des Dienstes.")
+	fmt.Fprintln(os.Stderr, "Password set. Running sessions end at the next restart of the service.")
 	return nil
 }

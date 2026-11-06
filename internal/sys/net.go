@@ -14,13 +14,13 @@ import (
 	"time"
 )
 
-// Interface beschreibt ein Netzwerk-Interface für die Übersicht.
+// Interface describes a network interface for the overview.
 type Interface struct {
 	Name  string   `json:"name"`
 	Up    bool     `json:"up"`
 	MAC   string   `json:"mac"`
 	IPv4  []string `json:"ipv4"`
-	IPv6  []string `json:"ipv6"` // ohne Link-Local
+	IPv6  []string `json:"ipv6"` // without link-local
 	Speed int      `json:"speed_mbit,omitempty"`
 }
 
@@ -58,7 +58,7 @@ func ReadInterface(name string) Interface {
 	return out
 }
 
-// DefaultGatewayV4 liest das IPv4-Standard-Gateway aus /proc/net/route.
+// DefaultGatewayV4 reads the IPv4 default gateway from /proc/net/route.
 func DefaultGatewayV4() (gw, dev string) {
 	f, err := os.Open(p("proc/net/route"))
 	if err != nil {
@@ -80,14 +80,14 @@ func DefaultGatewayV4() (gw, dev string) {
 	return "", ""
 }
 
-// Neighbor ist ein Eintrag der Nachbartabelle (ARP/NDP).
+// Neighbor is an entry in the neighbor table (ARP/NDP).
 type Neighbor struct {
 	IP    string `json:"ip"`
 	MAC   string `json:"mac"`
 	State string `json:"state"`
 }
 
-// Online meldet, ob der Nachbar kürzlich erreichbar war.
+// Online reports whether the neighbor was reachable recently.
 func (n Neighbor) Online() bool {
 	switch n.State {
 	case "REACHABLE", "STALE", "DELAY", "PROBE":
@@ -96,7 +96,7 @@ func (n Neighbor) Online() bool {
 	return false
 }
 
-// Neighbors liest die Nachbartabelle eines Interfaces über `ip -j neigh`.
+// Neighbors reads the neighbor table of an interface through `ip -j neigh`.
 func Neighbors(ctx context.Context, dev string) ([]Neighbor, error) {
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
@@ -123,7 +123,7 @@ func Neighbors(ctx context.Context, dev string) ([]Neighbor, error) {
 	return res, nil
 }
 
-// UnitState liefert den ActiveState mehrerer systemd-Units (active, failed, inactive …).
+// UnitState returns the ActiveState of several systemd units (active, failed, inactive …).
 func UnitState(ctx context.Context, units ...string) map[string]string {
 	res := map[string]string{}
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
@@ -133,7 +133,7 @@ func UnitState(ctx context.Context, units ...string) map[string]string {
 	if err != nil {
 		return res
 	}
-	// Blöcke je Unit, durch Leerzeilen getrennt
+	// blocks per unit, separated by empty lines
 	var id string
 	for _, line := range strings.Split(string(out), "\n") {
 		if v, ok := strings.CutPrefix(line, "Id="); ok {

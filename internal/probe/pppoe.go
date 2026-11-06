@@ -24,20 +24,20 @@ const (
 	tagGenericErr  = 0x0203
 )
 
-// PADO ist das zerlegte Angebot eines PPPoE-Zugangsservers.
+// PADO is the parsed offer of a PPPoE access server.
 type PADO struct {
 	ACMAC   net.HardwareAddr
 	VLAN    int
 	ACName  string
 	Service []string
-	Error   string // Fehler-Tag des Servers, falls gesetzt
+	Error   string // error tag of the server, if set
 }
 
-// BuildPADIFrame baut eine PADI-Anfrage (Broadcast), mit VLAN-Tag wenn vlan > 0.
-// Host-Uniq ordnet die Antworten unserer Anfrage zu.
+// BuildPADIFrame builds a PADI request (broadcast), with a VLAN tag if vlan > 0.
+// Host-Uniq matches responses to our request.
 func BuildPADIFrame(mac net.HardwareAddr, vlan int, hostUniq []byte) []byte {
 	var tags []byte
-	tags = appendTag(tags, tagServiceName, nil) // beliebiger Dienst
+	tags = appendTag(tags, tagServiceName, nil) // any service
 	tags = appendTag(tags, tagHostUniq, hostUniq)
 	p := make([]byte, 6, 6+len(tags))
 	p[0] = pppoeVerType
@@ -53,9 +53,9 @@ func appendTag(b []byte, typ uint16, v []byte) []byte {
 	return append(b, v...)
 }
 
-var errNotPADO = errors.New("kein passendes PADO")
+var errNotPADO = errors.New("no matching PADO")
 
-// ParsePADOFrame prüft, ob ein Rahmen ein PADO an uns mit unserem Host-Uniq ist.
+// ParsePADOFrame checks whether a frame is a PADO to us with our Host-Uniq.
 func ParsePADOFrame(frame []byte, mac net.HardwareAddr, hostUniq []byte) (PADO, error) {
 	f, err := parseFrame(frame)
 	if err != nil || f.EtherType != etherTypePPPoEDisc || !bytes.Equal(f.Dst, mac) {
@@ -92,7 +92,7 @@ func ParsePADOFrame(frame []byte, mac net.HardwareAddr, hostUniq []byte) (PADO, 
 		case tagServiceErr, tagACSysErr, tagGenericErr:
 			out.Error = string(v)
 			if out.Error == "" {
-				out.Error = "Fehler ohne Text"
+				out.Error = "error without text"
 			}
 		}
 	}

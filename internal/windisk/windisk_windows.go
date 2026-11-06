@@ -25,7 +25,7 @@ var (
 	procGetWindowsDirectoryW         = kernel32.NewProc("GetWindowsDirectoryW")
 )
 
-// Steuercodes aus winioctl.h.
+// Control codes from winioctl.h.
 const (
 	ioctlStorageQueryProperty     = 0x002D1400
 	ioctlDiskGetDriveGeometryEx   = 0x000700A0
@@ -78,7 +78,7 @@ func ioctl(h syscall.Handle, code uint32, in []byte, out []byte) (int, error) {
 
 func diskPath(n int) string { return fmt.Sprintf(`\\.\PhysicalDrive%d`, n) }
 
-// describe liest Bus, Hersteller und Produkt (STORAGE_DEVICE_DESCRIPTOR).
+// describe reads the bus, manufacturer and product (STORAGE_DEVICE_DESCRIPTOR).
 func describe(h syscall.Handle) (bus uint32, vendor, product string, err error) {
 	q := make([]byte, 12) // STORAGE_PROPERTY_QUERY: StorageDeviceProperty, PropertyStandardQuery
 	out := make([]byte, storageDeviceDescriptorBuffer)
@@ -87,7 +87,7 @@ func describe(h syscall.Handle) (bus uint32, vendor, product string, err error) 
 		return 0, "", "", err
 	}
 	if n < 36 {
-		return 0, "", "", errors.New("Antwort zu kurz")
+		return 0, "", "", errors.New("response too short")
 	}
 	out = out[:n]
 	str := func(off uint32) string {
@@ -104,7 +104,7 @@ func describe(h syscall.Handle) (bus uint32, vendor, product string, err error) 
 	return le.Uint32(out[28:]), str(le.Uint32(out[12:])), str(le.Uint32(out[16:])), nil
 }
 
-// geometry liest Größe und Sektorgröße (DISK_GEOMETRY_EX).
+// geometry reads the size and sector size (DISK_GEOMETRY_EX).
 func geometry(h syscall.Handle) (size int64, sector int, err error) {
 	out := make([]byte, 256)
 	n, err := ioctl(h, ioctlDiskGetDriveGeometryEx, nil, out)
@@ -112,13 +112,13 @@ func geometry(h syscall.Handle) (size int64, sector int, err error) {
 		return 0, 0, err
 	}
 	if n < 32 {
-		return 0, 0, errors.New("Antwort zu kurz")
+		return 0, 0, errors.New("response too short")
 	}
 	le := binary.LittleEndian
 	return int64(le.Uint64(out[24:])), int(le.Uint32(out[20:])), nil
 }
 
-// volume ist ein Volume mit den Datenträgern, auf denen es liegt.
+// volume is a volume with the disks it is on.
 type volume struct {
 	name    string // \\?\Volume{…}\
 	disks   []int
@@ -127,7 +127,7 @@ type volume struct {
 
 func utf16At(b []uint16) string { return syscall.UTF16ToString(b) }
 
-// volumes zählt alle Volumes auf.
+// volumes enumerates all volumes.
 func volumes() ([]volume, error) {
 	buf := make([]uint16, volumeNameLen)
 	h, _, err := procFindFirstVolumeW.Call(uintptr(unsafe.Pointer(&buf[0])), uintptr(len(buf)))
@@ -148,7 +148,7 @@ func volumes() ([]volume, error) {
 	return vs, nil
 }
 
-// volumeDisks liefert die Datenträger eines Volumes (VOLUME_DISK_EXTENTS).
+// volumeDisks returns the disks of a volume (VOLUME_DISK_EXTENTS).
 func volumeDisks(name string) []int {
 	h, err := open(strings.TrimSuffix(name, `\`), 0, 0)
 	if err != nil {
@@ -189,7 +189,7 @@ func volumeLetters(name string) []string {
 	return ls
 }
 
-// DisksOfPath liefert die Datenträger, auf denen eine Datei liegt.
+// DisksOfPath returns the disks a file is on.
 func DisksOfPath(path string) []int {
 	abs, err := filepath.Abs(path)
 	if err != nil {
@@ -207,7 +207,7 @@ func DisksOfPath(path string) []int {
 	return volumeDisks(utf16At(vol))
 }
 
-// protectedDisks sind das Systemlaufwerk und der Datenträger, von dem das Programm läuft.
+// protectedDisks are the system drive and the disk the program runs from.
 func protectedDisks() map[int]bool {
 	prot := map[int]bool{}
 	win := make([]uint16, syscall.MAX_PATH+1)
@@ -231,7 +231,7 @@ func protectedDisks() map[int]bool {
 	return prot
 }
 
-// List liefert die USB-Datenträger, auf die geschrieben werden darf.
+// List returns the USB disks that may be written to.
 func List() ([]Disk, error) {
 	prot := protectedDisks()
 	vols, _ := volumes()
@@ -249,7 +249,7 @@ func List() ([]Disk, error) {
 		size, sector, err := geometry(h)
 		syscall.CloseHandle(h)
 		if err != nil || size <= 0 {
-			// Kartenleser ohne Karte
+			// card reader without a card
 			continue
 		}
 		d := Disk{Number: n, Vendor: vendor, Product: product, Size: size, Sector: sector}
@@ -272,7 +272,7 @@ func contains(s []int, n int) bool {
 	return false
 }
 
-// Device ist ein geöffneter, für das Schreiben vorbereiteter Stick (stickwrite.Device).
+// Device is an opened stick prepared for writing (stickwrite.Device).
 type Device struct {
 	h      syscall.Handle
 	vols   []syscall.Handle
@@ -280,9 +280,9 @@ type Device struct {
 	sector int
 }
 
-// Open sperrt alle Volumes des Sticks, hängt sie aus und öffnet ihn zum rohen Schreiben. want muss
-// der Eintrag aus List sein; hat sich der Stick inzwischen geändert (anderer Stick, gleiche Nummer),
-// gibt es ErrChanged.
+// Open locks all volumes of the stick, dismounts them and opens it for raw writing. want must be
+// the entry from List; if the stick has changed in the meantime (different stick, same number),
+// ErrChanged is returned.
 func Open(want Disk) (*Device, error) {
 	if protectedDisks()[want.Number] {
 		return nil, ErrChanged
@@ -336,7 +336,7 @@ func Open(want Disk) (*Device, error) {
 	return d, nil
 }
 
-// lockVolume sperrt ein Volume und hängt es aus. Der Griff bleibt bis Close offen, solange gilt die Sperre.
+// lockVolume locks a volume and dismounts it. The handle stays open until Close, the lock holds until then.
 func lockVolume(path string) (syscall.Handle, error) {
 	h, err := open(path, accessRW, 0)
 	if err != nil {
@@ -354,7 +354,7 @@ func lockVolume(path string) (syscall.Handle, error) {
 		time.Sleep(lockWait)
 	}
 	if !locked {
-		// Noch offene Dateien (z. B. im Explorer): Aushängen erzwingt das Schließen, dann erneut sperren.
+		// Files still open (e.g. in Explorer): dismounting forces them closed, then lock again.
 		ioctl(h, fsctlDismountVolume, nil, nil)
 		if _, err := ioctl(h, fsctlLockVolume, nil, nil); err != nil {
 			syscall.CloseHandle(h)
@@ -410,16 +410,16 @@ func (d *Device) rw(p []byte, off int64, write bool) (int, error) {
 	return done, nil
 }
 
-// WriteAt schreibt ganze Sektoren (stickwrite sorgt für Ausrichtung).
+// WriteAt writes whole sectors (stickwrite takes care of alignment).
 func (d *Device) WriteAt(p []byte, off int64) (int, error) { return d.rw(p, off, true) }
 
-// ReadAt liest am Datenträger vorbei an jedem Zwischenspeicher (FILE_FLAG_NO_BUFFERING).
+// ReadAt reads from the disk past any cache (FILE_FLAG_NO_BUFFERING).
 func (d *Device) ReadAt(p []byte, off int64) (int, error) { return d.rw(p, off, false) }
 
-// Sync schreibt die Zwischenspeicher des Geräts.
+// Sync flushes the device's caches.
 func (d *Device) Sync() error { return mapErr(syscall.FlushFileBuffers(d.h)) }
 
-// Close lässt Windows die neue Partitionstabelle einlesen und gibt die Volumes frei.
+// Close lets Windows read the new partition table and releases the volumes.
 func (d *Device) Close() error {
 	if d.h != 0 && d.h != syscall.InvalidHandle {
 		ioctl(d.h, ioctlDiskUpdateProperties, nil, nil)

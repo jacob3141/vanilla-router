@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-// Package helper ist der privilegierte Teil der Oberfläche. Er läuft als root, lauscht auf
-// einem Unix-Socket und führt nur fest registrierte Aktionen aus. Jede Aktion prüft ihre
-// Parameter selbst, unabhängig davon, was der Webserver schon geprüft hat.
+// Package helper is the privileged part of the web interface. It runs as root, listens on
+// a Unix socket and only executes actions registered in a fixed list. Each action checks its
+// parameters itself, regardless of what the web server has already checked.
 package helper
 
 import (
@@ -15,7 +15,7 @@ import (
 	"time"
 )
 
-// Eine Verbindung trägt genau eine Anfrage und eine Antwort, je als eine JSON-Zeile.
+// A connection carries exactly one request and one response, each as one JSON line.
 type Request struct {
 	Action string          `json:"action"`
 	Params json.RawMessage `json:"params,omitempty"`
@@ -29,21 +29,21 @@ type Response struct {
 
 const maxMessage = 1 << 20
 
-// UserError ist ein Fehler, dessen Text so in der Oberfläche angezeigt werden darf.
-// Alle anderen Fehler erscheinen dort nur als „interner Fehler“, Details stehen im Journal.
+// UserError is an error whose text may be shown as is in the web interface.
+// All other errors only appear there as "internal error", details are in the journal.
 type UserError struct{ Msg string }
 
 func (e *UserError) Error() string { return e.Msg }
 
 func Userf(format string, a ...any) error { return &UserError{Msg: fmt.Sprintf(format, a...)} }
 
-// Client spricht mit dem Helper.
+// Client talks to the helper.
 type Client struct {
 	Socket  string
 	Timeout time.Duration
 }
 
-// Call führt eine Aktion aus. out darf nil sein.
+// Call executes an action. out may be nil.
 func (c *Client) Call(ctx context.Context, action string, params any, out any) error {
 	timeout := c.Timeout
 	if timeout == 0 {
@@ -55,7 +55,7 @@ func (c *Client) Call(ctx context.Context, action string, params any, out any) e
 	var d net.Dialer
 	conn, err := d.DialContext(ctx, "unix", c.Socket)
 	if err != nil {
-		return fmt.Errorf("Helper nicht erreichbar: %w", err)
+		return fmt.Errorf("helper not reachable: %w", err)
 	}
 	defer conn.Close()
 	if dl, ok := ctx.Deadline(); ok {
@@ -74,7 +74,7 @@ func (c *Client) Call(ctx context.Context, action string, params any, out any) e
 	r := bufio.NewReader(&limitedReader{conn, maxMessage})
 	var resp Response
 	if err := json.NewDecoder(r).Decode(&resp); err != nil {
-		return fmt.Errorf("Antwort des Helpers unlesbar: %w", err)
+		return fmt.Errorf("helper response unreadable: %w", err)
 	}
 	if !resp.OK {
 		return &UserError{Msg: resp.Error}
@@ -92,7 +92,7 @@ type limitedReader struct {
 
 func (l *limitedReader) Read(p []byte) (int, error) {
 	if l.n <= 0 {
-		return 0, errors.New("Nachricht zu groß")
+		return 0, errors.New("message too big")
 	}
 	if len(p) > l.n {
 		p = p[:l.n]

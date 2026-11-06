@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { t, setLang } from './i18n.js';
 import { h, clear, icon, toast } from './ui.js';
 import { get, post, setUnauthorizedHandler } from './api.js';
 import { renderSetup, renderLogin } from './views/auth.js';
@@ -20,42 +21,42 @@ import logs from './views/logs.js';
 import internet, { SETUP_LATER_KEY } from './views/internet.js';
 import { setupPalette } from './palette.js';
 
-// Navigation: Bereich → Ansichten. Jede Ansicht exportiert { title, subtitle, render(container) }
-// und darf eine Aufräumfunktion zurückgeben (z. B. um einen Live-Stream zu schließen).
+// Navigation: section → views. Each view exports { title, subtitle, render(container) }
+// and may return a cleanup function (e.g. to close a live stream).
 const NAV = [
-  { section: null, items: [{ path: 'dashboard', label: 'Übersicht', icon: 'dashboard', view: dashboard }] },
-  { section: 'Netzwerk', items: [
-    { path: 'internet', label: 'Internet & Heimnetz', icon: 'globe', view: internet },
-    { path: 'devices', label: 'Geräte', icon: 'devices', view: devices },
+  { section: null, items: [{ path: 'dashboard', label: 'Overview', icon: 'dashboard', view: dashboard }] },
+  { section: 'Network', items: [
+    { path: 'internet', label: 'Internet & home network', icon: 'globe', view: internet },
+    { path: 'devices', label: 'Devices', icon: 'devices', view: devices },
     { path: 'monitor', label: 'Online-Monitor', icon: 'activity', view: monitor },
     { path: 'dns', label: 'DNS', icon: 'dns', view: dns },
     { path: 'firewall', label: 'Firewall', icon: 'shield', view: firewall },
-    { path: 'connections', label: 'Verbindungen', icon: 'arrowRight', view: connections },
-    { path: 'network', label: 'Netzwerk-Status', icon: 'globe', view: network },
+    { path: 'connections', label: 'Connections', icon: 'arrowRight', view: connections },
+    { path: 'network', label: 'Network status', icon: 'globe', view: network },
   ] },
-  { section: 'Dienste', items: [
-    { path: 'services', label: 'Dienste', icon: 'services', view: services },
-    // Erweiterungen: nur sichtbar, wenn installiert (PLAN.md 3.8, /api/state → features)
-    { path: 'containers', label: 'Container', icon: 'container', view: containers, feature: 'containers' },
-    { path: 'files', label: 'Dateiablage', icon: 'drive', view: files, feature: 'files' },
+  { section: 'Services', items: [
+    { path: 'services', label: 'Services', icon: 'services', view: services },
+    // Extensions: only visible when installed (PLAN.md 3.8, /api/state → features)
+    { path: 'containers', label: 'Containers', icon: 'container', view: containers, feature: 'containers' },
+    { path: 'files', label: 'File share', icon: 'drive', view: files, feature: 'files' },
   ] },
   { section: 'System', items: [
     { path: 'system', label: 'System', icon: 'system', view: system },
-    { path: 'logs', label: 'Protokolle', icon: 'file', view: logs },
-    { path: 'tools', label: 'Werkzeuge', icon: 'tools', view: tools },
-    { path: 'settings', label: 'Einstellungen', icon: 'settings', view: settings },
+    { path: 'logs', label: 'Logs', icon: 'file', view: logs },
+    { path: 'tools', label: 'Tools', icon: 'tools', view: tools },
+    { path: 'settings', label: 'Settings', icon: 'settings', view: settings },
   ] },
 ];
 
 const ROUTES = Object.fromEntries(NAV.flatMap((s) => s.items).map((i) => [i.path, i]));
 const openPalette = setupPalette(NAV.flatMap((s) => s.items.map((i) => ({ ...i, section: s.section }))));
-// Seiten ohne eigenen Menüpunkt; markiert wird der übergeordnete Eintrag
+// Pages without their own menu item; the parent entry is highlighted
 const HIDDEN = { device: { path: 'devices', view: device } };
 
 const app = document.getElementById('app');
 let cleanup = null;
 
-// --- Farbschema ----------------------------------------------------------------------
+// --- Color scheme ----------------------------------------------------------------------
 function storedTheme() { try { return localStorage.getItem('theme'); } catch { return null; } }
 function applyTheme(t) {
   const theme = t || (matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
@@ -70,7 +71,7 @@ function toggleTheme() {
   applyTheme(next);
   renderThemeButton();
 }
-const themeBtn = h('button', { class: 'btn ghost icon', title: 'Hell/Dunkel umschalten', onclick: toggleTheme });
+const themeBtn = h('button', { class: 'btn ghost icon', title: 'Toggle light/dark', onclick: toggleTheme });
 function renderThemeButton() {
   clear(themeBtn).appendChild(icon(document.documentElement.dataset.theme === 'light' ? 'moon' : 'sun'));
 }
@@ -82,9 +83,10 @@ async function boot() {
   try {
     state = await get('/api/state');
   } catch (e) {
-    clear(app).append(h('div', { class: 'auth-page' }, h('div', { class: 'card auth-card' }, h('h1', null, 'Nicht erreichbar'), h('p', { class: 'lead' }, e.message))));
+    clear(app).append(h('div', { class: 'auth-page' }, h('div', { class: 'card auth-card' }, h('h1', null, 'Not reachable'), h('p', { class: 'lead' }, e.message))));
     return;
   }
+  await setLang(state.lang);
   app.className = '';
   if (!state.configured) return renderSetup(app, boot);
   if (!state.authenticated) return renderLogin(app, boot);
@@ -93,11 +95,11 @@ async function boot() {
 
 setUnauthorizedHandler(() => {
   if (cleanup) { cleanup(); cleanup = null; }
-  toast('Die Sitzung ist abgelaufen. Bitte neu anmelden.', 'warn');
+  toast('The session has expired. Please sign in again.', 'warn');
   boot();
 });
 
-// --- Gerüst mit Navigation -----------------------------------------------------------
+// --- Frame with navigation -----------------------------------------------------------
 let shell, contentEl, titleEl, subtitleEl, navLinks = {};
 let routerName = 'vanilla-router';
 
@@ -116,19 +118,19 @@ function renderShell(state) {
     h('aside', { class: 'sidebar' },
       h('div', { class: 'brand' },
         h('div', { class: 'brand-logo' }, icon('router')),
-        h('div', null, h('div', { class: 'brand-name' }, routerName), h('div', { class: 'brand-sub' }, state.dev ? 'Testinstanz' : 'Verwaltung'))),
+        h('div', null, h('div', { class: 'brand-name' }, routerName), h('div', { class: 'brand-sub' }, state.dev ? 'Test instance' : 'Administration'))),
       nav,
-      // F-UI-07 (AGPL §13): Lizenz und Quelltext immer erreichbar
+      // F-UI-07 (AGPL §13): license and source always reachable
       h('div', { class: 'sidebar-foot' },
-        h('a', { href: state.source || '#', target: '_blank', rel: 'noopener noreferrer', title: 'Freie Software unter der GNU AGPL, Version 3 oder später' },
-          `vanilla-router ${state.version || ''} · AGPL-3.0 · Quelltext`))),
+        h('a', { href: state.source || '#', target: '_blank', rel: 'noopener noreferrer', title: 'Free software under the GNU AGPL, version 3 or later' },
+          `vanilla-router ${state.version || ''} · AGPL-3.0 · source code`))),
     h('div', { class: 'main' },
       h('header', { class: 'topbar' },
-        h('button', { class: 'btn ghost icon menu-btn', title: 'Menü', onclick: () => shell.classList.toggle('nav-open') }, icon('menu')),
+        h('button', { class: 'btn ghost icon menu-btn', title: 'Menu', onclick: () => shell.classList.toggle('nav-open') }, icon('menu')),
         h('div', { class: 'title' }, titleEl, subtitleEl),
-        h('button', { class: 'btn search-btn', title: 'Schnellsuche (Strg+K)', onclick: () => openPalette() }, icon('search'), h('span', { class: 'hide-sm' }, 'Suchen'), h('kbd', { class: 'hide-sm' }, 'Strg K')),
+        h('button', { class: 'btn search-btn', title: 'Quick search (Ctrl+K)', onclick: () => openPalette() }, icon('search'), h('span', { class: 'hide-sm' }, 'Search'), h('kbd', { class: 'hide-sm' }, 'Ctrl K')),
         themeBtn,
-        h('button', { class: 'btn ghost', title: 'Abmelden', onclick: logout }, icon('logout'), h('span', { class: 'hide-sm' }, 'Abmelden'))),
+        h('button', { class: 'btn ghost', title: 'Sign out', onclick: logout }, icon('logout'), h('span', { class: 'hide-sm' }, 'Sign out'))),
       contentEl));
   shell.addEventListener('click', (e) => { if (e.target === shell) shell.classList.remove('nav-open'); });
   clear(app).append(shell);
@@ -136,9 +138,9 @@ function renderShell(state) {
   offerInternetSetup();
 }
 
-// Einrichtungsschritt „Internetzugang“ (F-UI-08): Hat der Assistent PPPoE oder keine Antwort erkannt,
-// führt die Oberfläche nach der Anmeldung einmal dorthin. „Später“ gilt einen Tag lang, die Übersicht
-// erinnert weiter.
+// Setup step "internet access" (F-UI-08): if the assistant detected PPPoE or no answer,
+// the web interface leads there once after login. "Later" applies for one day, the overview
+// keeps reminding.
 async function offerInternetSetup() {
   let s;
   try { s = await get('/api/settings'); } catch { return; }
@@ -161,9 +163,9 @@ function route() {
   if (cleanup) { cleanup(); cleanup = null; }
   for (const [p, a] of Object.entries(navLinks)) a.classList.toggle('active', p === entry.path);
   shell.classList.remove('nav-open');
-  titleEl.textContent = entry.view.title;
-  subtitleEl.textContent = entry.view.subtitle || '';
-  document.title = `${entry.view.title} · ${routerName}`;
+  titleEl.textContent = t(entry.view.title);
+  subtitleEl.textContent = t(entry.view.subtitle || '');
+  document.title = `${t(entry.view.title)} · ${routerName}`;
   clear(contentEl);
   const res = entry.view.render(contentEl);
   if (typeof res === 'function') cleanup = res;

@@ -1,23 +1,23 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-// Package windisk findet USB-Sticks unter Windows und öffnet sie zum rohen Schreiben (F-STICK-03,
-// F-STICK-05, PLAN.md 3.12). Nur Datenträger am USB-Bus, nie das Systemlaufwerk und nie der Datenträger,
-// von dem das Programm selbst läuft.
+// Package windisk finds USB sticks on Windows and opens them for raw writing (F-STICK-03,
+// F-STICK-05, PLAN.md 3.12). Only disks on the USB bus, never the system drive and never the disk
+// the program itself runs from.
 package windisk
 
 import "errors"
 
-// Disk ist ein Datenträger, auf den geschrieben werden darf.
+// Disk is a disk that may be written to.
 type Disk struct {
 	Number  int      // \\.\PhysicalDriveN
-	Vendor  string   // Hersteller laut Gerät, kann leer sein
-	Product string   // Produktname laut Gerät
+	Vendor  string   // manufacturer according to the device, can be empty
+	Product string   // product name according to the device
 	Size    int64    // Bytes
-	Sector  int      // logische Sektorgröße
-	Letters []string // Laufwerksbuchstaben der Volumes, z. B. "E:"
+	Sector  int      // logical sector size
+	Letters []string // drive letters of the volumes, e.g. "E:"
 }
 
-// Name ist der Anzeigename, z. B. „SanDisk Ultra“.
+// Name is the display name, e.g. "SanDisk Ultra".
 func (d Disk) Name() string {
 	switch {
 	case d.Vendor != "" && d.Product != "":
@@ -27,17 +27,17 @@ func (d Disk) Name() string {
 	case d.Vendor != "":
 		return d.Vendor
 	}
-	return "USB-Datenträger"
+	return "USB drive"
 }
 
-// LargeDisk ist die Grenze, ab der eine zusätzliche Bestätigung nötig ist (F-STICK-03).
+// LargeDisk is the limit from which an additional confirmation is needed (F-STICK-03).
 const LargeDisk = 256_000_000_000
 
-// Fehler für Laien-Meldungen (F-STICK-06).
+// Errors for plain-language messages (F-STICK-06).
 var (
-	ErrWriteProtected = errors.New("der Stick ist schreibgeschützt")
-	ErrRemoved        = errors.New("der Stick wurde abgezogen")
-	ErrBusy           = errors.New("der Stick wird noch von einem Programm benutzt")
-	ErrChanged        = errors.New("der Stick hat sich geändert")
-	ErrNotAdmin       = errors.New("keine Administratorrechte")
+	ErrWriteProtected = errors.New("the stick is write-protected")
+	ErrRemoved        = errors.New("the stick was unplugged")
+	ErrBusy           = errors.New("the stick is still being used by a program")
+	ErrChanged        = errors.New("the stick has changed")
+	ErrNotAdmin       = errors.New("no administrator rights")
 )

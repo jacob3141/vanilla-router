@@ -5,14 +5,14 @@ package helper
 import "testing"
 
 func TestValidTarget(t *testing.T) {
-	for _, ok := range []string{"8.8.8.8", "2001:4860:4860::8888", "ubuntu.com", "drucker.home.arpa", "localhost", "ubuntu.com."} {
+	for _, ok := range []string{"8.8.8.8", "2001:4860:4860::8888", "ubuntu.com", "printer.home.arpa", "localhost", "ubuntu.com."} {
 		if _, err := validTarget(ok); err != nil {
-			t.Errorf("%q abgelehnt: %v", ok, err)
+			t.Errorf("%q rejected: %v", ok, err)
 		}
 	}
 	for _, bad := range []string{"", "-f", "--help", "-c100 8.8.8.8", "8.8.8.8;id", "a b", "$(id)", "`id`", "a..b", ".ubuntu.com", "x/../y", "ubuntu.com\n-f"} {
 		if _, err := validTarget(bad); err == nil {
-			t.Errorf("%q akzeptiert", bad)
+			t.Errorf("%q accepted", bad)
 		}
 	}
 }

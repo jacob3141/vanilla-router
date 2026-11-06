@@ -19,31 +19,31 @@ import (
 	"vanilla-router/internal/gen"
 )
 
-// Einstellungen für Internet-Anschluss, Heimnetz und System (F-UI-03, F-UI-08, F-UI-09).
+// Settings for the internet port, home network and system (F-UI-03, F-UI-08, F-UI-09).
 //
-// Netzwerk-Änderungen laufen über die Bestätigung von apply: Ohne Bestätigung nimmt ein
-// systemd-Timer sie zurück, unabhängig von diesem Prozess. Beim Heimnetz ist die Frist länger, weil
-// die Geräte erst eine neue Adresse brauchen und man sich unter der neuen Adresse neu anmeldet.
+// Network changes go through apply's confirmation: without confirmation a
+// systemd timer rolls them back, independently of this process. The deadline is longer for the home
+// network, because devices first need a new address and you sign in again at the new address.
 const (
 	confirmWAN = 2 * time.Minute
 	confirmLAN = 5 * time.Minute
 	zoneinfo   = "/usr/share/zoneinfo"
 )
 
-// SettingsInfo ist die Antwort von settings.get.
+// SettingsInfo is the response of settings.get.
 type SettingsInfo struct {
 	Hostname string           `json:"hostname"`
 	Domain   string           `json:"domain"`
 	Timezone string           `json:"timezone"`
 	WAN      WANSettings      `json:"wan"`
 	Detected *config.Detected `json:"detected"`
-	Setup    bool             `json:"needs_setup"` // Internetzugang noch einrichten (F-UI-08)
+	Setup    bool             `json:"needs_setup"` // internet access still to be set up (F-UI-08)
 	LAN      LANSettings      `json:"lan"`
 	Pending  *PendingInfo     `json:"pending"`
 	DryRun   bool             `json:"dry_run"`
 }
 
-// WANSettings sind die Felder der Seite „Internet“. Das PPPoE-Passwort wird nie zurückgegeben.
+// WANSettings are the fields of the "Internet" page. The PPPoE password is never returned.
 type WANSettings struct {
 	Type          string   `json:"type"`
 	PPPoEUser     string   `json:"pppoe_user"`
@@ -56,24 +56,24 @@ type WANSettings struct {
 	MTU           int      `json:"mtu"`
 }
 
-// LANSettings sind die Felder für das Heimnetz.
+// LANSettings are the fields for the home network.
 type LANSettings struct {
-	Address   string `json:"address"` // Adresse des Routers ohne Präfix
+	Address   string `json:"address"` // router address without prefix
 	Prefix    int    `json:"prefix"`
 	PoolStart string `json:"pool_start"`
 	PoolEnd   string `json:"pool_end"`
 	Lease     string `json:"lease"`
 }
 
-// PendingInfo beschreibt eine Änderung, die auf Bestätigung wartet.
+// PendingInfo describes a change waiting for confirmation.
 type PendingInfo struct {
 	Deadline time.Time `json:"deadline"`
 }
 
 func (s *Server) secrets() apply.DirSecrets { return apply.DirSecrets{Dir: s.Path(s.cfg.SecretsDir)} }
 
-// commitConfig spielt eine ganze Konfiguration ein. confirm > 0: Netzwerk-Änderungen müssen bestätigt
-// werden. Liefert die Frist oder nil, wenn nichts zu bestätigen ist.
+// commitConfig applies a whole configuration. confirm > 0: network changes must be confirmed.
+// Returns the deadline or nil if there is nothing to confirm.
 func (s *Server) commitConfig(nc *config.Config, confirm time.Duration) (*PendingInfo, error) {
 	if err := nc.Validate(); err != nil {
 		return nil, userConfigError(err)
@@ -81,19 +81,19 @@ func (s *Server) commitConfig(nc *config.Config, confirm time.Duration) (*Pendin
 	a := s.applier()
 	res, err := a.Apply(nc, s.secrets(), apply.Options{Confirm: confirm})
 	if err != nil {
-		return nil, &UserError{Msg: "Die Änderung wurde nicht übernommen: " + firstLine(err.Error())}
+		return nil, &UserError{Msg: "The change was not applied: " + firstLine(err.Error())}
 	}
 	if !res.Pending {
 		return nil, nil
 	}
 	if s.cfg.DryRun {
-		// Im Probelauf startet kein systemd-Timer, die Rücknahme übernimmt der Helper selbst.
+		// In a dry run no systemd timer starts, the helper does the rollback itself.
 		genID := res.Generation
 		time.AfterFunc(time.Until(res.Deadline), func() {
 			s.mu.Lock()
 			defer s.mu.Unlock()
 			if err := s.applier().RollbackPending(genID); err != nil {
-				s.cfg.Log.Error("probelauf: rücknahme fehlgeschlagen", "err", err)
+				s.cfg.Log.Error("dry run: rollback failed", "err", err)
 			}
 		})
 	}
@@ -123,7 +123,7 @@ func settingsOf(c *config.Config) (WANSettings, LANSettings) {
 	return w, l
 }
 
-// timezones liest die Zonen aus zone1970.tab (eine pro Land/Region), dazu UTC.
+// timezones reads the zones from zone1970.tab (one per country/region), plus UTC.
 func timezones() []string {
 	f, err := os.Open(filepath.Join(zoneinfo, "zone1970.tab"))
 	if err != nil {
@@ -145,7 +145,7 @@ func timezones() []string {
 	return out
 }
 
-// validZone prüft, dass es die Zeitzone als Datei gibt (Schutz vor Pfaden kommt zusätzlich aus Validate).
+// validZone checks that the time zone exists as a file (protection against paths also comes from Validate).
 func validZone(tz string) bool {
 	if tz == "UTC" {
 		return true
@@ -157,7 +157,7 @@ func validZone(tz string) bool {
 	return err == nil && fi.Mode().IsRegular()
 }
 
-// wanNets liefert die IPv4-Netze am Internet-Anschluss (für die Prüfung auf Überschneidung, F-NET-03).
+// wanNets returns the IPv4 networks on the internet port (for the overlap check, F-NET-03).
 func wanNets() []netip.Prefix {
 	var out []netip.Prefix
 	for _, name := range []string{gen.WANIf, "ppp0"} {
@@ -203,12 +203,12 @@ func (s *Server) registerSettings() {
 		var p struct {
 			Type          string `json:"type"`
 			PPPoEUser     string `json:"pppoe_user"`
-			PPPoEPassword string `json:"pppoe_password"` // leer = bisheriges behalten
+			PPPoEPassword string `json:"pppoe_password"` // empty = keep the previous one
 			PPPoEVLAN     int    `json:"pppoe_vlan"`
 			Telekom       *struct {
-				Anschlusskennung string `json:"anschlusskennung"`
-				Zugangsnummer    string `json:"zugangsnummer"`
-				Mitbenutzer      string `json:"mitbenutzer"`
+				Anschlusskennung string `json:"line_id"`
+				Zugangsnummer    string `json:"access_number"`
+				Mitbenutzer      string `json:"co_user"`
 			} `json:"telekom"`
 			StaticAddress string   `json:"static_address"`
 			StaticGateway string   `json:"static_gateway"`
@@ -248,22 +248,22 @@ func (s *Server) registerSettings() {
 				vlan = 7
 			}
 			if user == "" {
-				return nil, Userf("Bitte den Benutzernamen aus dem Brief des Anbieters eingeben.")
+				return nil, Userf("Please enter the user name from your provider's letter.")
 			}
 			ref := ""
 			if c.WAN.PPPoE != nil {
 				ref = c.WAN.PPPoE.PasswordRef
 			}
 			if p.PPPoEPassword != "" {
-				// Neues Passwort unter neuem Namen: Eine Rücknahme stellt den alten Verweis wieder her,
-				// das alte Passwort passt dann noch dazu.
+				// New password under a new name: a rollback restores the old reference,
+				// and the old password still matches it.
 				newRef = "pppoe-" + newID()
 				if err := s.secrets().Set(newRef, p.PPPoEPassword); err != nil {
 					return nil, err
 				}
 				ref = newRef
 			} else if _, err := s.secrets().Get(ref); ref == "" || err != nil {
-				return nil, Userf("Bitte das Passwort aus dem Brief des Anbieters eingeben.")
+				return nil, Userf("Please enter the password from your provider's letter.")
 			}
 			w.PPPoE = &config.PPPoE{User: user, PasswordRef: ref, VLAN: vlan}
 		case config.WANStatic:
@@ -275,7 +275,7 @@ func (s *Server) registerSettings() {
 			}
 			w.Static = &config.StaticWAN{Address: strings.TrimSpace(p.StaticAddress), Gateway: strings.TrimSpace(p.StaticGateway), DNS: dns}
 		default:
-			return nil, Userf("Bitte eine Anschlussart wählen.")
+			return nil, Userf("Please choose a connection type.")
 		}
 		nc.WAN = w
 		pend, err := s.commitConfig(&nc, confirmWAN)
@@ -298,10 +298,10 @@ func (s *Server) registerSettings() {
 		}
 		host := strings.ToLower(strings.TrimSpace(p.Hostname))
 		if !config.ValidHostname(host) {
-			return nil, Userf("Der Name „%s“ geht nicht: nur Kleinbuchstaben, Ziffern und Bindestrich, höchstens 63 Zeichen.", p.Hostname)
+			return nil, Userf("The name \"%s\" does not work: only lowercase letters, digits and hyphens, at most 63 characters.", p.Hostname)
 		}
 		if !validZone(p.Timezone) {
-			return nil, Userf("Die Zeitzone „%s“ gibt es nicht.", p.Timezone)
+			return nil, Userf("The time zone \"%s\" does not exist.", p.Timezone)
 		}
 		s.mu.Lock()
 		defer s.mu.Unlock()
@@ -329,15 +329,15 @@ func (s *Server) registerSettings() {
 		}
 		addr, err := netip.ParseAddr(strings.TrimSpace(p.Address))
 		if err != nil || !addr.Is4() {
-			return nil, Userf("„%s“ ist keine IPv4-Adresse.", p.Address)
+			return nil, Userf("\"%s\" is not an IPv4 address.", p.Address)
 		}
 		pfx := netip.PrefixFrom(addr, p.Prefix)
 		if !pfx.IsValid() {
-			return nil, Userf("Die Netzgröße /%d geht nicht.", p.Prefix)
+			return nil, Userf("The network size /%d does not work.", p.Prefix)
 		}
 		for _, w := range wanNets() {
 			if w.Overlaps(pfx.Masked()) {
-				return nil, Userf("Das Netz %s überschneidet sich mit dem Netz am Internet-Anschluss (%s). Bitte ein anderes wählen, z. B. 192.168.50.1.", pfx.Masked(), w)
+				return nil, Userf("The network %s overlaps with the network on the internet port (%s). Please choose another one, e.g. 192.168.50.1.", pfx.Masked(), w)
 			}
 		}
 		s.mu.Lock()
@@ -383,7 +383,7 @@ func (s *Server) registerSettings() {
 		s.mu.Lock()
 		defer s.mu.Unlock()
 		if err := s.applier().Confirm(); err != nil {
-			return nil, Userf("Es wartet keine Änderung auf Bestätigung (Frist abgelaufen?).")
+			return nil, Userf("No change is waiting for confirmation (deadline expired?).")
 		}
 		s.pruneSecrets()
 		return nil, nil
@@ -394,16 +394,16 @@ func (s *Server) registerSettings() {
 		defer s.mu.Unlock()
 		a := s.applier()
 		if a.Pending() == nil {
-			return nil, Userf("Es wartet keine Änderung auf Bestätigung.")
+			return nil, Userf("No change is waiting for confirmation.")
 		}
 		if err := a.RollbackLast(); err != nil {
-			return nil, &UserError{Msg: "Zurücknehmen fehlgeschlagen: " + firstLine(err.Error())}
+			return nil, &UserError{Msg: "Rollback failed: " + firstLine(err.Error())}
 		}
 		return nil, nil
 	})
 }
 
-// pruneSecrets löscht PPPoE-Passwörter, auf die die bestätigte Konfiguration nicht mehr verweist.
+// pruneSecrets deletes PPPoE passwords the confirmed configuration no longer refers to.
 func (s *Server) pruneSecrets() {
 	c, err := s.loadConfig()
 	if err != nil {

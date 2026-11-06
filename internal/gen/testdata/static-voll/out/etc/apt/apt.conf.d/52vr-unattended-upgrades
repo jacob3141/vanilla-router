@@ -1,5 +1,0 @@
-// Von vanilla-router erzeugt, nicht von Hand ändern.
-// Änderungen über die Weboberfläche oder /etc/vanilla-router/config.json und `vrctl apply`.
-Unattended-Upgrade::Automatic-Reboot "false";
-Unattended-Upgrade::Automatic-Reboot-Time "";
-Unattended-Upgrade::Remove-Unused-Kernel-Packages "true";

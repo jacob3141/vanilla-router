@@ -11,9 +11,9 @@ import (
 
 const networkDir = "/etc/systemd/network/"
 
-// networkd erzeugt .link (feste Namen per MAC), .netdev (Bridge, VLAN) und .network-Dateien.
-// IPv6 im Heimnetz (RA, SLAAC, Prefix Delegation) macht allein networkd, dnsmasq macht nur DHCPv4
-// und DNS. So gibt es genau eine RA-Quelle im LAN (Q-04).
+// networkd generates .link (fixed names by MAC), .netdev (bridge, VLAN) and .network files.
+// IPv6 in the home network (RA, SLAAC, prefix delegation) is done by networkd alone, dnsmasq only does
+// DHCPv4 and DNS. So there is exactly one RA source in the LAN (Q-04).
 func networkd(c *config.Config) []File {
 	var fs []File
 	f := func(name, group string, w *ini) {
@@ -21,7 +21,7 @@ func networkd(c *config.Config) []File {
 	}
 	ipv6 := c.WAN.IPv6.Mode == "auto"
 
-	// Feste Namen: wan0, lanp1 … Die Reihenfolge der LAN-Ports folgt config.json.
+	// Fixed names: wan0, lanp1 … The order of the LAN ports follows config.json.
 	link := func(mac, name string) *ini {
 		w := &ini{}
 		w.section("Match")
@@ -37,7 +37,7 @@ func networkd(c *config.Config) []File {
 		f("10-vr-"+name+".link", GroupLink, link(m, name))
 	}
 
-	// Bridge lan0, auch bei nur einem Port, damit weitere ohne Umbau dazukommen (PLAN.md 3.4).
+	// Bridge lan0, even with only one port, so more can be added without rework (PLAN.md 3.4).
 	br := &ini{}
 	br.section("NetDev")
 	br.kv("Name", LANIf)
@@ -55,12 +55,12 @@ func networkd(c *config.Config) []File {
 	ports.kv("Bridge", LANIf)
 	f("30-vr-"+LANPort+".network", GroupNetworkd, ports)
 
-	// Internet-Anschluss
+	// Internet port
 	wan := &ini{}
 	wan.section("Match")
 	wan.kv("Name", WANIf)
 	wan.section("Link")
-	wan.kv("RequiredForOnline", "no") // Router muss auch ohne Modem starten
+	wan.kv("RequiredForOnline", "no") // The router must also start without a modem
 	if c.WAN.MTU != 0 && c.WAN.Type != config.WANPPPoE {
 		wan.kv("MTUBytes", strconv.Itoa(c.WAN.MTU))
 	}
@@ -76,7 +76,7 @@ func networkd(c *config.Config) []File {
 			wan.kv("DNS", d)
 		}
 	case config.WANPPPoE:
-		// wan0 trägt nur PPPoE (bzw. das VLAN), keine eigenen Adressen.
+		// wan0 only carries PPPoE (or the VLAN), no addresses of its own.
 		wan.kv("DHCP", "no")
 		wan.kv("LinkLocalAddressing", "no")
 		wan.kv("IPv6AcceptRA", "no")
@@ -91,7 +91,7 @@ func networkd(c *config.Config) []File {
 			wan.section("DHCPv4")
 			wan.kv("UseDNS", "yes")
 			wan.kv("UseDomains", "no")
-			wan.kv("SendHostname", "no") // nichts über das Heimnetz verraten (P-09)
+			wan.kv("SendHostname", "no") // reveal nothing about the home network (P-09)
 			wan.kv("UseHostname", "no")
 		}
 		if ipv6 {
@@ -121,7 +121,7 @@ func networkd(c *config.Config) []File {
 			vn.kv("IPv6AcceptRA", "no")
 			f("30-vr-"+pppLowerIf(c)+".network", GroupNetworkd, vn)
 		}
-		// ppp0 legt pppd an und setzt IPv4 selbst. networkd übernimmt nur IPv6 (DHCPv6-PD über PPP).
+		// pppd creates ppp0 and sets IPv4 itself. networkd only handles IPv6 (DHCPv6-PD over PPP).
 		pp := &ini{}
 		pp.section("Match")
 		pp.kv("Name", PPPIf)
@@ -142,7 +142,7 @@ func networkd(c *config.Config) []File {
 		f("30-vr-"+PPPIf+".network", GroupNetworkd, pp)
 	}
 
-	// Heimnetz
+	// Home network
 	lan := &ini{}
 	lan.section("Match")
 	lan.kv("Name", LANIf)
@@ -171,7 +171,7 @@ func networkd(c *config.Config) []File {
 		lan.section("IPv6SendRA")
 		lan.kv("EmitDNS", "yes")
 		if hasULA {
-			lan.kv("DNS", ulaAddr.String()) // feste Adresse, ändert sich nicht mit dem Anbieter-Präfix
+			lan.kv("DNS", ulaAddr.String()) // fixed address, does not change with the provider's prefix
 		} else {
 			lan.kv("DNS", "_link_local")
 		}
@@ -190,7 +190,7 @@ func dhcp6(w *ini, c *config.Config) {
 	w.section("DHCPv6")
 	w.kv("PrefixDelegationHint", fmt.Sprintf("::/%d", c.WAN.IPv6.RequestPrefix))
 	w.kv("UseDNS", "yes")
-	w.kv("WithoutRA", "solicit") // manche Anbieter senden kein RA mit gesetztem M-Bit
+	w.kv("WithoutRA", "solicit") // some providers send no RA with the M bit set
 	w.section("IPv6AcceptRA")
 	w.kv("UseDNS", "yes")
 }

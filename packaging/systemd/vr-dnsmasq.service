@@ -1,8 +1,8 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-# DNS und DHCPv4 im Heimnetz. Startet das Programm aus dnsmasq-base (Ubuntu main), nicht das
-# Paket dnsmasq aus universe (D-10). Konfiguration erzeugt vrctl.
+# DNS and DHCPv4 in the home network. Starts the program from dnsmasq-base (Ubuntu main), not the
+# package dnsmasq from universe (D-10). vrctl generates the configuration.
 [Unit]
-Description=vanilla-router DNS und DHCP (dnsmasq)
+Description=vanilla-router DNS and DHCP (dnsmasq)
 After=network.target systemd-networkd.service
 Wants=network.target
 ConditionPathExists=/etc/vanilla-router/dnsmasq.conf
@@ -14,7 +14,7 @@ ExecStart=/usr/sbin/dnsmasq --keep-in-foreground --conf-file=/etc/vanilla-router
 Restart=on-failure
 RestartSec=2
 
-# Härtung: dnsmasq braucht Port 53/67 und Rohsockets für DHCP, sonst nichts.
+# Hardening: dnsmasq needs ports 53/67 and raw sockets for DHCP, nothing else.
 CapabilityBoundingSet=CAP_NET_BIND_SERVICE CAP_NET_RAW CAP_NET_ADMIN CAP_SETUID CAP_SETGID CAP_CHOWN
 NoNewPrivileges=yes
 ProtectSystem=strict

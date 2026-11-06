@@ -12,8 +12,8 @@ import (
 	"vanilla-router/internal/conf"
 )
 
-// Firewall-Änderungen werden sofort wirksam, aber ohne Bestätigung innerhalb dieser Frist
-// automatisch zurückgenommen (wie bei Consumer-Routern).
+// Firewall changes take effect immediately, but are rolled back automatically without
+// confirmation within this deadline (as on consumer routers).
 const confirmWindow = 60 * time.Second
 
 type pendingChange struct {
@@ -22,15 +22,15 @@ type pendingChange struct {
 	timer    *time.Timer
 }
 
-// Das tägliche Neuladen der Zeitsperren (Sommerzeit) macht vr-firewall-reload.timer, die Zeitzone
-// kommt aus config.json (vrctl firewall-load).
+// vr-firewall-reload.timer does the daily reload of the time-based blocks (daylight saving), the time
+// zone comes from config.json (vrctl firewall-load).
 
-// startPending merkt sich den alten Zustand und stellt ihn nach Ablauf der Frist wieder her.
-// Aufrufer hält s.mu.
+// startPending remembers the old state and restores it when the deadline expires.
+// The caller holds s.mu.
 func (s *Server) startPending(prev conf.State) time.Time {
 	if s.pending != nil {
 		s.pending.timer.Stop()
-		prev = s.pending.prev // Ausgangspunkt bleibt der letzte bestätigte Zustand
+		prev = s.pending.prev // The starting point stays the last confirmed state
 	}
 	p := &pendingChange{prev: prev, deadline: time.Now().Add(confirmWindow)}
 	p.timer = time.AfterFunc(confirmWindow, func() {
@@ -42,17 +42,17 @@ func (s *Server) startPending(prev conf.State) time.Time {
 		s.pending = nil
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
-		s.cfg.Log.Warn("firewall: keine bestätigung, nehme portweiterleitungen zurück")
-		// Nur die Weiterleitungen zurücksetzen; Sperren, die inzwischen geändert wurden, bleiben
+		s.cfg.Log.Warn("firewall: no confirmation, rolling back port forwards")
+		// Only reset the forwards; blocks that have changed in the meantime stay
 		cur, err := s.loadState()
 		if err != nil {
-			s.cfg.Log.Error("firewall: zustand unlesbar", "err", err)
+			s.cfg.Log.Error("firewall: state unreadable", "err", err)
 			return
 		}
 		next := cur.Clone()
 		next.PortForwards = p.prev.PortForwards
 		if err := s.commit(ctx, cur, next, parts{portfw: true}); err != nil {
-			s.cfg.Log.Error("firewall: zurücknehmen fehlgeschlagen", "err", err)
+			s.cfg.Log.Error("firewall: rollback failed", "err", err)
 		}
 	})
 	s.pending = p
@@ -82,7 +82,7 @@ func (s *Server) registerFirewall() {
 		for _, t := range []string{"inet vr_filter", "ip vr_nat", "ip vr_portfw", "inet vr_block"} {
 			out, err := run(ctx, "nft", append([]string{"list", "table"}, strings.Fields(t)...)...)
 			if err != nil {
-				out = "(Tabelle nicht geladen)"
+				out = "(table not loaded)"
 			}
 			tables[t] = out
 		}
@@ -120,7 +120,7 @@ func (s *Server) registerFirewall() {
 				}
 			}
 			if !found {
-				return nil, Userf("Diese Weiterleitung gibt es nicht mehr.")
+				return nil, Userf("This port forward no longer exists.")
 			}
 		}
 		if err := s.commit(ctx, prev, next, parts{portfw: true}); err != nil {
@@ -146,7 +146,7 @@ func (s *Server) registerFirewall() {
 		n := len(next.PortForwards)
 		next.PortForwards = deleteWhere(next.PortForwards, func(f conf.PortForward) bool { return f.ID == p.ID })
 		if len(next.PortForwards) == n {
-			return nil, Userf("Diese Weiterleitung gibt es nicht mehr.")
+			return nil, Userf("This port forward no longer exists.")
 		}
 		if err := s.commit(ctx, prev, next, parts{portfw: true}); err != nil {
 			return nil, err
@@ -198,7 +198,7 @@ func (s *Server) registerFirewall() {
 		n := len(next.Blocks)
 		next.Blocks = deleteWhere(next.Blocks, func(x conf.Block) bool { return x.MAC == mac })
 		if len(next.Blocks) == n {
-			return nil, Userf("Für %s gibt es keine Sperre.", mac)
+			return nil, Userf("There is no block for %s.", mac)
 		}
 		return nil, s.commit(ctx, prev, next, parts{portfw: true})
 	})
@@ -207,7 +207,7 @@ func (s *Server) registerFirewall() {
 		s.mu.Lock()
 		defer s.mu.Unlock()
 		if s.pending == nil {
-			return nil, Userf("Es gibt keine offene Änderung (Frist abgelaufen?).")
+			return nil, Userf("There is no open change (deadline expired?).")
 		}
 		s.pending.timer.Stop()
 		s.pending = nil

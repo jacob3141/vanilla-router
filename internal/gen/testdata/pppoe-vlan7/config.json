@@ -2,9 +2,9 @@
   "schema": 1,
   "system": {
     "hostname": "router",
-    "timezone": "Europe/Berlin",
-    "locale": "de_DE.UTF-8",
-    "keymap": "de"
+    "timezone": "UTC",
+    "locale": "en_US.UTF-8",
+    "keymap": "us"
   },
   "wan": {
     "match_mac": "02:00:00:00:00:01",

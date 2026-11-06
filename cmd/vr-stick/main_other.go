@@ -2,8 +2,8 @@
 
 //go:build !windows
 
-// vr-stick ist der Stick-Ersteller für Windows (PLAN.md 3.12, F-STICK). Auf anderen Systemen gibt es
-// ihn noch nicht (Q-18), dort schreibt man das Abbild mit dd.
+// vr-stick is the stick creator for Windows (PLAN.md 3.12, F-STICK). It does not exist yet on other
+// systems (Q-18), where the image is written with dd.
 package main
 
 import (
@@ -12,7 +12,7 @@ import (
 )
 
 func main() {
-	fmt.Fprintln(os.Stderr, "vr-stick gibt es derzeit nur für Windows (PLAN.md 3.12, Q-18).")
-	fmt.Fprintln(os.Stderr, "Unter Linux: sudo dd if=vanilla-router-stick.img of=/dev/sdX bs=4M conv=fsync status=progress")
+	fmt.Fprintln(os.Stderr, "vr-stick is currently only available for Windows (PLAN.md 3.12, Q-18).")
+	fmt.Fprintln(os.Stderr, "On Linux: sudo dd if=vanilla-router-stick.img of=/dev/sdX bs=4M conv=fsync status=progress")
 	os.Exit(1)
 }

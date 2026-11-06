@@ -11,20 +11,20 @@ import (
 	"time"
 )
 
-// Lease ist eine DHCP-Vergabe von dnsmasq. Die Form entspricht dem Prototyp (dort isc-dhcp).
+// Lease is a DHCP assignment from dnsmasq. The form matches the prototype (isc-dhcp there).
 type Lease struct {
 	IP       string    `json:"ip"`
 	MAC      string    `json:"mac"`
 	Hostname string    `json:"hostname"`
-	State    string    `json:"state"` // active oder expired
+	State    string    `json:"state"` // active or expired
 	Starts   time.Time `json:"starts"`
-	Ends     time.Time `json:"ends"` // Null bei unendlicher Lease
+	Ends     time.Time `json:"ends"` // zero with an infinite lease
 }
 
-// LeasesFile ist die Lease-Datei von vr-dnsmasq (gen.DNSmasq: dhcp-leasefile).
+// LeasesFile is the lease file of vr-dnsmasq (gen.DNSmasq: dhcp-leasefile).
 var LeasesFile = "/var/lib/vanilla-router/dnsmasq.leases"
 
-// ReadLeases liest die aktuelle Lease-Datei.
+// ReadLeases reads the current lease file.
 func ReadLeases() ([]Lease, error) {
 	f, err := os.Open(LeasesFile)
 	if err != nil {
@@ -34,8 +34,8 @@ func ReadLeases() ([]Lease, error) {
 	return parseLeases(f, time.Now())
 }
 
-// parseLeases liest das dnsmasq-Format: „<ablauf-unix> <mac> <ip> <name|*> <client-id|*>“.
-// IPv6-Leases (Zeile „duid …“ und Zeilen danach) gibt es hier nicht, weil DHCPv6 aus ist (Q-04).
+// parseLeases reads the dnsmasq format: "<expiry-unix> <mac> <ip> <name|*> <client-id|*>".
+// IPv6 leases (line "duid …" and lines after it) do not exist here, because DHCPv6 is off (Q-04).
 func parseLeases(r io.Reader, now time.Time) ([]Lease, error) {
 	var out []Lease
 	sc := bufio.NewScanner(r)
@@ -47,7 +47,7 @@ func parseLeases(r io.Reader, now time.Time) ([]Lease, error) {
 		}
 		exp, err := strconv.ParseInt(f[0], 10, 64)
 		if err != nil || !strings.Contains(f[1], ":") || strings.Contains(f[2], ":") {
-			continue // keine IPv4-Lease
+			continue // not an IPv4 lease
 		}
 		l := Lease{MAC: strings.ToLower(f[1]), IP: f[2], State: "active"}
 		if f[3] != "*" {

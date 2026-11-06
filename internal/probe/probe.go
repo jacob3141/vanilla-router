@@ -11,12 +11,12 @@ import (
 	"time"
 )
 
-// Options steuert eine Probe.
+// Options controls a probe.
 type Options struct {
-	Timeout  time.Duration // Gesamtdauer, Vorgabe 5 s
-	Interval time.Duration // Anfragen so oft wiederholen, Vorgabe 1 s
-	Grace    time.Duration // nach der ersten Antwort noch so lange auf weitere warten, Vorgabe 500 ms
-	VLANs    []int         // PPPoE-Discovery auf diesen VLANs, 0 = ohne Tag. Vorgabe {0, 7} (7: Telekom)
+	Timeout  time.Duration // total duration, default 5 s
+	Interval time.Duration // repeat requests this often, default 1 s
+	Grace    time.Duration // after the first answer, wait this long for more, default 500 ms
+	VLANs    []int         // PPPoE discovery on these VLANs, 0 = without tag. Default {0, 7} (7: Telekom)
 	NoDHCP   bool
 	NoPPPoE  bool
 }
@@ -37,24 +37,24 @@ func (o Options) withDefaults() Options {
 	return o
 }
 
-// Result ist das Ergebnis einer Probe.
+// Result is the result of a probe.
 type Result struct {
 	DHCP  *Offer
-	PPPoE []PADO // höchstens ein Eintrag je VLAN und Zugangsserver
+	PPPoE []PADO // at most one entry per VLAN and access server
 }
 
-// Answered meldet, ob irgendetwas geantwortet hat.
+// Answered reports whether anything answered.
 func (r Result) Answered() bool { return r.DHCP != nil || len(r.PPPoE) > 0 }
 
-// conn ist die Socket-Schnittstelle (in Tests ersetzt).
+// conn is the socket interface (replaced in tests).
 type conn interface {
 	Send([]byte) error
 	Recv(time.Duration) ([]byte, error)
 	Close() error
 }
 
-// Run probiert auf dem Interface (Index, MAC) DHCP und PPPoE. Es wird keine Adresse übernommen
-// und kein Zustand im System verändert. Das Interface muss eingeschaltet sein (netdetect.SetUp).
+// Run tries DHCP and PPPoE on the interface (index, MAC). No address is taken
+// and no state in the system changes. The interface must be turned on (netdetect.SetUp).
 func Run(ctx context.Context, ifindex int, mac net.HardwareAddr, opts Options) (Result, error) {
 	c, err := openRaw(ifindex)
 	if err != nil {

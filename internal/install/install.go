@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-// Package install schreibt das Zielsystem auf den Datenträger (PLAN.md 3.9.2 S8, 3.9.4):
-// Partitionen (GPT: ESP + btrfs mit @, @log, @snapshots), System aus dem Image, Einstellungen aus
-// config.json, Bootloader (shim + GRUB, Secure Boot, Q-16) und Dienste. Vor diesem Schritt wird nichts
-// auf die Festplatte geschrieben (Grundsatz des Assistenten).
+// Package install writes the target system to the disk (PLAN.md 3.9.2 S8, 3.9.4):
+// partitions (GPT: ESP + btrfs with @, @log, @snapshots), system from the image, settings from
+// config.json, bootloader (shim + GRUB, Secure Boot, Q-16) and services. Nothing is written to
+// the disk before this step (a principle of the assistant).
 package install
 
 import (
@@ -19,37 +19,37 @@ import (
 	"vanilla-router/internal/gen"
 )
 
-// Runner führt Programme aus, optional mit Eingabe auf stdin.
+// Runner runs programs, optionally with input on stdin.
 type Runner interface {
 	Run(env []string, stdin []byte, name string, args ...string) ([]byte, error)
 }
 
-// Plan beschreibt eine Installation.
+// Plan describes an installation.
 type Plan struct {
-	Disk      string // Gerät, z. B. /dev/sda (wird vollständig gelöscht)
-	Rootfs    string // Image des Zielsystems (tar.zst)
+	Disk      string // device, e.g. /dev/sda (will be completely erased)
+	Rootfs    string // image of the target system (tar.zst)
 	Config    *config.Config
-	Secrets   map[string]string // z. B. "pppoe" → Passwort
-	SetupCode string            // Einrichtungscode der Weboberfläche
-	Target    string            // Einhängepunkt, Vorgabe /mnt/vr-target
+	Secrets   map[string]string // e.g. "pppoe" → password
+	SetupCode string            // setup code of the web interface
+	Target    string            // mount point, default /mnt/vr-target
 }
 
-// Installer führt einen Plan aus.
+// Installer executes a plan.
 type Installer struct {
 	Run Runner
-	// Progress meldet den Fortschritt für die Anzeige (Schritt n von total).
+	// Progress reports the progress for display (step n of total).
 	Progress func(n, total int, text string)
 }
 
-// Steps sind die Schritte mit Texten für Laien.
+// Steps are the steps with texts for non-experts.
 var Steps = []string{
-	"Datenträger vorbereiten",
-	"Dateisysteme anlegen",
-	"System kopieren (dauert einige Minuten)",
-	"Einstellungen schreiben",
-	"Startprogramm einrichten",
-	"Dienste einrichten",
-	"Abschließen",
+	"Preparing the disk",
+	"Creating file systems",
+	"Copying the system (takes a few minutes)",
+	"Writing settings",
+	"Setting up the boot loader",
+	"Setting up services",
+	"Finishing",
 }
 
 type mapSecrets map[string]string
@@ -58,11 +58,11 @@ func (m mapSecrets) Get(ref string) (string, error) {
 	if v, ok := m[ref]; ok {
 		return v, nil
 	}
-	return "", fmt.Errorf("Geheimnis %q fehlt", ref)
+	return "", fmt.Errorf("secret %q is missing", ref)
 }
 
-// Install führt alle Schritte aus. Bei einem Fehler wird alles ausgehängt, der Datenträger bleibt
-// in einem unfertigen Zustand und kann mit einer neuen Installation überschrieben werden.
+// Install runs all steps. On an error everything is unmounted, the disk stays in an
+// unfinished state and can be overwritten with a new installation.
 func (in *Installer) Install(p Plan) (err error) {
 	if p.Target == "" {
 		p.Target = "/mnt/vr-target"
@@ -70,14 +70,14 @@ func (in *Installer) Install(p Plan) (err error) {
 	if err := p.Config.Validate(); err != nil {
 		return err
 	}
-	// Erzeugen vor dem ersten Schreibzugriff: Ein Fehler in Konfiguration oder Geheimnissen
-	// soll auffallen, bevor der Datenträger gelöscht ist.
+	// Generate before the first write: an error in the configuration or secrets
+	// should come to light before the disk is erased.
 	files, err := gen.Render(p.Config, mapSecrets(p.Secrets))
 	if err != nil {
 		return err
 	}
 	if _, err := os.Stat(p.Rootfs); err != nil {
-		return fmt.Errorf("Image des Zielsystems fehlt: %w", err)
+		return fmt.Errorf("image of the target system is missing: %w", err)
 	}
 	T := p.Target
 	esp, root := disk.PartPath(p.Disk, 1), disk.PartPath(p.Disk, 2)
@@ -91,9 +91,18 @@ func (in *Installer) Install(p Plan) (err error) {
 	chroot := func(name string, args ...string) error {
 		return run(nil, "chroot", append([]string{T, name}, args...)...)
 	}
+	// The kernel's file systems under the target can stay busy (cgroup under /sys), and that says nothing
+	// about the installation. So they are detached lazily. The target itself is then unmounted strictly:
+	// only that guarantees that everything is on the disk.
+	detachAPI := func() {
+		for _, dir := range []string{"proc", "run", "sys", "dev"} {
+			in.Run.Run(nil, nil, "umount", "-R", "-l", filepath.Join(T, dir))
+		}
+	}
 	mounted := false
 	defer func() {
 		if mounted {
+			detachAPI()
 			in.Run.Run(nil, nil, "umount", "-R", T)
 		}
 	}()
@@ -105,7 +114,7 @@ func (in *Installer) Install(p Plan) (err error) {
 		}
 	}
 
-	next() // Datenträger vorbereiten
+	next() // Prepare the disk
 	if err := run(nil, "wipefs", "--all", "--force", p.Disk); err != nil {
 		return err
 	}
@@ -116,7 +125,7 @@ func (in *Installer) Install(p Plan) (err error) {
 		return err
 	}
 
-	next() // Dateisysteme
+	next() // File systems
 	if err := run(nil, "mkfs.vfat", "-F", "32", "-n", disk.ESPLabel, esp); err != nil {
 		return err
 	}
@@ -158,18 +167,18 @@ func (in *Installer) Install(p Plan) (err error) {
 		return err
 	}
 
-	next() // System kopieren
+	next() // Copy the system
 	if err := run(nil, "tar", "--zstd", "-xpf", p.Rootfs, "--xattrs", "--xattrs-include=*", "--acls",
 		"--numeric-owner", "-C", T); err != nil {
 		return err
 	}
 
-	next() // Einstellungen
+	next() // Settings
 	uuid := func(dev string) (string, error) {
 		out, err := in.Run.Run([]string{"LC_ALL=C"}, nil, "blkid", "-s", "UUID", "-o", "value", dev)
 		u := strings.TrimSpace(string(out))
 		if err != nil || u == "" {
-			return "", fmt.Errorf("UUID von %s nicht lesbar: %v", dev, err)
+			return "", fmt.Errorf("UUID of %s not readable: %v", dev, err)
 		}
 		return u, nil
 	}
@@ -185,7 +194,7 @@ func (in *Installer) Install(p Plan) (err error) {
 		return err
 	}
 
-	next() // Startprogramm
+	next() // Boot loader
 	for _, b := range []struct{ fs, dir string }{{"--rbind", "dev"}, {"--rbind", "sys"}, {"--bind", "run"}} {
 		if err := run(nil, "mount", b.fs, "/"+b.dir, filepath.Join(T, b.dir)); err != nil {
 			return err
@@ -198,7 +207,7 @@ func (in *Installer) Install(p Plan) (err error) {
 	if err := chroot("grub-install", append(grub, "--bootloader-id=vanilla-router")...); err != nil {
 		return err
 	}
-	// Zusätzlich unter dem Standardpfad EFI/BOOT/BOOTX64.EFI: manche Firmware vergisst NVRAM-Einträge.
+	// Also under the standard path EFI/BOOT/BOOTX64.EFI: some firmware forgets NVRAM entries.
 	if err := chroot("grub-install", append(grub, "--removable", "--no-nvram")...); err != nil {
 		return err
 	}
@@ -206,7 +215,7 @@ func (in *Installer) Install(p Plan) (err error) {
 		return err
 	}
 
-	next() // Dienste
+	next() // Services
 	a := &apply.Applier{Root: T, Run: offlineRunner{in.Run}}
 	if _, err := a.Setup(false, T); err != nil {
 		return err
@@ -218,8 +227,9 @@ func (in *Installer) Install(p Plan) (err error) {
 		return err
 	}
 
-	next() // Abschließen
+	next() // Finish
 	run(nil, "sync")
+	detachAPI()
 	if err := run(nil, "umount", "-R", T); err != nil {
 		return err
 	}
@@ -227,7 +237,7 @@ func (in *Installer) Install(p Plan) (err error) {
 	return nil
 }
 
-// offlineRunner passt den Installer-Runner an apply.Runner an.
+// offlineRunner adapts the installer runner to apply.Runner.
 type offlineRunner struct{ r Runner }
 
 func (o offlineRunner) Run(env []string, name string, args ...string) ([]byte, error) {
@@ -240,7 +250,7 @@ func writeSystemFiles(T string, p Plan, rootUUID, espUUID string, files []gen.Fi
 		return config.WriteFileAtomic(filepath.Join(T, filepath.FromSlash(rel)), []byte(content), mode)
 	}
 	mo := disk.MountOptions
-	fstab := fmt.Sprintf(`# Von vanilla-router bei der Installation erzeugt
+	fstab := fmt.Sprintf(`# Generated by vanilla-router during installation
 UUID=%[1]s  /            btrfs  subvol=@,%[3]s          0 0
 UUID=%[1]s  /var/log     btrfs  subvol=@log,%[3]s       0 0
 UUID=%[1]s  /.snapshots  btrfs  subvol=@snapshots,%[3]s 0 0
@@ -259,7 +269,7 @@ UUID=%[2]s  /boot/efi    vfat   umask=0077               0 1
 		{"/etc/timezone", 0o644, c.System.Timezone + "\n"},
 		{"/etc/default/locale", 0o644, "LANG=" + c.System.Locale + "\n"},
 		{"/etc/default/keyboard", 0o644, fmt.Sprintf("XKBMODEL=\"pc105\"\nXKBLAYOUT=%q\nXKBVARIANT=\"\"\nXKBOPTIONS=\"\"\nBACKSPACE=\"guess\"\n", c.System.Keymap)},
-		{"/etc/machine-id", 0o444, ""}, // beim ersten Start neu erzeugt, jedes Gerät eine eigene
+		{"/etc/machine-id", 0o444, ""}, // regenerated at the first start, each device gets its own
 	}
 	for _, s := range steps {
 		if err := w(s.rel, s.mode, s.content); err != nil {
@@ -293,12 +303,12 @@ UUID=%[2]s  /boot/efi    vfat   umask=0077               0 1
 	return nil
 }
 
-// ExecRunner ist der echte Runner.
+// ExecRunner is the real runner.
 type ExecRunner struct{}
 
-// Run startet ein Programm.
+// Run starts a program.
 func (ExecRunner) Run(env []string, stdin []byte, name string, args ...string) ([]byte, error) {
 	return execRun(env, stdin, name, args...)
 }
 
-var errNoRoot = errors.New("Installation braucht Root-Rechte")
+var errNoRoot = errors.New("installation needs root")

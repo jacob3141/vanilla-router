@@ -7,9 +7,6 @@
 > “Now plug the cable from your modem into one of the network ports.”
 > That port automatically becomes the internet connection, all others become your home network.
 
-> **Language:** the user interface and most documentation are currently in German (PLAN.md, Q-07).
-> An English version is planned.
-
 ## Why
 
 Router systems like OpenWrt are built for tiny devices with a few MB of storage and are therefore quite
@@ -40,25 +37,25 @@ it into a router without requiring any Linux knowledge.
 
 In development, **not ready for production use**. The code for all parts is written and covered by unit
 tests: configuration, generators, applying with rollback, web interface, setup assistant, WAN detection,
-rollback after updates and the stick creator. So far only port detection and the stick creator have been
-tested on real hardware. The boot stick has never been built. The exact status is in
-[docs/architektur.md, section 14](docs/architektur.md#14-stand-was-auf-echter-hardware-geprüft-ist)
-(German), the plan in [PLAN.md](PLAN.md) (German).
+rollback after updates and the stick creator. A complete installation works in a virtual machine with Secure
+Boot; on real hardware only port detection and the stick creator have been tested so far. An installed router
+does not update vanilla-router itself yet, only Ubuntu's security updates. The exact status is in
+[docs/architecture.md, section 15](docs/architecture.md#15-status-what-has-been-tested-for-real),
+the plan in [PLAN.md](PLAN.md).
 
 The web interface comes from a hand-built prototype that serves a real household as router and NAS.
 
 ## Documentation
 
-All documents except this README and SECURITY.md are currently in German.
-
 | For | What | Where |
 |---|---|---|
 | Everyone | Goals, requirements, decisions, open questions, roadmap | [PLAN.md](PLAN.md) |
-| Developers | Architecture, idea, data flow, security model, where to start | [docs/architektur.md](docs/architektur.md) |
-| Developers | Development environment, testing, trying it out without a router, building | [docs/entwicklung.md](docs/entwicklung.md) |
+| Developers | Architecture, idea, data flow, security model, where to start | [docs/architecture.md](docs/architecture.md) |
+| Developers | Development environment, testing, trying it out without a router, building | [docs/development.md](docs/development.md) |
 | Contributors | Rules for code, tests, texts and commits | [CONTRIBUTING.md](CONTRIBUTING.md) |
 | Security researchers | Reporting vulnerabilities | [SECURITY.md](SECURITY.md) |
 | Building the boot stick | Images with mkosi | [image/README.md](image/README.md) |
+| Everyone | What changed in each release | [CHANGELOG.md](CHANGELOG.md) |
 
 ## Quick start for developers
 
@@ -81,7 +78,7 @@ test/dev/webui.sh
 ```
 
 This runs all checks and starts the web interface locally on http://127.0.0.1:9443, without root and
-without changing anything on your machine. More in [docs/entwicklung.md](docs/entwicklung.md).
+without changing anything on your machine. More in [docs/development.md](docs/development.md).
 
 ## License
 

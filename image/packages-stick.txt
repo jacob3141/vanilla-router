@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-# Boot-Stick: kleines System für den Assistenten (vr-install) und die Werkzeuge der Installation.
+# Boot stick: a small system for the assistant (vr-install) and the installation tools.
 linux-generic
 linux-firmware
 shim-signed
@@ -8,6 +8,7 @@ systemd
 systemd-sysv
 udev
 util-linux
+fdisk
 dosfstools
 btrfs-progs
 zstd

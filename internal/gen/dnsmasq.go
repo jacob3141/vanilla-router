@@ -11,9 +11,9 @@ import (
 	"vanilla-router/internal/config"
 )
 
-// DNSmasq erzeugt /etc/vanilla-router/dnsmasq.conf für DNS und DHCPv4 im Heimnetz.
-// Gestartet wird das Programm aus dnsmasq-base (main) von vr-dnsmasq.service, nicht das Paket
-// dnsmasq aus universe (D-10). Router Advertisements macht networkd (Q-04), hier also kein enable-ra.
+// DNSmasq generates /etc/vanilla-router/dnsmasq.conf for DNS and DHCPv4 in the home network.
+// The program from dnsmasq-base (main) is started by vr-dnsmasq.service, not the package
+// dnsmasq from universe (D-10). networkd does router advertisements (Q-04), hence no enable-ra here.
 func DNSmasq(c *config.Config) string {
 	var b strings.Builder
 	w := func(format string, args ...any) { fmt.Fprintf(&b, format+"\n", args...) }
@@ -22,10 +22,10 @@ func DNSmasq(c *config.Config) string {
 	dom := c.DNS.Domain
 	_, ulaAddr, hasULA := lanULA(c)
 
-	w("\n# Nur im Heimnetz, nie am Internet-Anschluss")
+	w("\n# Only in the home network, never on the internet port")
 	w("interface=%s", LANIf)
 	w("bind-dynamic")
-	w("no-hosts") // /etc/hosts enthält 127.0.1.1 für den Hostnamen, das soll nicht ins LAN
+	w("no-hosts") // /etc/hosts contains 127.0.1.1 for the host name, that should not go into the LAN
 
 	w("\n# DNS")
 	w("domain-needed")
@@ -42,22 +42,22 @@ func DNSmasq(c *config.Config) string {
 			w("server=%s", u)
 		}
 	} else {
-		// DNS-Server des Anbieters: networkd gibt sie an resolved weiter (Stub-Listener aus, D-12),
-		// pppd schreibt sie bei PPPoE nach /etc/ppp/resolv.conf.
+		// The provider's DNS servers: networkd passes them to resolved (stub listener off, D-12),
+		// pppd writes them to /etc/ppp/resolv.conf with PPPoE.
 		w("resolv-file=/run/systemd/resolve/resolv.conf")
 		if c.WAN.Type == config.WANPPPoE {
 			w("resolv-file=/etc/ppp/resolv.conf")
 		}
 	}
 
-	w("\n# Namen im Heimnetz")
+	w("\n# Names in the home network")
 	if hasULA {
 		w("host-record=%s.%s,%s,%s,%s", c.System.Hostname, dom, c.System.Hostname, router, ulaAddr)
 	} else {
 		w("host-record=%s.%s,%s,%s", c.System.Hostname, dom, c.System.Hostname, router)
 	}
 	for _, r := range c.DHCP.Reservations {
-		// Name auch dann auflösbar, wenn das Gerät gerade keine Lease hat
+		// Name resolvable even if the device has no lease right now
 		w("host-record=%s.%s,%s,%s", r.Name, dom, r.Name, r.IP)
 	}
 	for _, r := range c.DNS.Records {
@@ -84,7 +84,7 @@ func netmask(p netip.Prefix) string {
 	return fmt.Sprintf("%d.%d.%d.%d", m>>24, m>>16&0xff, m>>8&0xff, m&0xff)
 }
 
-// dnsmasqDuration schreibt eine Dauer in dnsmasq-Form (12h, 30m, 90s).
+// dnsmasqDuration writes a duration in dnsmasq form (12h, 30m, 90s).
 func dnsmasqDuration(d time.Duration) string {
 	switch {
 	case d%time.Hour == 0:

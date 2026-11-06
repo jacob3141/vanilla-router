@@ -12,15 +12,15 @@ import (
 	"sort"
 )
 
-// Ein kleiner Rasterer: Pfade werden in Polygone zerlegt, Konturen in Vierecke je Strecke plus Kreise
-// an den Punkten (runde Enden und Ecken). Die Deckung je Pixel wird mit 16 Unterzeilen und exakter
-// waagerechter Überdeckung berechnet (Nonzero-Regel).
+// A small rasterizer: paths are split into polygons, strokes into quads per segment plus circles
+// at the points (round ends and corners). The coverage per pixel is calculated with 16 subrows and exact
+// horizontal overlap (nonzero rule).
 
 const subRows = 16
 
 type poly []Pt
 
-// flatten zerlegt einen Pfad in Linienzüge; closed sagt, ob der Zug mit Z endet.
+// flatten splits a path into polylines; closed says whether the line ends with Z.
 func (pa Path) flatten(px float64) (lines []poly, closed []bool) {
 	var cur poly
 	flush := func(c bool) {
@@ -66,8 +66,8 @@ func area(q poly) float64 {
 	return a / 2
 }
 
-// oriented dreht ein Polygon in eine einheitliche Richtung, damit sich Teile einer Kontur bei der
-// Nonzero-Regel nicht gegenseitig aufheben.
+// oriented turns a polygon in a uniform direction, so that parts of a stroke do not cancel each
+// other out under the nonzero rule.
 func oriented(q poly) poly {
 	if area(q) < 0 {
 		r := make(poly, len(q))
@@ -127,7 +127,7 @@ type edge struct {
 	dir            int
 }
 
-// coverage berechnet die Deckung je Pixel (0…1) für n × n Pixel.
+// coverage calculates the coverage per pixel (0…1) for n × n pixels.
 func coverage(ps []poly, n int) []float64 {
 	var es []edge
 	for _, q := range ps {
@@ -195,10 +195,10 @@ func addSpan(row []float64, xa, xb float64) {
 	}
 }
 
-// Render zeichnet das Logo in n × n Pixel.
+// Render draws the logo in n × n pixels.
 func Render(n int) *image.NRGBA {
 	px := float64(n)
-	// vormultiplizierte Farbe
+	// premultiplied color
 	buf := make([][4]float64, n*n)
 	paint := func(cov []float64, c color.NRGBA) {
 		for i, v := range cov {
@@ -245,17 +245,17 @@ func Render(n int) *image.NRGBA {
 	return img
 }
 
-// PNG liefert das Logo als PNG mit n × n Pixeln.
+// PNG returns the logo as a PNG with n × n pixels.
 func PNG(n int) []byte {
 	var b bytes.Buffer
 	png.Encode(&b, Render(n))
 	return b.Bytes()
 }
 
-// IconSizes sind die Größen im Windows-Icon (Taskleiste, Explorer, Kopf des Stick-Erstellers bis 200 % DPI).
+// IconSizes are the sizes in the Windows icon (taskbar, Explorer, stick creator header up to 200 % DPI).
 var IconSizes = []int{16, 20, 24, 32, 40, 48, 64, 96, 128, 256}
 
-// IconImage liefert ein Bild für eine .ico-Datei oder RT_ICON: bis 128 als 32-Bit-DIB, 256 als PNG.
+// IconImage returns an image for an .ico file or RT_ICON: up to 128 as a 32-bit DIB, 256 as PNG.
 func IconImage(n int) []byte {
 	if n >= 256 {
 		return PNG(n)
@@ -271,13 +271,13 @@ func IconImage(n int) []byte {
 		XPels, YPels          int32
 		ClrUsed, ClrImportant uint32
 	}{40, int32(n), int32(2 * n), 1, 32, 0, 0, 0, 0, 0, 0})
-	for y := n - 1; y >= 0; y-- { // von unten nach oben
+	for y := n - 1; y >= 0; y-- { // from bottom to top
 		for x := 0; x < n; x++ {
 			c := img.NRGBAAt(x, y)
 			b.Write([]byte{c.B, c.G, c.R, c.A})
 		}
 	}
-	mask := (n + 31) / 32 * 4 // UND-Maske, 1 Bit je Pixel, Zeilen auf 4 Byte aufgefüllt
+	mask := (n + 31) / 32 * 4 // AND mask, 1 bit per pixel, rows padded to 4 bytes
 	for y := n - 1; y >= 0; y-- {
 		row := make([]byte, mask)
 		for x := 0; x < n; x++ {
@@ -290,7 +290,7 @@ func IconImage(n int) []byte {
 	return b.Bytes()
 }
 
-// ICO liefert eine .ico-Datei mit allen IconSizes.
+// ICO returns an .ico file with all IconSizes.
 func ICO() []byte {
 	le := binary.LittleEndian
 	var head, data bytes.Buffer
@@ -298,7 +298,7 @@ func ICO() []byte {
 	off := 6 + 16*len(IconSizes)
 	for _, n := range IconSizes {
 		img := IconImage(n)
-		head.Write([]byte{byte(n), byte(n), 0, 0}) // 256 wird als 0 geschrieben
+		head.Write([]byte{byte(n), byte(n), 0, 0}) // 256 is written as 0
 		binary.Write(&head, le, [2]uint16{1, 32})
 		binary.Write(&head, le, [2]uint32{uint32(len(img)), uint32(off + data.Len())})
 		data.Write(img)

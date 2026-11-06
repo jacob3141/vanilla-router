@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-// vr-sign erzeugt Schlüssel und signierte Manifeste für Stick-Abbilder (F-STICK-04, PLAN.md 3.12).
-// Der private Schlüssel gehört auf einen Rechner ohne Netz (Q-19), nie ins Repo.
+// vr-sign creates keys and signed manifests for stick images (F-STICK-04, PLAN.md 3.12).
+// The private key belongs on a computer without network access (Q-19), never in the repo.
 //
 //	vr-sign keygen -o stick.key
 //	vr-sign manifest -key stick.key -image dist/vanilla-router-stick.raw -version 0.1.0 -gzip -o dist/release
@@ -48,16 +48,16 @@ func main() {
 }
 
 func usage() {
-	fmt.Fprintln(os.Stderr, "Aufruf: vr-sign keygen|manifest|verify … (siehe Kopf von cmd/vr-sign/main.go)")
+	fmt.Fprintln(os.Stderr, "Usage: vr-sign keygen|manifest|verify … (see the top of cmd/vr-sign/main.go)")
 	os.Exit(2)
 }
 
 func keygen(args []string) error {
 	fs := flag.NewFlagSet("keygen", flag.ExitOnError)
-	out := fs.String("o", "", "Datei für den privaten Schlüssel")
+	out := fs.String("o", "", "file for the private key")
 	fs.Parse(args)
 	if *out == "" {
-		return fmt.Errorf("-o fehlt")
+		return fmt.Errorf("-o is missing")
 	}
 	seed := make([]byte, 32)
 	if _, err := rand.Read(seed); err != nil {
@@ -85,7 +85,7 @@ func readSeed(path string) ([]byte, error) {
 	}
 	seed, err := base64.StdEncoding.DecodeString(strings.TrimSpace(string(b)))
 	if err != nil || len(seed) != 32 {
-		return nil, fmt.Errorf("%s: kein gültiger Schlüssel", path)
+		return nil, fmt.Errorf("%s: not a valid key", path)
 	}
 	return seed, nil
 }
@@ -103,16 +103,16 @@ func sumFile(path string) (int64, string, error) {
 
 func makeManifest(args []string) error {
 	fs := flag.NewFlagSet("manifest", flag.ExitOnError)
-	key := fs.String("key", "", "privater Schlüssel (keygen)")
-	img := fs.String("image", "", "Abbild (roh)")
+	key := fs.String("key", "", "private key (keygen)")
+	img := fs.String("image", "", "image (raw)")
 	ver := fs.String("version", "", "Version")
 	name := fs.String("name", "vanilla-router-stick", "Name")
-	url := fs.String("url", "", "Adresse der Datei (leer: neben dem Manifest)")
-	gz := fs.Bool("gzip", false, "Datei mit gzip packen")
-	out := fs.String("o", "", "Ausgabeordner")
+	url := fs.String("url", "", "URL of the file (empty: next to the manifest)")
+	gz := fs.Bool("gzip", false, "compress the file with gzip")
+	out := fs.String("o", "", "output folder")
 	fs.Parse(args)
 	if *key == "" || *img == "" || *ver == "" || *out == "" {
-		return fmt.Errorf("-key, -image, -version und -o sind nötig")
+		return fmt.Errorf("-key, -image, -version and -o are required")
 	}
 	seed, err := readSeed(*key)
 	if err != nil {
@@ -170,7 +170,7 @@ func makeManifest(args []string) error {
 	if err := os.WriteFile(filepath.Join(*out, "manifest.json.sig"), sig, 0o644); err != nil {
 		return err
 	}
-	fmt.Printf("%s: %s, stick.json bei %d, Schlüssel %s\n", *out, fileName, off, manifest.Public(seed))
+	fmt.Printf("%s: %s, stick.json at %d, key %s\n", *out, fileName, off, manifest.Public(seed))
 	return nil
 }
 
@@ -215,10 +215,10 @@ func copyFile(src, dst string) error {
 
 func verify(args []string) error {
 	fs := flag.NewFlagSet("verify", flag.ExitOnError)
-	pub := fs.String("pub", "", "öffentlicher Schlüssel (base64)")
+	pub := fs.String("pub", "", "public key (base64)")
 	fs.Parse(args)
 	if *pub == "" || fs.NArg() != 1 {
-		return fmt.Errorf("Aufruf: verify -pub <schlüssel> manifest.json")
+		return fmt.Errorf("Usage: verify -pub <key> manifest.json")
 	}
 	data, err := os.ReadFile(fs.Arg(0))
 	if err != nil {
@@ -232,6 +232,6 @@ func verify(args []string) error {
 	if err != nil {
 		return err
 	}
-	fmt.Printf("gültig: %s %s, %s (%d Bytes)\n", m.Name, m.Version, m.File.Name, m.File.Size)
+	fmt.Printf("valid: %s %s, %s (%d bytes)\n", m.Name, m.Version, m.File.Name, m.File.Size)
 	return nil
 }

@@ -11,16 +11,16 @@ func TestTimezone(t *testing.T) {
 		"GMT Standard Time":            "Europe/London",
 		"Pacific Standard Time":        "America/Los_Angeles",
 		"UTC":                          "Etc/UTC",
-		"Unbekannte Zone":              "",
+		"unknown zone":                 "",
 		"":                             "",
 		"Central Europe Standard Time": "Europe/Budapest",
 	} {
 		if got := Timezone(win); got != want {
-			t.Errorf("Timezone(%q) = %q, erwartet %q", win, got, want)
+			t.Errorf("Timezone(%q) = %q, expected %q", win, got, want)
 		}
 	}
 	if n := len(zones); n < 100 {
-		t.Fatalf("nur %d Zonen geladen", n)
+		t.Fatalf("only %d zones loaded", n)
 	}
 }
 
@@ -30,7 +30,7 @@ func TestLocale(t *testing.T) {
 		"sr-Latn-RS": "sr_RS.UTF-8", "de": "", "x; rm": "", "": "", "de-de": "",
 	} {
 		if got := Locale(win); got != want {
-			t.Errorf("Locale(%q) = %q, erwartet %q", win, got, want)
+			t.Errorf("Locale(%q) = %q, expected %q", win, got, want)
 		}
 	}
 }
@@ -41,7 +41,7 @@ func TestKeymap(t *testing.T) {
 		"00010409": "", "0407": "", "0000040g": "", "00000999": "",
 	} {
 		if got := Keymap(klid); got != want {
-			t.Errorf("Keymap(%q) = %q, erwartet %q", klid, got, want)
+			t.Errorf("Keymap(%q) = %q, expected %q", klid, got, want)
 		}
 	}
 }

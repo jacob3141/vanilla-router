@@ -1,0 +1,19 @@
+#!/bin/sh
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Runs after mkosi's presets, which would otherwise turn all the package's services back on.
+set -e
+# Fail the build, not the user's installation, if the installer lacks a tool (internal/install).
+for tool in blkid btrfs chroot mkfs.btrfs mkfs.vfat mount sfdisk sync systemctl tar udevadm umount wipefs zstd; do
+	command -v "$tool" >/dev/null || { echo "stick image lacks $tool" >&2; exit 1; }
+done
+# With an empty machine-id, systemd treats every start as the first boot and tries to apply presets on
+# the read-only stick, which fills the console with errors.
+tr -d - </proc/sys/kernel/random/uuid >/etc/machine-id
+systemctl enable vr-installer.service
+systemctl mask getty@tty1.service
+# No network services should run on the stick: the assistant turns the ports on itself.
+for unit in systemd-networkd.service systemd-networkd.socket ssh.service ssh.socket \
+	vr-firewall.service vr-firewall-reload.timer vr-dnsmasq.service vr-pppoe.service \
+	vr-webui.service vr-webui-helper.service vr-health.service; do
+	systemctl disable "$unit" 2>/dev/null || true
+done

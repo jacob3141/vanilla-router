@@ -8,7 +8,7 @@ import (
 	"syscall"
 )
 
-// PeerListener nimmt nur Verbindungen der erlaubten UID an (SO_PEERCRED) und schließt alle anderen.
+// PeerListener only accepts connections from the allowed UID (SO_PEERCRED) and closes all others.
 type PeerListener struct {
 	*net.UnixListener
 	AllowUID int
@@ -32,7 +32,7 @@ func (l *PeerListener) Accept() (net.Conn, error) {
 		if uid == l.AllowUID {
 			return c, nil
 		}
-		l.Log.Warn("verbindung abgelehnt", "uid", uid)
+		l.Log.Warn("connection rejected", "uid", uid)
 		c.Close()
 	}
 }

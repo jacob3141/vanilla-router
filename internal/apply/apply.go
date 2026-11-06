@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-// Package apply spielt erzeugte Dateien ein (PLAN.md 3.3, P-05):
+// Package apply applies generated files (PLAN.md 3.3, P-05):
 //
-//	erzeugen → vergleichen → im Staging prüfen (nft -c, dnsmasq --test) → alte Fassung sichern →
-//	atomar ersetzen → gezielt neu laden → Gesundheitsprüfung → bei Fehler alte Fassung zurück.
+//	generate → compare → check in staging (nft -c, dnsmasq --test) → back up the old version →
+//	replace atomically → reload selectively → health check → on failure restore the old version.
 //
-// Netzwerk- und Firewall-Änderungen können zusätzlich eine Bestätigung verlangen: Ohne
-// `vrctl confirm` nimmt ein systemd-Timer die Änderung nach Ablauf der Frist zurück. Der Timer
-// läuft unabhängig von diesem Prozess, auch wenn die Oberfläche oder die SSH-Sitzung abreißt.
+// Network and firewall changes can also require confirmation: without
+// `vrctl confirm`, a systemd timer rolls the change back when the deadline expires. The timer
+// runs independently of this process, even if the web interface or SSH session drops.
 package apply
 
 import (
@@ -27,50 +27,50 @@ import (
 	"vanilla-router/internal/gen"
 )
 
-// GroupConfig ist config.json selbst. Sie wird mit gesichert und zurückgenommen.
+// GroupConfig is config.json itself. It is backed up and rolled back too.
 const GroupConfig = "config"
 
-// Runner führt Programme aus. In Tests ersetzt.
+// Runner runs programs. Replaced in tests.
 type Runner interface {
 	Run(env []string, name string, args ...string) ([]byte, error)
 }
 
-// Applier spielt Konfigurationen ein.
+// Applier applies configurations.
 type Applier struct {
-	Root     string // Wurzel des Dateisystems, "/" im Betrieb, ein Testordner in Tests
-	StateDir string // /var/lib/vanilla-router (relativ zu Root)
+	Root     string // filesystem root, "/" in production, a test folder in tests
+	StateDir string // /var/lib/vanilla-router (relative to Root)
 	Run      Runner
 	Now      func() time.Time
 	Log      io.Writer
-	// HealthTimeout begrenzt die Gesundheitsprüfung. Vorgabe 15 s.
+	// HealthTimeout limits the health check. Default 15 s.
 	HealthTimeout time.Duration
-	// Sleep zwischen zwei Versuchen der Gesundheitsprüfung (in Tests ersetzt).
+	// Sleep between two health check attempts (replaced in tests).
 	Sleep func(time.Duration)
-	// SkipHealth lässt die Gesundheitsprüfung aus (Probelauf der Testinstanz, dort wird nichts geladen).
+	// SkipHealth skips the health check (dry run of the test instance, nothing is loaded there).
 	SkipHealth bool
 }
 
-// Options für Apply.
+// Options for Apply.
 type Options struct {
-	DryRun  bool          // nur prüfen und anzeigen, nichts ändern
-	Confirm time.Duration // > 0: ohne Bestätigung nach dieser Zeit zurücknehmen
-	Self    string        // Pfad von vrctl für den Rücknahme-Timer, Vorgabe /usr/sbin/vrctl
+	DryRun  bool          // only check and show, change nothing
+	Confirm time.Duration // > 0: roll back after this time without confirmation
+	Self    string        // path of vrctl for the rollback timer, default /usr/sbin/vrctl
 }
 
-// Change ist eine geplante Änderung.
+// Change is a planned change.
 type Change struct {
 	Path   string
 	Group  string
 	Action string // create, update, remove
 }
 
-// Result beschreibt, was passiert ist.
+// Result describes what happened.
 type Result struct {
 	Changes      []Change
-	Generation   string // Kennung der Sicherung, leer wenn nichts geändert wurde
+	Generation   string // ID of the backup, empty if nothing changed
 	Reloaded     []string
-	RebootNeeded bool // .link-Dateien geändert: Namen der Ports gelten erst nach einem Neustart
-	Pending      bool // wartet auf Bestätigung
+	RebootNeeded bool // .link files changed: port names only take effect after a restart
+	Pending      bool // waiting for confirmation
 	Deadline     time.Time
 }
 
@@ -89,7 +89,7 @@ func (a *Applier) stateDir() string {
 	return a.StateDir
 }
 
-// Plan vergleicht die erzeugten Dateien mit dem System.
+// Plan compares the generated files with the system.
 func (a *Applier) Plan(files []gen.File) ([]Change, error) {
 	var ch []Change
 	want := map[string]bool{}
@@ -130,10 +130,10 @@ func (a *Applier) Plan(files []gen.File) ([]Change, error) {
 	return ch, nil
 }
 
-// Apply erzeugt, prüft und spielt die Konfiguration ein. config.json wird mitgeschrieben.
+// Apply generates, checks and applies the configuration. config.json is written as well.
 func (a *Applier) Apply(c *config.Config, sec gen.Secrets, opt Options) (*Result, error) {
 	if pend, _ := a.readPending(); pend != nil {
-		return nil, fmt.Errorf("Eine Änderung vom %s wartet noch auf Bestätigung (vrctl confirm oder vrctl rollback)", pend.Created.Format("15:04:05"))
+		return nil, fmt.Errorf("A change from %s is still waiting for confirmation (vrctl confirm or vrctl rollback)", pend.Created.Format("15:04:05"))
 	}
 	files, err := gen.Render(c, sec)
 	if err != nil {
@@ -151,7 +151,7 @@ func (a *Applier) Apply(c *config.Config, sec gen.Secrets, opt Options) (*Result
 	}
 	res := &Result{Changes: changes}
 	if len(changes) == 0 {
-		a.logf("Keine Änderungen.")
+		a.logf("No changes.")
 		return res, nil
 	}
 	byPath := map[string]gen.File{}
@@ -168,11 +168,11 @@ func (a *Applier) Apply(c *config.Config, sec gen.Secrets, opt Options) (*Result
 	old := a.current()
 	genID, err := a.backup(changes)
 	if err != nil {
-		return nil, fmt.Errorf("Sicherung der alten Fassung: %w", err)
+		return nil, fmt.Errorf("backup of the old version: %w", err)
 	}
 	res.Generation = genID
 	if err := a.install(changes, byPath); err != nil {
-		a.logf("Einspielen fehlgeschlagen (%v), nehme zurück …", err)
+		a.logf("applying failed (%v), rolling back …", err)
 		return nil, errors.Join(err, a.restore(genID))
 	}
 	groups := changedGroups(changes)
@@ -184,12 +184,12 @@ func (a *Applier) Apply(c *config.Config, sec gen.Secrets, opt Options) (*Result
 		err = a.health(groups, c)
 	}
 	if err != nil {
-		a.logf("Fehler nach dem Einspielen: %v. Nehme zurück …", err)
+		a.logf("error after applying: %v. Rolling back …", err)
 		return nil, errors.Join(err, a.restore(genID))
 	}
 	if opt.Confirm > 0 && (groups[gen.GroupNetworkd] || groups[gen.GroupFirewall] || groups[gen.GroupPPP]) {
 		if err := a.schedule(genID, opt); err != nil {
-			a.logf("Rücknahme-Timer nicht gestartet (%v), nehme sofort zurück …", err)
+			a.logf("rollback timer not started (%v), rolling back immediately …", err)
 			return nil, errors.Join(err, a.restore(genID))
 		}
 		res.Pending = true
@@ -214,7 +214,7 @@ func changedGroups(ch []Change) map[string]bool {
 	return g
 }
 
-// check prüft geänderte Dateien mit den Werkzeugen der Dienste, bevor etwas ersetzt wird.
+// check validates changed files with the services' own tools before anything is replaced.
 func (a *Applier) check(files []gen.File, changes []Change, c *config.Config) error {
 	groups := changedGroups(changes)
 	stage, err := os.MkdirTemp("", "vr-stage-")
@@ -233,11 +233,11 @@ func (a *Applier) check(files []gen.File, changes []Change, c *config.Config) er
 		switch {
 		case f.Group == gen.GroupFirewall && groups[gen.GroupFirewall]:
 			if out, err := a.Run.Run(tzEnv(c), "nft", "-c", "-f", dst); err != nil {
-				return fmt.Errorf("Firewall-Regeln abgelehnt (nft -c): %v %s", err, strings.TrimSpace(string(out)))
+				return fmt.Errorf("firewall rules rejected (nft -c): %v %s", err, strings.TrimSpace(string(out)))
 			}
 		case f.Group == gen.GroupDNSmasq && groups[gen.GroupDNSmasq]:
 			if out, err := a.Run.Run(nil, "dnsmasq", "--test", "--conf-file="+dst); err != nil {
-				return fmt.Errorf("dnsmasq-Konfiguration abgelehnt: %v %s", err, strings.TrimSpace(string(out)))
+				return fmt.Errorf("dnsmasq configuration rejected: %v %s", err, strings.TrimSpace(string(out)))
 			}
 		}
 	}
@@ -246,7 +246,7 @@ func (a *Applier) check(files []gen.File, changes []Change, c *config.Config) er
 
 func tzEnv(c *config.Config) []string { return []string{"TZ=" + c.System.Timezone} }
 
-// manifest beschreibt eine Sicherung.
+// manifest describes a backup.
 type manifest struct {
 	Created time.Time       `json:"created"`
 	Entries []manifestEntry `json:"entries"`
@@ -261,7 +261,7 @@ type manifestEntry struct {
 
 func (a *Applier) genDir(id string) string { return a.p(path.Join(a.stateDir(), "generations", id)) }
 
-// backup sichert den alten Stand aller betroffenen Dateien.
+// backup saves the old state of all affected files.
 func (a *Applier) backup(changes []Change) (string, error) {
 	id := a.now().UTC().Format("20060102T150405.000000000Z")
 	dir := a.genDir(id)
@@ -301,24 +301,24 @@ func (a *Applier) install(changes []Change, files map[string]gen.File) error {
 			if err := os.Remove(a.p(c.Path)); err != nil && !errors.Is(err, os.ErrNotExist) {
 				return err
 			}
-			a.logf("  entfernt  %s", c.Path)
+			a.logf("  removed  %s", c.Path)
 		default:
 			f := files[c.Path]
 			if err := config.WriteFileAtomic(a.p(f.Path), f.Content, os.FileMode(f.Mode)); err != nil {
 				return err
 			}
-			a.logf("  %-8s  %s", map[string]string{"create": "neu", "update": "geändert"}[c.Action], c.Path)
+			a.logf("  %-8s  %s", map[string]string{"create": "new", "update": "changed"}[c.Action], c.Path)
 		}
 	}
 	return nil
 }
 
-// restore spielt eine Sicherung zurück und lädt die betroffenen Dienste neu.
+// restore puts a backup back and reloads the affected services.
 func (a *Applier) restore(id string) error {
 	dir := a.genDir(id)
 	b, err := os.ReadFile(filepath.Join(dir, "manifest.json"))
 	if err != nil {
-		return fmt.Errorf("Sicherung %s nicht lesbar: %w", id, err)
+		return fmt.Errorf("backup %s not readable: %w", id, err)
 	}
 	var m manifest
 	if err := json.Unmarshal(b, &m); err != nil {
@@ -343,7 +343,7 @@ func (a *Applier) restore(id string) error {
 			errs = append(errs, err)
 		}
 	}
-	// Mit der zurückgespielten Konfiguration neu laden (Zeitzone für die Sperren).
+	// Reload with the restored configuration (time zone for the blocks).
 	c := a.current()
 	if c != nil {
 		if err := a.system(before, c, groups); err != nil {
@@ -354,14 +354,14 @@ func (a *Applier) restore(id string) error {
 		errs = append(errs, err)
 	}
 	if err := errors.Join(errs...); err != nil {
-		return fmt.Errorf("Rücknahme unvollständig: %w", err)
+		return fmt.Errorf("rollback incomplete: %w", err)
 	}
-	a.logf("Alte Fassung (%s) wiederhergestellt.", id)
+	a.logf("Old version (%s) restored.", id)
 	return nil
 }
 
-// reload lädt die Dienste der geänderten Gruppen in sinnvoller Reihenfolge neu.
-// c darf nil sein (Rücknahme ohne lesbare Konfiguration), dann gelten Vorgaben.
+// reload reloads the services of the changed groups in a sensible order.
+// c may be nil (rollback without a readable configuration), then the defaults apply.
 func (a *Applier) reload(groups map[string]bool, c *config.Config) ([]string, error) {
 	var done []string
 	var errs []error
@@ -412,7 +412,7 @@ func (a *Applier) reload(groups map[string]bool, c *config.Config) ([]string, er
 	return dedup(done), errors.Join(errs...)
 }
 
-// current liest die eingespielte config.json, nil wenn sie fehlt oder ungültig ist.
+// current reads the applied config.json, nil if it is missing or invalid.
 func (a *Applier) current() *config.Config {
 	c, err := config.Load(a.p(config.Path))
 	if err != nil {
@@ -421,10 +421,10 @@ func (a *Applier) current() *config.Config {
 	return c
 }
 
-// system übernimmt Einstellungen, die nicht in erzeugten Dateien stehen: Hostname und Zeitzone des
-// Systems. Ändern sich Name oder Adresse des Routers, startet die Weboberfläche kurz danach neu
-// (neues Zertifikat, neue Adresse). Eine geänderte Zeitzone lädt die Firewall neu, weil die
-// Zeitsperren in Ortszeit gelten. old darf nil sein (erste Einrichtung).
+// system takes over settings that are not in generated files: host name and time zone of the
+// system. If the router's name or address changes, the web interface restarts shortly afterwards
+// (new certificate, new address). A changed time zone reloads the firewall, because the
+// time-based blocks apply in local time. old may be nil (first setup).
 func (a *Applier) system(old, c *config.Config, groups map[string]bool) error {
 	if old == nil {
 		return nil
@@ -445,9 +445,9 @@ func (a *Applier) system(old, c *config.Config, groups map[string]bool) error {
 	pppoe := func(x *config.Config) bool { return x.WAN.Type == config.WANPPPoE }
 	if old.System.Hostname != c.System.Hostname || old.DNS.Domain != c.DNS.Domain || old.LAN.IPv4 != c.LAN.IPv4 ||
 		pppoe(old) != pppoe(c) {
-		// Neues Zertifikat, neue Adresse oder anderes Uplink-Interface (wan0/ppp0) für die Statistik.
-		// Verzögert, damit die Antwort an den Browser noch rausgeht. try-restart: läuft die
-		// Oberfläche nicht, bleibt sie aus.
+		// New certificate, new address or a different uplink interface (wan0/ppp0) for the statistics.
+		// Delayed, so the response to the browser still goes out. try-restart: if the
+		// web interface is not running, it stays off.
 		run("systemd-run", "--on-active=3s", "--timer-property=AccuracySec=1s",
 			"systemctl", "try-restart", "vr-webui.service")
 	}
@@ -464,8 +464,8 @@ func dedup(s []string) []string {
 	return out
 }
 
-// health prüft nach dem Einspielen, ob das Heimnetz noch funktioniert. Das Internet wird bewusst
-// nicht geprüft: Ein ausgefallenes Modem soll keine Rücknahme auslösen.
+// health checks after applying whether the home network still works. The internet is deliberately
+// not checked: a failed modem should not trigger a rollback.
 func (a *Applier) health(groups map[string]bool, c *config.Config) error {
 	timeout := a.HealthTimeout
 	if timeout == 0 {
@@ -486,7 +486,7 @@ func (a *Applier) health(groups map[string]bool, c *config.Config) error {
 		checks = append(checks, func() error {
 			_, err := a.Run.Run(nil, "systemctl", "is-active", "--quiet", "vr-dnsmasq.service")
 			if err != nil {
-				return fmt.Errorf("DNS/DHCP-Dienst läuft nicht")
+				return fmt.Errorf("DNS/DHCP service is not running")
 			}
 			return nil
 		})
@@ -495,7 +495,7 @@ func (a *Applier) health(groups map[string]bool, c *config.Config) error {
 		checks = append(checks, func() error {
 			out, err := a.Run.Run(nil, "ip", "-4", "-o", "addr", "show", "dev", gen.LANIf)
 			if err != nil || !strings.Contains(string(out), c.LAN.IPv4) {
-				return fmt.Errorf("Heimnetz-Adresse %s fehlt an %s", c.LAN.IPv4, gen.LANIf)
+				return fmt.Errorf("home network address %s is missing on %s", c.LAN.IPv4, gen.LANIf)
 			}
 			return nil
 		})
@@ -513,13 +513,13 @@ func (a *Applier) health(groups map[string]bool, c *config.Config) error {
 			return nil
 		}
 		if !a.now().Before(deadline) {
-			return fmt.Errorf("Gesundheitsprüfung: %w", failed)
+			return fmt.Errorf("health check: %w", failed)
 		}
 		sleep(time.Second)
 	}
 }
 
-// pending ist eine noch nicht bestätigte Änderung.
+// pending is a change that has not been confirmed yet.
 type pending struct {
 	Generation string    `json:"generation"`
 	Created    time.Time `json:"created"`
@@ -541,7 +541,7 @@ func (a *Applier) readPending() (*pending, error) {
 	return &p, nil
 }
 
-// Pending liefert eine wartende Änderung oder nil.
+// Pending returns a waiting change or nil.
 func (a *Applier) Pending() *pending {
 	p, _ := a.readPending()
 	return p
@@ -564,30 +564,30 @@ func (a *Applier) schedule(genID string, opt Options) error {
 		os.Remove(a.pendingPath())
 		return fmt.Errorf("%v %s", err, strings.TrimSpace(string(out)))
 	}
-	a.logf("Bitte innerhalb von %s bestätigen (vrctl confirm), sonst wird die Änderung zurückgenommen.", secs)
+	a.logf("Please confirm within %s (vrctl confirm), otherwise the change is rolled back.", secs)
 	return nil
 }
 
-// Confirm bestätigt eine wartende Änderung.
+// Confirm confirms a waiting change.
 func (a *Applier) Confirm() error {
 	p, err := a.readPending()
 	if err != nil {
-		return fmt.Errorf("Keine Änderung wartet auf Bestätigung")
+		return fmt.Errorf("No change is waiting for confirmation")
 	}
 	a.Run.Run(nil, "systemctl", "stop", p.Unit+".timer")
 	if err := os.Remove(a.pendingPath()); err != nil {
 		return err
 	}
-	a.logf("Änderung bestätigt.")
+	a.logf("Change confirmed.")
 	return nil
 }
 
-// RollbackPending nimmt die wartende Änderung zurück, wenn sie zu genID gehört (Aufruf durch den
-// Timer). Ist sie schon bestätigt, passiert nichts.
+// RollbackPending rolls back the waiting change if it belongs to genID (called by the
+// timer). If it has already been confirmed, nothing happens.
 func (a *Applier) RollbackPending(genID string) error {
 	p, err := a.readPending()
 	if err != nil || p.Generation != genID {
-		a.logf("Nichts zurückzunehmen (schon bestätigt).")
+		a.logf("Nothing to roll back (already confirmed).")
 		return nil
 	}
 	err = a.restore(genID)
@@ -595,7 +595,7 @@ func (a *Applier) RollbackPending(genID string) error {
 	return err
 }
 
-// RollbackLast nimmt die zuletzt eingespielte Änderung zurück (manuell).
+// RollbackLast rolls back the most recently applied change (manually).
 func (a *Applier) RollbackLast() error {
 	if p, err := a.readPending(); err == nil {
 		a.Run.Run(nil, "systemctl", "stop", p.Unit+".timer")
@@ -605,16 +605,16 @@ func (a *Applier) RollbackLast() error {
 	}
 	gens, err := a.Generations()
 	if err != nil || len(gens) == 0 {
-		return fmt.Errorf("Keine Sicherung vorhanden")
+		return fmt.Errorf("No backup available")
 	}
 	last := gens[len(gens)-1]
 	if err := a.restore(last); err != nil {
 		return err
 	}
-	return os.RemoveAll(a.genDir(last)) // dieselbe Sicherung nicht zweimal zurückspielen
+	return os.RemoveAll(a.genDir(last)) // do not restore the same backup twice
 }
 
-// Generations listet die Sicherungen, älteste zuerst.
+// Generations lists the backups, oldest first.
 func (a *Applier) Generations() ([]string, error) {
 	ents, err := os.ReadDir(a.p(path.Join(a.stateDir(), "generations")))
 	if err != nil {

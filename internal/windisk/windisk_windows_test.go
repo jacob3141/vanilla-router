@@ -4,7 +4,7 @@ package windisk
 
 import "testing"
 
-// TestList läuft nur unter Windows und liest nur (keine Administratorrechte nötig).
+// TestList only runs on Windows and only reads (no administrator rights needed).
 func TestList(t *testing.T) {
 	disks, err := List()
 	if err != nil {
@@ -12,16 +12,16 @@ func TestList(t *testing.T) {
 	}
 	prot := protectedDisks()
 	if len(prot) == 0 {
-		t.Error("Systemlaufwerk nicht erkannt")
+		t.Error("system drive not recognized")
 	}
-	t.Logf("geschützt: %v", prot)
+	t.Logf("protected: %v", prot)
 	for _, d := range disks {
 		if prot[d.Number] {
-			t.Errorf("geschützter Datenträger in der Liste: %+v", d)
+			t.Errorf("protected disk in the list: %+v", d)
 		}
 		if d.Size <= 0 || d.Sector < 512 {
 			t.Errorf("%+v", d)
 		}
-		t.Logf("USB: %d %q %d Bytes, Sektor %d, %v", d.Number, d.Name(), d.Size, d.Sector, d.Letters)
+		t.Logf("USB: %d %q %d bytes, sector %d, %v", d.Number, d.Name(), d.Size, d.Sector, d.Letters)
 	}
 }

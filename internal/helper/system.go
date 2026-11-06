@@ -16,21 +16,21 @@ import (
 )
 
 const (
-	AuditScript   = "/usr/lib/vanilla-router/audit-collect.sh" // Erweiterung, siehe api.AuditScript
+	AuditScript   = "/usr/lib/vanilla-router/audit-collect.sh" // extension, see api.AuditScript
 	AuditLastFile = "/var/lib/vanilla-router/audit-last.json"
 	updateUnit    = "vr-update"
 )
 
 var hostRe = regexp.MustCompile(`^[a-zA-Z0-9]([a-zA-Z0-9-]{0,62})(\.[a-zA-Z0-9]([a-zA-Z0-9-]{0,62}))*\.?$`)
 
-// validTarget lässt nur IP-Adressen und Hostnamen zu, nie etwas, das wie eine Option aussieht.
+// validTarget only allows IP addresses and host names, never anything that looks like an option.
 func validTarget(s string) (string, error) {
 	s = strings.TrimSpace(s)
 	if a, err := netip.ParseAddr(s); err == nil {
 		return a.String(), nil
 	}
 	if len(s) > 253 || !hostRe.MatchString(s) {
-		return "", Userf("„%s“ ist weder eine IP-Adresse noch ein gültiger Hostname.", s)
+		return "", Userf("\"%s\" is neither an IP address nor a valid host name.", s)
 	}
 	return s, nil
 }
@@ -57,7 +57,7 @@ func (s *Server) registerSystem() {
 	s.handle("system.updates.get", func(ctx context.Context, _ json.RawMessage) (any, error) {
 		out, _ := run(ctx, "apt-get", "-s", "-o", "Debug::NoLocking=1", "upgrade", "--with-new-pkgs")
 		var ups []Update
-		// Inst paket [alt] (neu quelle [arch])
+		// Inst package [old] (new source [arch])
 		re := regexp.MustCompile(`^Inst (\S+) (?:\[(\S+)\] )?\((\S+) ([^)]*)\)`)
 		for _, line := range strings.Split(out, "\n") {
 			if m := re.FindStringSubmatch(line); m != nil {
@@ -87,15 +87,15 @@ func (s *Server) registerSystem() {
 
 	s.handle("system.update.start", func(ctx context.Context, _ json.RawMessage) (any, error) {
 		if st, _ := run(ctx, "systemctl", "is-active", updateUnit); strings.TrimSpace(st) == "active" || strings.TrimSpace(st) == "activating" {
-			return nil, Userf("Es läuft bereits eine Aktualisierung.")
+			return nil, Userf("An update is already running.")
 		}
 		run(ctx, "systemctl", "reset-failed", updateUnit+".service")
 		if s.cfg.DryRun {
-			s.cfg.Log.Info("probelauf: update übersprungen")
+			s.cfg.Log.Info("dry run: update skipped")
 			return nil, nil
 		}
-		// Feste Befehlszeile ohne Benutzereingaben; lokale Konfigurationen bleiben bei Konflikten erhalten
-		_, err := run(ctx, "systemd-run", "--unit="+updateUnit, "--description=Updates aus der Weboberfläche",
+		// Fixed command line without user input; local configurations stay on conflicts
+		_, err := run(ctx, "systemd-run", "--unit="+updateUnit, "--description=Updates from the web interface",
 			"--setenv=DEBIAN_FRONTEND=noninteractive", "/bin/sh", "-c",
 			"apt-get update && apt-get -y -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold upgrade --with-new-pkgs")
 		return nil, err
@@ -115,10 +115,10 @@ func (s *Server) registerSystem() {
 			return nil, err
 		}
 		if p.Action != "reboot" && p.Action != "poweroff" {
-			return nil, Userf("Unbekannte Aktion %q.", p.Action)
+			return nil, Userf("Unknown action %q.", p.Action)
 		}
-		s.cfg.Log.Warn("system: " + p.Action + " aus der weboberfläche")
-		// Verzögert, damit die Antwort noch beim Browser ankommt
+		s.cfg.Log.Warn("system: " + p.Action + " from the web interface")
+		// Delayed, so the response still reaches the browser
 		return nil, s.apply(ctx, "systemd-run", "--on-active=3", "--unit=vr-power", "/usr/bin/systemctl", p.Action)
 	})
 
@@ -137,7 +137,7 @@ func (s *Server) registerSystem() {
 		return r, json.Unmarshal(b, &r)
 	})
 
-	// Das Audit liest nur, deshalb läuft es auch in der Testinstanz echt
+	// The audit only reads, which is why it really runs in the test instance too
 	s.handle("system.audit.run", func(ctx context.Context, _ json.RawMessage) (any, error) {
 		ctx, cancel := context.WithTimeout(ctx, 3*time.Minute)
 		defer cancel()
@@ -219,7 +219,7 @@ func (s *Server) registerSystem() {
 		switch typ {
 		case "A", "AAAA", "MX", "TXT", "NS", "CNAME", "PTR", "SOA", "SRV":
 		default:
-			return nil, Userf("Abfragetyp %q wird nicht unterstützt.", p.Type)
+			return nil, Userf("Query type %q is not supported.", p.Type)
 		}
 		server := "127.0.0.1"
 		if c, err := s.loadConfig(); err == nil {
@@ -229,14 +229,14 @@ func (s *Server) registerSystem() {
 		if p.Server != "" {
 			a, err := netip.ParseAddr(p.Server)
 			if err != nil {
-				return nil, Userf("Der DNS-Server muss als IP-Adresse angegeben werden.")
+				return nil, Userf("The DNS server must be given as an IP address.")
 			}
 			server = a.String()
 		}
 		args := []string{"+time=3", "+tries=1", "@" + server}
 		if typ == "PTR" {
 			if _, err := netip.ParseAddr(t); err != nil {
-				return nil, Userf("Für PTR bitte eine IP-Adresse angeben.")
+				return nil, Userf("For PTR please give an IP address.")
 			}
 			args = append(args, "-x", t)
 		} else {

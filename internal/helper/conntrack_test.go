@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-// attr baut ein Netlink-Attribut (Typ, Inhalt), auf 4 Byte aufgefüllt.
+// attr builds a netlink attribute (type, content), padded to 4 bytes.
 func attr(typ uint16, data []byte, nested bool) []byte {
 	l := 4 + len(data)
 	b := make([]byte, (l+3)&^3)
@@ -39,7 +39,7 @@ func tupleAttr(typ uint16, src, dst []byte, proto uint8, sport, dport uint16) []
 }
 
 func TestParseCTMessage(t *testing.T) {
-	// Portweiterleitung: von außen auf 198.51.100.178:8080, Antwort von 192.168.42.20:80
+	// Port forward: from outside to 198.51.100.178:8080, response from 192.168.42.20:80
 	msg := cat([]byte{2, 0, 0, 0}, // nfgenmsg: AF_INET
 		tupleAttr(ctaTupleOrig, []byte{203, 0, 113, 5}, []byte{198, 51, 100, 178}, 6, 51000, 8080),
 		tupleAttr(ctaTupleReply, []byte{192, 168, 42, 20}, []byte{203, 0, 113, 5}, 6, 80, 51000),
@@ -49,7 +49,7 @@ func TestParseCTMessage(t *testing.T) {
 	)
 	c, ok := parseCTMessage(msg)
 	if !ok {
-		t.Fatal("nicht gelesen")
+		t.Fatal("not read")
 	}
 	want := Conn{Proto: "tcp", Src: "203.0.113.5", Dst: "198.51.100.178", SrcPort: 51000, DstPort: 8080,
 		ReplySrc: "192.168.42.20", State: "ESTABLISHED", Timeout: 431990, DNAT: true, Assured: true}
@@ -57,8 +57,8 @@ func TestParseCTMessage(t *testing.T) {
 		t.Errorf("\n got %+v\nwant %+v", c, want)
 	}
 	if _, ok := parseCTMessage([]byte{2, 0}); ok {
-		t.Error("kaputte Nachricht akzeptiert")
+		t.Error("broken message accepted")
 	}
-	// abgeschnittenes Attribut darf nicht abstürzen
+	// a truncated attribute must not crash
 	parseCTMessage(cat([]byte{2, 0, 0, 0}, []byte{0xff, 0x00, 0x01, 0x80, 1, 2}))
 }

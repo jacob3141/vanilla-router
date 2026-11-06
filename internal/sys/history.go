@@ -10,9 +10,9 @@ import (
 	"time"
 )
 
-// Point ist ein Minutenmittel. Raten in Byte pro Sekunde, CPU und RAM in Prozent.
+// Point is a one-minute average. Rates in bytes per second, CPU and RAM in percent.
 type Point struct {
-	T     int64   `json:"t"` // Unix-Sekunden, Beginn der Minute
+	T     int64   `json:"t"` // Unix seconds, start of the minute
 	CPU   float32 `json:"cpu"`
 	Mem   float32 `json:"mem"`
 	WanRx float32 `json:"wr"`
@@ -23,8 +23,8 @@ type Point struct {
 
 const historyMinutes = 24 * 60
 
-// History hält 24 Stunden Minutenwerte und speichert sie im Datenordner,
-// damit ein Neustart des Dienstes den Verlauf nicht löscht.
+// History keeps 24 hours of minute values and saves them in the data folder,
+// so a restart of the service does not delete the history.
 type History struct {
 	mu     sync.Mutex
 	points []Point
@@ -42,7 +42,7 @@ func NewHistory(dataDir string) *History {
 	return h
 }
 
-// Add nimmt einen Live-Wert auf und schließt beim Minutenwechsel einen Punkt ab.
+// Add records a live value and closes a point when the minute changes.
 func (h *History) Add(l Live) {
 	if l.Time.IsZero() {
 		return
@@ -61,7 +61,7 @@ func (h *History) Add(l Live) {
 	if l.Mem.Total > 0 {
 		memPct = float32(100 * float64(l.Mem.Total-l.Mem.Available) / float64(l.Mem.Total))
 	}
-	// laufender Mittelwert
+	// running average
 	f := func(acc *float32, v float32) { *acc += (v - *acc) / float32(h.n) }
 	f(&h.cur.CPU, float32(l.CPU))
 	f(&h.cur.Mem, memPct)
@@ -86,7 +86,7 @@ func (h *History) trim(now time.Time) {
 	h.points = h.points[i:]
 }
 
-// Since liefert alle abgeschlossenen Minuten ab dem Zeitpunkt.
+// Since returns all closed minutes from the given moment.
 func (h *History) Since(t time.Time) []Point {
 	h.mu.Lock()
 	defer h.mu.Unlock()

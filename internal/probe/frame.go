@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-// Package probe fragt auf einem Port, ob dort ein Modem bzw. Anbieter antwortet, ohne eine Adresse
-// zu übernehmen oder das System zu verändern: DHCP-Discover (T-M1-05) und PPPoE-Discovery mit und
-// ohne VLAN (T-M1-06). Pakete werden selbst gebaut und über einen AF_PACKET-Socket gesendet.
-// Bauen und Zerlegen der Pakete ist von der Socket-Ebene getrennt und ohne Rechte testbar.
+// Package probe asks on a port whether a modem or provider answers there, without taking an
+// address or changing the system: DHCP discover (T-M1-05) and PPPoE discovery with and
+// without VLAN (T-M1-06). Packets are built by hand and sent over an AF_PACKET socket.
+// Building and parsing packets is separate from the socket level and testable without privileges.
 package probe
 
 import (
@@ -20,17 +20,17 @@ const (
 
 var broadcastMAC = net.HardwareAddr{0xff, 0xff, 0xff, 0xff, 0xff, 0xff}
 
-// Frame ist ein zerlegter Ethernet-Rahmen.
+// Frame is a parsed Ethernet frame.
 type Frame struct {
 	Dst, Src  net.HardwareAddr
-	VLAN      int // 0 = ohne VLAN-Tag
+	VLAN      int // 0 = without a VLAN tag
 	EtherType uint16
 	Payload   []byte
 }
 
-var errShort = errors.New("Paket zu kurz")
+var errShort = errors.New("packet too short")
 
-// buildFrame setzt einen Ethernet-Rahmen zusammen, mit VLAN-Tag wenn vlan > 0.
+// buildFrame assembles an Ethernet frame, with a VLAN tag if vlan > 0.
 func buildFrame(dst, src net.HardwareAddr, vlan int, etherType uint16, payload []byte) []byte {
 	b := make([]byte, 0, 18+len(payload))
 	b = append(b, dst...)
@@ -41,14 +41,14 @@ func buildFrame(dst, src net.HardwareAddr, vlan int, etherType uint16, payload [
 	}
 	b = binary.BigEndian.AppendUint16(b, etherType)
 	b = append(b, payload...)
-	// Mindestlänge 60 Byte ohne Prüfsumme, sonst verwerfen manche Gegenstellen den Rahmen.
+	// Minimum length 60 bytes without checksum, otherwise some peers discard the frame.
 	for len(b) < 60 {
 		b = append(b, 0)
 	}
 	return b
 }
 
-// parseFrame zerlegt einen Ethernet-Rahmen. Ein VLAN-Tag wird ausgewertet (nur einer, kein QinQ).
+// parseFrame parses an Ethernet frame. A VLAN tag is evaluated (only one, no QinQ).
 func parseFrame(b []byte) (Frame, error) {
 	if len(b) < 14 {
 		return Frame{}, errShort
@@ -69,8 +69,8 @@ func parseFrame(b []byte) (Frame, error) {
 	return f, nil
 }
 
-// insertVLAN fügt ein vom Treiber entferntes VLAN-Tag wieder in den Rahmen ein, damit parseFrame
-// alle Rahmen gleich behandelt (siehe PACKET_AUXDATA in rawsock_linux.go).
+// insertVLAN puts a VLAN tag removed by the driver back into the frame, so that parseFrame
+// treats all frames the same (see PACKET_AUXDATA in rawsock_linux.go).
 func insertVLAN(b []byte, tci uint16) []byte {
 	if len(b) < 12 {
 		return b
@@ -82,7 +82,7 @@ func insertVLAN(b []byte, tci uint16) []byte {
 	return append(out, b[12:]...)
 }
 
-// checksum ist die Internet-Prüfsumme (RFC 1071).
+// checksum is the internet checksum (RFC 1071).
 func checksum(b []byte) uint16 {
 	var s uint32
 	for i := 0; i+1 < len(b); i += 2 {
@@ -97,11 +97,11 @@ func checksum(b []byte) uint16 {
 	return ^uint16(s)
 }
 
-// buildIPv4UDP baut IPv4- und UDP-Kopf um payload. Die UDP-Prüfsumme wird berechnet.
+// buildIPv4UDP builds the IPv4 and UDP header around payload. The UDP checksum is calculated.
 func buildIPv4UDP(src, dst net.IP, sport, dport uint16, id uint16, payload []byte) []byte {
 	udpLen := 8 + len(payload)
 	ip := make([]byte, 20, 20+udpLen)
-	ip[0] = 0x45 // Version 4, Kopf 20 Byte
+	ip[0] = 0x45 // version 4, header 20 bytes
 	binary.BigEndian.PutUint16(ip[2:], uint16(20+udpLen))
 	binary.BigEndian.PutUint16(ip[4:], id)
 	ip[8] = 64 // TTL
@@ -129,12 +129,12 @@ func buildIPv4UDP(src, dst net.IP, sport, dport uint16, id uint16, payload []byt
 	return append(ip, udp...)
 }
 
-// parseIPv4UDP liefert Ports und Nutzdaten eines IPv4/UDP-Pakets. Prüfsummen werden nicht
-// geprüft (viele Karten berechnen sie per Offload erst beim Senden, eigene Rahmen sind ohnehin
-// ausgefiltert).
+// parseIPv4UDP returns the ports and payload of an IPv4/UDP packet. Checksums are not
+// checked (many cards only calculate them by offload when sending, own frames are anyway
+// filtered out).
 func parseIPv4UDP(b []byte) (sport, dport uint16, payload []byte, err error) {
 	if len(b) < 20 || b[0]>>4 != 4 {
-		return 0, 0, nil, errors.New("kein IPv4")
+		return 0, 0, nil, errors.New("not IPv4")
 	}
 	ihl := int(b[0]&0x0f) * 4
 	total := int(binary.BigEndian.Uint16(b[2:4]))
@@ -142,10 +142,10 @@ func parseIPv4UDP(b []byte) (sport, dport uint16, payload []byte, err error) {
 		return 0, 0, nil, errShort
 	}
 	if b[9] != 17 {
-		return 0, 0, nil, errors.New("kein UDP")
+		return 0, 0, nil, errors.New("not UDP")
 	}
 	if binary.BigEndian.Uint16(b[6:8])&0x3fff != 0 {
-		return 0, 0, nil, errors.New("fragmentiert")
+		return 0, 0, nil, errors.New("fragmented")
 	}
 	u := b[ihl:total]
 	ul := int(binary.BigEndian.Uint16(u[4:6]))

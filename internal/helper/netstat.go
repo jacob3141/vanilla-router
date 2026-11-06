@@ -43,7 +43,7 @@ func listPorts(ctx context.Context) ([]Port, error) {
 			continue
 		}
 		port, _ := strconv.Atoi(local[i+1:])
-		// ss schreibt z. B. "[fe80::1]%lan0:53": erst die Schnittstelle abtrennen, dann die Klammern
+		// ss writes e.g. "[fe80::1]%lan0:53": split off the interface first, then the brackets
 		addr := local[:i]
 		if j := strings.Index(addr, "%"); j >= 0 {
 			addr = addr[:j]
@@ -53,7 +53,7 @@ func listPorts(ctx context.Context) ([]Port, error) {
 		if m := ssProcRe.FindStringSubmatch(line); m != nil {
 			p.Process = m[1]
 		}
-		// UDP-Sockets im Bereich für ausgehende Verbindungen sind Clients, keine Dienste
+		// UDP sockets in the range for outgoing connections are clients, not services
 		if p.Proto == "udp" && port >= 32768 && port <= 60999 && (addr == "0.0.0.0" || addr == "*") {
 			continue
 		}
@@ -104,8 +104,8 @@ func top(m map[string]int, n int) []countEntry {
 
 var dnsQueryRe = regexp.MustCompile(`^query\[(\w+)\] (\S+) from (\S+)$`)
 
-// dnsStats wertet das Journal von dnsmasq aus (dnsmasq protokolliert mit log-queries jede Anfrage).
-// client: nur Anfragen dieser IP zählen (leer = alle).
+// dnsStats evaluates the dnsmasq journal (with log-queries dnsmasq logs every request).
+// client: only count requests from this IP (empty = all).
 func dnsStats(ctx context.Context, hours int, client string) (map[string]any, error) {
 	ctx, cancel := context.WithTimeout(ctx, 60*time.Second)
 	defer cancel()
@@ -135,7 +135,7 @@ func dnsStats(ctx context.Context, hours int, client string) (map[string]any, er
 			domains[strings.ToLower(m[2])]++
 			clients[m[3]]++
 		case client != "":
-			// Antworten lassen sich keinem Client zuordnen
+			// Responses cannot be assigned to a client
 		case strings.HasPrefix(line, "cached "):
 			cached++
 		case strings.HasPrefix(line, "forwarded "):
@@ -160,7 +160,7 @@ func (s *Server) registerNetstat() {
 	s.handle("conn.list", func(ctx context.Context, _ json.RawMessage) (any, error) {
 		v4, err := dumpConntrack(syscall.AF_INET, 20000)
 		if err != nil {
-			return nil, Userf("Die Verbindungstabelle ist nicht lesbar: %v", err)
+			return nil, Userf("The connection table cannot be read: %v", err)
 		}
 		v6, _ := dumpConntrack(syscall.AF_INET6, 5000)
 		return append(v4, v6...), nil

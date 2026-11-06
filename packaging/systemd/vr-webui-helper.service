@@ -1,8 +1,8 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-# Privilegierter Helper der Weboberfläche: feste Aktionsliste, nur für den Benutzer vr-webui
-# (SO_PEERCRED). Ändert die Konfiguration nur über config.json und vrctl-apply-Logik.
+# Privileged helper of the web interface: fixed list of actions, only for the user vr-webui
+# (SO_PEERCRED). Changes the configuration only through config.json and vrctl-apply logic.
 [Unit]
-Description=vanilla-router Weboberfläche (Helper)
+Description=vanilla-router web interface (helper)
 After=network.target
 
 [Service]

@@ -10,28 +10,30 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"vanilla-router/internal/i18n"
 
 	"vanilla-router/internal/config"
 )
 
-// IssueFile zeigt agetty vor der Anmeldung auf der Konsole an (util-linux liest /run/issue.d).
+// IssueFile is shown by agetty before login on the console (util-linux reads /run/issue.d).
 const IssueFile = "/run/issue.d/50-vanilla-router.issue"
 
-// WriteIssue schreibt Adresse und, solange die Oberfläche nicht eingerichtet ist, den
-// Einrichtungscode auf die Konsole des Routers (F-INST-17). Wer einen Bildschirm anschließt, sieht
-// so ohne Anmeldung, wie es weitergeht. code leer = schon eingerichtet.
-func WriteIssue(path, fqdn, ip, code string) error {
+// WriteIssue writes the address and, as long as the web interface is not set up, the
+// setup code to the router's console (F-INST-17). Anyone who connects a screen thus sees
+// how to continue, without logging in. Empty code = already set up.
+func WriteIssue(path, fqdn, ip, code, locale string) error {
+	i18n.SetLocale(locale)
 	var b strings.Builder
 	b.WriteString("\n  vanilla-router\n\n")
-	fmt.Fprintf(&b, "  Weboberfläche:  https://%s   (oder https://%s)\n", fqdn, ip)
+	b.WriteString(i18n.T(fmt.Sprintf("  Web interface:  https://%s   (or https://%s)\n", fqdn, ip)))
 	if code != "" {
-		fmt.Fprintf(&b, "  Einrichtungscode für die erste Anmeldung:  %s\n", code)
-		b.WriteString("  Öffnen Sie die Adresse auf einem Gerät im Heimnetz.\n")
+		b.WriteString(i18n.T(fmt.Sprintf("  Setup code for the first login:  %s\n", code)))
+		b.WriteString(i18n.T("  Open this address on a device in your home network.\n"))
 	}
 	b.WriteString("\n")
-	// „\“ ist für agetty ein Steuerzeichen. Name, Adresse und Code sind geprüft und enthalten es nie.
+	// "\" is a control character for agetty. Name, address and code are validated and never contain it.
 	if strings.Contains(b.String(), `\`) {
-		return fmt.Errorf("unerwartetes Zeichen")
+		return fmt.Errorf("unexpected character")
 	}
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return err
@@ -39,12 +41,12 @@ func WriteIssue(path, fqdn, ip, code string) error {
 	if err := config.WriteFileAtomic(path, []byte(b.String()), 0o644); err != nil {
 		return err
 	}
-	exec.Command("agetty", "--reload").Run() // laufende Anmeldeaufforderungen neu zeichnen
+	exec.Command("agetty", "--reload").Run() // redraw running login prompts
 	return nil
 }
 
 func (s *Server) registerConsole() {
-	// Nach dem Setzen des ersten Passworts: Code von der Konsole nehmen, er gilt nicht mehr.
+	// After the first password is set: take the code off the console, it is no longer valid.
 	s.handle("console.setup_done", func(ctx context.Context, _ json.RawMessage) (any, error) {
 		s.mu.Lock()
 		defer s.mu.Unlock()
@@ -53,6 +55,6 @@ func (s *Server) registerConsole() {
 			return nil, err
 		}
 		_, router, _ := c.LANPrefix()
-		return nil, WriteIssue(s.Path(IssueFile), c.System.Hostname+"."+c.DNS.Domain, router.String(), "")
+		return nil, WriteIssue(s.Path(IssueFile), c.System.Hostname+"."+c.DNS.Domain, router.String(), "", c.System.Locale)
 	})
 }

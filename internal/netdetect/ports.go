@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-// Package netdetect findet die Ethernet-Anschlüsse eines Rechners und beobachtet ihren Link-Zustand.
-// Grundlage für die Erkennung des Internet-Anschlusses im Installer (PLAN.md 3.9.3, T-M1-02, T-M1-03).
+// Package netdetect finds the Ethernet ports of a computer and watches their link state.
+// Basis for detecting the internet port in the installer (PLAN.md 3.9.3, T-M1-02, T-M1-03).
 package netdetect
 
 import (
@@ -13,8 +13,8 @@ import (
 	"strings"
 )
 
-// Tri ist ein Wahrheitswert mit dem Zustand „unbekannt“. sysfs liefert für ausgeschaltete Ports
-// beim Lesen von carrier einen Fehler statt 0.
+// Tri is a truth value with the state "unknown". For ports that are off, sysfs returns an
+// error when reading carrier instead of 0.
 type Tri int8
 
 const (
@@ -26,65 +26,65 @@ const (
 func (t Tri) String() string {
 	switch t {
 	case Yes:
-		return "ja"
+		return "yes"
 	case No:
-		return "nein"
+		return "no"
 	}
-	return "unbekannt"
+	return "unknown"
 }
 
-// Port beschreibt einen physischen Ethernet-Anschluss.
+// Port describes a physical Ethernet port.
 type Port struct {
 	Name      string // Kernel-Name, z. B. enp1s0
-	Index     int    // Interface-Index (für Netlink und AF_PACKET)
+	Index     int    // interface index (for netlink and AF_PACKET)
 	MAC       string
 	Driver    string // z. B. r8169, e1000e, igc, virtio_net
 	Bus       string // pci, usb, virtio …
-	DevPath   string // aufgelöster Gerätepfad unter /sys/devices, bestimmt die Reihenfolge
-	AdminUp   bool   // IFF_UP gesetzt
-	Carrier   Tri    // Kabel steckt und Gegenstelle ist aktiv
+	DevPath   string // resolved device path under /sys/devices, determines the order
+	AdminUp   bool   // IFF_UP set
+	Carrier   Tri    // cable is plugged in and the other end is active
 	OperState string // up, down, dormant …
-	SpeedMbps int    // aktuelle Geschwindigkeit, 0 wenn unbekannt oder kein Link
-	Number    int    // laufende Nummer ab 1 für Texte („Anschluss 2“)
+	SpeedMbps int    // current speed, 0 if unknown or no link
+	Number    int    // running number from 1 for texts ("Port 2")
 }
 
-// Label ist die Bezeichnung für Laien.
+// Label is the name for non-experts.
 func (p Port) Label() string {
-	s := fmt.Sprintf("Anschluss %d", p.Number)
+	s := fmt.Sprintf("Port %d", p.Number)
 	if p.Bus == "usb" {
-		s += " (USB-Adapter)"
+		s += " (USB adapter)"
 	}
 	return s
 }
 
-// Ausschlussgründe, nur für Diagnose und Tests.
+// Reasons for exclusion, only for diagnostics and tests.
 const (
 	skipLoopback = "loopback"
-	skipNotEther = "kein Ethernet"
-	skipVirtual  = "virtuell"
+	skipNotEther = "not Ethernet"
+	skipVirtual  = "virtual"
 	skipWireless = "WLAN"
 	skipBridge   = "Bridge/Bond"
 )
 
-// Skipped beschreibt ein Interface, das kein Kandidat ist.
+// Skipped describes an interface that is not a candidate.
 type Skipped struct {
 	Name, Reason string
 }
 
-// ListPorts liest sysRoot/class/net (normal: sysRoot = "/sys") und liefert die physischen
-// Ethernet-Ports in stabiler Reihenfolge (nach Gerätepfad, also Bus-Position).
+// ListPorts reads sysRoot/class/net (normally: sysRoot = "/sys") and returns the physical
+// Ethernet ports in a stable order (by device path, i.e. bus position).
 func ListPorts(sysRoot string) ([]Port, []Skipped, error) {
 	return ListPortsOpts(sysRoot, Options{})
 }
 
-// Options für ListPortsOpts.
+// Options for ListPortsOpts.
 type Options struct {
-	// IncludeVirtual nimmt virtuelle Ethernet-Interfaces (veth) mit auf. Nur für das Testlabor
-	// (test/lab), auf echter Hardware sind das Docker- oder VM-Interfaces.
+	// IncludeVirtual includes virtual Ethernet interfaces (veth). Only for the test lab
+	// (test/lab), on real hardware those are Docker or VM interfaces.
 	IncludeVirtual bool
 }
 
-// ListPortsOpts ist ListPorts mit Optionen.
+// ListPortsOpts is ListPorts with options.
 func ListPortsOpts(sysRoot string, opt Options) ([]Port, []Skipped, error) {
 	base := filepath.Join(sysRoot, "class", "net")
 	ents, err := os.ReadDir(base)
@@ -106,7 +106,7 @@ func ListPortsOpts(sysRoot string, opt Options) ([]Port, []Skipped, error) {
 		}
 		ports = append(ports, p)
 	}
-	// Eingebaute Ports zuerst, USB-Adapter danach, innerhalb davon nach Position am Bus.
+	// Built-in ports first, USB adapters afterwards, within that by position on the bus.
 	sort.Slice(ports, func(i, j int) bool {
 		ui, uj := ports[i].Bus == "usb", ports[j].Bus == "usb"
 		if ui != uj {
@@ -195,9 +195,9 @@ func linkBase(path string) string {
 	return filepath.Base(t)
 }
 
-// lessPath vergleicht Gerätepfade abschnittsweise. PCI-Adressen (feste Breite, hexadezimal) werden
-// als Text verglichen, alles andere „natürlich“, also Zahlenfolgen numerisch
-// („…/usb1/1-2“ vor „…/usb1/1-10“).
+// lessPath compares device paths section by section. PCI addresses (fixed width, hexadecimal) are
+// compared as text, everything else "naturally", i.e. digit sequences numerically
+// ("…/usb1/1-2" before "…/usb1/1-10").
 func lessPath(a, b string) bool {
 	as, bs := strings.Split(a, "/"), strings.Split(b, "/")
 	for i := 0; i < len(as) && i < len(bs); i++ {
@@ -212,7 +212,7 @@ func lessPath(a, b string) bool {
 	return len(as) < len(bs)
 }
 
-// isPCIAddr erkennt „0000:00:1f.6“ und die Kurzform „pci0000:00“.
+// isPCIAddr recognizes "0000:00:1f.6" and the short form "pci0000:00".
 func isPCIAddr(s string) bool {
 	s = strings.TrimPrefix(s, "pci")
 	if len(s) != 12 && len(s) != 7 {

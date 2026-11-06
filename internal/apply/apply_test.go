@@ -14,12 +14,12 @@ import (
 	"vanilla-router/internal/config"
 )
 
-// fakeRunner merkt sich Aufrufe und simuliert das System.
+// fakeRunner records calls and simulates the system.
 type fakeRunner struct {
 	calls  []string
-	fail   map[string]bool // Präfix eines Aufrufs → Fehler
-	lanIP  string          // was `ip addr show lan0` meldet
-	active bool            // vr-dnsmasq läuft
+	fail   map[string]bool // prefix of a call → error
+	lanIP  string          // what `ip addr show lan0` reports
+	active bool            // vr-dnsmasq is running
 }
 
 func (f *fakeRunner) Run(env []string, name string, args ...string) ([]byte, error) {
@@ -27,7 +27,7 @@ func (f *fakeRunner) Run(env []string, name string, args ...string) ([]byte, err
 	f.calls = append(f.calls, call)
 	for p := range f.fail {
 		if strings.HasPrefix(call, p) {
-			return []byte("simulierter Fehler"), errors.New("exit status 1")
+			return []byte("simulated error"), errors.New("exit status 1")
 		}
 	}
 	switch {
@@ -56,7 +56,7 @@ func (m memSecrets) Get(ref string) (string, error) {
 	if v, ok := m[ref]; ok {
 		return v, nil
 	}
-	return "", errors.New("fehlt")
+	return "", errors.New("missing")
 }
 
 func setup(t *testing.T) (*Applier, *fakeRunner, *config.Config) {
@@ -83,7 +83,7 @@ func read(t *testing.T, a *Applier, p string) string {
 	return string(b)
 }
 
-func TestErstesEinspielenUndKeineAenderung(t *testing.T) {
+func TestFirstApplyAndNoChange(t *testing.T) {
 	a, r, c := setup(t)
 	res, err := a.Apply(c, nil, Options{})
 	if err != nil {
@@ -94,11 +94,11 @@ func TestErstesEinspielenUndKeineAenderung(t *testing.T) {
 	}
 	for _, want := range []string{"nft -c -f", "dnsmasq --test", "sysctl", "nft -f", "networkctl reload", "systemctl restart vr-dnsmasq", "systemctl disable --now vr-pppoe", "systemctl disable --now ssh.socket"} {
 		if !r.called(want) {
-			t.Errorf("%q nicht aufgerufen: %v", want, r.calls)
+			t.Errorf("%q not called: %v", want, r.calls)
 		}
 	}
 	if !strings.Contains(read(t, a, config.Path), `"schema": 1`) {
-		t.Error("config.json nicht geschrieben")
+		t.Error("config.json not written")
 	}
 	if fi, _ := os.Stat(a.p("/etc/ppp/chap-secrets")); fi.Mode().Perm() != 0o600 {
 		t.Errorf("chap-secrets %v", fi.Mode().Perm())
@@ -106,11 +106,11 @@ func TestErstesEinspielenUndKeineAenderung(t *testing.T) {
 	r.calls = nil
 	res, err = a.Apply(c, nil, Options{})
 	if err != nil || len(res.Changes) != 0 || len(r.calls) != 0 {
-		t.Errorf("zweiter Lauf: %+v %v %v", res, err, r.calls)
+		t.Errorf("second run: %+v %v %v", res, err, r.calls)
 	}
 }
 
-func TestNurFirewallNeuGeladen(t *testing.T) {
+func TestOnlyFirewallReloaded(t *testing.T) {
 	a, r, c := setup(t)
 	if _, err := a.Apply(c, nil, Options{}); err != nil {
 		t.Fatal(err)
@@ -121,18 +121,18 @@ func TestNurFirewallNeuGeladen(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(res.Changes) != 2 { // vr.nft und config.json
+	if len(res.Changes) != 2 { // vr.nft and config.json
 		t.Errorf("%+v", res.Changes)
 	}
 	if r.called("networkctl") || r.called("systemctl restart vr-dnsmasq") || !r.called("nft -f") {
-		t.Errorf("falsche Dienste neu geladen: %v", r.calls)
+		t.Errorf("wrong services reloaded: %v", r.calls)
 	}
 	if !strings.Contains(read(t, a, "/etc/vanilla-router/nft/vr.nft"), "dport 8080 dnat to 192.168.42.20:80") {
-		t.Error("Regel fehlt")
+		t.Error("rule is missing")
 	}
 }
 
-func TestPruefungSchlaegtFehlNichtsGeaendert(t *testing.T) {
+func TestCheckFailsNothingChanged(t *testing.T) {
 	a, r, c := setup(t)
 	if _, err := a.Apply(c, nil, Options{}); err != nil {
 		t.Fatal(err)
@@ -141,17 +141,17 @@ func TestPruefungSchlaegtFehlNichtsGeaendert(t *testing.T) {
 	r.fail["nft -c"] = true
 	c.Firewall.PortForwards = []config.PortForward{{Proto: "tcp", ExtPort: 8080, IntIP: "192.168.42.20", IntPort: 80}}
 	if _, err := a.Apply(c, nil, Options{}); err == nil || !strings.Contains(err.Error(), "nft -c") {
-		t.Fatalf("Fehler erwartet: %v", err)
+		t.Fatalf("error expected: %v", err)
 	}
 	if read(t, a, "/etc/vanilla-router/nft/vr.nft") != before {
-		t.Error("Datei trotz abgelehnter Prüfung geändert")
+		t.Error("file changed despite the rejected check")
 	}
 	if strings.Contains(read(t, a, config.Path), "8080") {
-		t.Error("config.json trotz Fehler geändert")
+		t.Error("config.json changed despite the error")
 	}
 }
 
-func TestGesundheitsfehlerNimmtZurueck(t *testing.T) {
+func TestHealthFailureRollsBack(t *testing.T) {
 	a, r, c := setup(t)
 	if _, err := a.Apply(c, nil, Options{}); err != nil {
 		t.Fatal(err)
@@ -159,13 +159,13 @@ func TestGesundheitsfehlerNimmtZurueck(t *testing.T) {
 	oldNet := read(t, a, "/etc/systemd/network/30-vr-lan0.network")
 	oldCfg := read(t, a, config.Path)
 	c.LAN.IPv4 = "192.168.42.2/24"
-	r.calls = nil // lanIP bleibt .1/24: neue Adresse kommt „nicht an“
+	r.calls = nil // lanIP stays .1/24: the new address "does not arrive"
 	_, err := a.Apply(c, nil, Options{})
-	if err == nil || !strings.Contains(err.Error(), "Heimnetz-Adresse") {
-		t.Fatalf("Fehler erwartet: %v", err)
+	if err == nil || !strings.Contains(err.Error(), "home network address") {
+		t.Fatalf("error expected: %v", err)
 	}
 	if read(t, a, "/etc/systemd/network/30-vr-lan0.network") != oldNet || read(t, a, config.Path) != oldCfg {
-		t.Error("nicht zurückgenommen")
+		t.Error("not rolled back")
 	}
 	n := 0
 	for _, call := range r.calls {
@@ -174,27 +174,27 @@ func TestGesundheitsfehlerNimmtZurueck(t *testing.T) {
 		}
 	}
 	if n != 2 {
-		t.Errorf("networkctl reload %d-mal, erwartet 2 (Einspielen und Rücknahme): %v", n, r.calls)
+		t.Errorf("networkctl reload %d times, expected 2 (apply and rollback): %v", n, r.calls)
 	}
 }
 
-func TestVeralteteDateienEntfernt(t *testing.T) {
+func TestOutdatedFilesRemoved(t *testing.T) {
 	a, _, c := setup(t)
 	c.WAN.Type = config.WANPPPoE
-	c.WAN.PPPoE = &config.PPPoE{User: "nutzer@example.org", PasswordRef: "pppoe", VLAN: 7}
+	c.WAN.PPPoE = &config.PPPoE{User: "user@example.org", PasswordRef: "pppoe", VLAN: 7}
 	if _, err := a.Apply(c, memSecrets{"pppoe": "pw"}, Options{}); err != nil {
 		t.Fatal(err)
 	}
 	for _, p := range []string{"/etc/systemd/network/20-vr-wan0.7.netdev", "/etc/ppp/peers/vr-wan"} {
 		if read(t, a, p) == "" {
-			t.Fatalf("%s fehlt", p)
+			t.Fatalf("%s is missing", p)
 		}
 	}
-	if !strings.Contains(read(t, a, "/etc/ppp/chap-secrets"), `"nutzer@example.org" * "pw" *`) {
+	if !strings.Contains(read(t, a, "/etc/ppp/chap-secrets"), `"user@example.org" * "pw" *`) {
 		t.Error("chap-secrets")
 	}
-	// Eigene Datei des Nutzers im selben Ordner bleibt erhalten
-	os.WriteFile(a.p("/etc/systemd/network/50-eigene.network"), []byte("x"), 0o644)
+	// The user's own file in the same folder stays
+	os.WriteFile(a.p("/etc/systemd/network/50-own.network"), []byte("x"), 0o644)
 
 	c.WAN.Type, c.WAN.PPPoE = config.WANDHCP, nil
 	res, err := a.Apply(c, nil, Options{})
@@ -203,14 +203,14 @@ func TestVeralteteDateienEntfernt(t *testing.T) {
 	}
 	for _, p := range []string{"/etc/systemd/network/20-vr-wan0.7.netdev", "/etc/systemd/network/30-vr-ppp0.network", "/etc/ppp/peers/vr-wan"} {
 		if read(t, a, p) != "" {
-			t.Errorf("%s nicht entfernt", p)
+			t.Errorf("%s not removed", p)
 		}
 	}
-	if read(t, a, "/etc/systemd/network/50-eigene.network") != "x" {
-		t.Error("fremde Datei entfernt")
+	if read(t, a, "/etc/systemd/network/50-own.network") != "x" {
+		t.Error("foreign file removed")
 	}
 	if strings.Contains(read(t, a, "/etc/ppp/chap-secrets"), "pw") {
-		t.Error("altes Passwort liegt noch in chap-secrets")
+		t.Error("old password is still in chap-secrets")
 	}
 	removed := 0
 	for _, ch := range res.Changes {
@@ -219,11 +219,11 @@ func TestVeralteteDateienEntfernt(t *testing.T) {
 		}
 	}
 	if removed != 4 { // netdev, vlan-network, ppp0-network, peers
-		t.Errorf("%d entfernt: %+v", removed, res.Changes)
+		t.Errorf("%d removed: %+v", removed, res.Changes)
 	}
 }
 
-func TestBestaetigungUndZeitablauf(t *testing.T) {
+func TestConfirmationAndTimeout(t *testing.T) {
 	a, r, c := setup(t)
 	if _, err := a.Apply(c, nil, Options{}); err != nil {
 		t.Fatal(err)
@@ -235,19 +235,19 @@ func TestBestaetigungUndZeitablauf(t *testing.T) {
 		t.Fatalf("%+v %v", res, err)
 	}
 	if !r.called("systemd-run --unit=vr-rollback-") || !r.called("systemd-run --unit=vr-rollback-"+strings.NewReplacer(".", "-").Replace(res.Generation)) {
-		t.Errorf("Timer nicht gestartet: %v", r.calls)
+		t.Errorf("timer not started: %v", r.calls)
 	}
 	if _, err := a.Apply(c, nil, Options{}); err == nil {
-		t.Error("zweite Änderung trotz offener Bestätigung angenommen")
+		t.Error("second change accepted despite a pending confirmation")
 	}
-	// Timer läuft ab
+	// timer expires
 	if err := a.RollbackPending(res.Generation); err != nil {
 		t.Fatal(err)
 	}
 	if read(t, a, "/etc/vanilla-router/nft/vr.nft") != old || a.Pending() != nil {
-		t.Error("nicht zurückgenommen")
+		t.Error("not rolled back")
 	}
-	// Erneut, diesmal bestätigt
+	// Again, this time confirmed
 	res, err = a.Apply(c, nil, Options{Confirm: 60 * time.Second})
 	if err != nil {
 		t.Fatal(err)
@@ -255,11 +255,11 @@ func TestBestaetigungUndZeitablauf(t *testing.T) {
 	if err := a.Confirm(); err != nil {
 		t.Fatal(err)
 	}
-	if err := a.RollbackPending(res.Generation); err != nil { // Timer feuert trotzdem: nichts tun
+	if err := a.RollbackPending(res.Generation); err != nil { // timer fires anyway: do nothing
 		t.Fatal(err)
 	}
 	if !strings.Contains(read(t, a, "/etc/vanilla-router/nft/vr.nft"), "8080") {
-		t.Error("bestätigte Änderung zurückgenommen")
+		t.Error("confirmed change rolled back")
 	}
 }
 
@@ -270,7 +270,7 @@ func TestDryRun(t *testing.T) {
 		t.Fatal(res, err)
 	}
 	if read(t, a, config.Path) != "" || r.called("nft -f") {
-		t.Error("Probelauf hat etwas geändert")
+		t.Error("dry run changed something")
 	}
 }
 
@@ -286,23 +286,23 @@ func TestRollbackLast(t *testing.T) {
 		t.Fatal(err)
 	}
 	if read(t, a, config.Path) != first {
-		t.Error("nicht zurück")
+		t.Error("not restored")
 	}
 }
 
 func TestDirSecrets(t *testing.T) {
 	s := DirSecrets{Dir: filepath.Join(t.TempDir(), "secrets")}
-	if err := s.Set("pppoe", "geheim"); err != nil {
+	if err := s.Set("pppoe", "secret"); err != nil {
 		t.Fatal(err)
 	}
-	if v, err := s.Get("pppoe"); err != nil || v != "geheim" {
+	if v, err := s.Get("pppoe"); err != nil || v != "secret" {
 		t.Errorf("%q %v", v, err)
 	}
 	os.Chmod(filepath.Join(s.Dir, "pppoe"), 0o644)
 	if _, err := s.Get("pppoe"); err == nil {
-		t.Error("lesbare Datei angenommen")
+		t.Error("readable file accepted")
 	}
 	if _, err := s.Get("../x"); err == nil {
-		t.Error("Pfad mit .. angenommen")
+		t.Error("path with .. accepted")
 	}
 }

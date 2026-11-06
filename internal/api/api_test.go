@@ -57,12 +57,12 @@ var okHdr = map[string]string{"Origin": origin, "X-Routerui": "1", "Content-Type
 func TestCSRFRejected(t *testing.T) {
 	s, _ := newTestServer(t)
 	for name, hdr := range map[string]map[string]string{
-		"ohne Header":    {"Origin": origin},
-		"fremder Origin": {"Origin": "https://evil.example", "X-Routerui": "1"},
-		"ohne Origin":    {"X-Routerui": "1"},
+		"without header": {"Origin": origin},
+		"foreign origin": {"Origin": "https://evil.example", "X-Routerui": "1"},
+		"without origin": {"X-Routerui": "1"},
 	} {
 		if w := do(s, "POST", "/api/login", `{"password":"x"}`, hdr); w.Code != http.StatusForbidden {
-			t.Errorf("%s: Status %d, erwartet 403", name, w.Code)
+			t.Errorf("%s: status %d, expected 403", name, w.Code)
 		}
 	}
 }
@@ -70,10 +70,10 @@ func TestCSRFRejected(t *testing.T) {
 func TestProtectedNeedsSession(t *testing.T) {
 	s, _ := newTestServer(t)
 	if w := do(s, "GET", "/api/dashboard", "", nil); w.Code != http.StatusUnauthorized {
-		t.Errorf("Übersicht ohne Anmeldung: Status %d, erwartet 401", w.Code)
+		t.Errorf("overview without login: status %d, expected 401", w.Code)
 	}
-	if w := do(s, "GET", "/api/dashboard", "", nil, &http.Cookie{Name: cookieName, Value: "erfunden"}); w.Code != http.StatusUnauthorized {
-		t.Errorf("Übersicht mit falschem Cookie: Status %d, erwartet 401", w.Code)
+	if w := do(s, "GET", "/api/dashboard", "", nil, &http.Cookie{Name: cookieName, Value: "made-up"}); w.Code != http.StatusUnauthorized {
+		t.Errorf("overview with a wrong cookie: status %d, expected 401", w.Code)
 	}
 }
 
@@ -81,45 +81,45 @@ func TestSetupThenLogin(t *testing.T) {
 	s, store := newTestServer(t)
 	code, _ := store.SetupCode()
 
-	if w := do(s, "POST", "/api/setup", `{"code":"FALS-CHER","password":"ein-sicheres-passwort"}`, okHdr); w.Code != http.StatusForbidden {
-		t.Fatalf("falscher Code: Status %d", w.Code)
+	if w := do(s, "POST", "/api/setup", `{"code":"FALS-CHER","password":"a-secure-password"}`, okHdr); w.Code != http.StatusForbidden {
+		t.Fatalf("wrong code: status %d", w.Code)
 	}
-	w := do(s, "POST", "/api/setup", `{"code":"`+code+`","password":"ein-sicheres-passwort"}`, okHdr)
+	w := do(s, "POST", "/api/setup", `{"code":"`+code+`","password":"a-secure-password"}`, okHdr)
 	if w.Code != http.StatusOK {
-		t.Fatalf("Einrichtung: Status %d %s", w.Code, w.Body)
+		t.Fatalf("setup: status %d %s", w.Code, w.Body)
 	}
 	c := w.Result().Cookies()
 	if len(c) != 1 || !c[0].HttpOnly || !c[0].Secure || c[0].SameSite != http.SameSiteStrictMode {
-		t.Fatalf("Sitzungs-Cookie unsicher gesetzt: %+v", c)
+		t.Fatalf("session cookie set insecurely: %+v", c)
 	}
 	if w := do(s, "GET", "/api/state", "", nil, c[0]); !strings.Contains(w.Body.String(), `"authenticated":true`) {
-		t.Errorf("nach Einrichtung nicht angemeldet: %s", w.Body)
+		t.Errorf("not logged in after setup: %s", w.Body)
 	}
-	if w := do(s, "POST", "/api/setup", `{"code":"`+code+`","password":"noch-ein-passwort"}`, okHdr); w.Code != http.StatusConflict {
-		t.Errorf("zweite Einrichtung: Status %d, erwartet 409", w.Code)
+	if w := do(s, "POST", "/api/setup", `{"code":"`+code+`","password":"yet-another-password"}`, okHdr); w.Code != http.StatusConflict {
+		t.Errorf("second setup: status %d, expected 409", w.Code)
 	}
 
-	if w := do(s, "POST", "/api/login", `{"password":"falsch-falsch-falsch"}`, okHdr); w.Code != http.StatusUnauthorized {
-		t.Errorf("falsches Passwort: Status %d", w.Code)
+	if w := do(s, "POST", "/api/login", `{"password":"wrong-wrong-wrong"}`, okHdr); w.Code != http.StatusUnauthorized {
+		t.Errorf("wrong password: status %d", w.Code)
 	}
-	if w := do(s, "POST", "/api/login", `{"password":"ein-sicheres-passwort"}`, okHdr); w.Code != http.StatusOK {
-		t.Errorf("richtiges Passwort: Status %d", w.Code)
+	if w := do(s, "POST", "/api/login", `{"password":"a-secure-password"}`, okHdr); w.Code != http.StatusOK {
+		t.Errorf("correct password: status %d", w.Code)
 	}
 }
 
 func TestLoginThrottled(t *testing.T) {
 	s, store := newTestServer(t)
-	store.SetPassword("ein-sicheres-passwort")
+	store.SetPassword("a-secure-password")
 	var last int
 	for i := 0; i < 5; i++ {
-		last = do(s, "POST", "/api/login", `{"password":"falsch-falsch-falsch"}`, okHdr).Code
+		last = do(s, "POST", "/api/login", `{"password":"wrong-wrong-wrong"}`, okHdr).Code
 	}
 	if last != http.StatusTooManyRequests {
-		t.Errorf("nach 5 Fehlversuchen Status %d, erwartet 429", last)
+		t.Errorf("after 5 failed attempts status %d, expected 429", last)
 	}
-	// auch das richtige Passwort wird während der Sperre abgewiesen
-	if w := do(s, "POST", "/api/login", `{"password":"ein-sicheres-passwort"}`, okHdr); w.Code != http.StatusTooManyRequests {
-		t.Errorf("richtiges Passwort während der Sperre: Status %d", w.Code)
+	// even the correct password is rejected during the lockout
+	if w := do(s, "POST", "/api/login", `{"password":"a-secure-password"}`, okHdr); w.Code != http.StatusTooManyRequests {
+		t.Errorf("correct password during the lockout: status %d", w.Code)
 	}
 }
 
@@ -128,7 +128,7 @@ func TestSecurityHeaders(t *testing.T) {
 	w := do(s, "GET", "/", "", nil)
 	for _, h := range []string{"Content-Security-Policy", "X-Frame-Options", "X-Content-Type-Options", "Referrer-Policy"} {
 		if w.Header().Get(h) == "" {
-			t.Errorf("Header %s fehlt", h)
+			t.Errorf("header %s is missing", h)
 		}
 	}
 }

@@ -16,13 +16,13 @@ func TestHistoryAveragesPerMinute(t *testing.T) {
 	}
 	add(0, 10, 1000)
 	add(30, 30, 3000)
-	add(60, 50, 0) // neue Minute schließt die erste ab
+	add(60, 50, 0) // a new minute closes the first
 	pts := h.Since(base)
 	if len(pts) != 1 {
-		t.Fatalf("%d Punkte, erwartet 1", len(pts))
+		t.Fatalf("%d points, expected 1", len(pts))
 	}
 	if p := pts[0]; p.CPU != 20 || p.WanRx != 2000 || p.Mem != 40 || p.T != base.Unix() {
-		t.Errorf("Mittelwert falsch: %+v", p)
+		t.Errorf("average wrong: %+v", p)
 	}
 	if err := h.Save(); err != nil {
 		t.Fatal(err)
@@ -32,22 +32,22 @@ func TestHistoryAveragesPerMinute(t *testing.T) {
 func TestICMPEchoChecksum(t *testing.T) {
 	p := icmpEcho(0x1234, 7, []byte("routerui"))
 	if p[0] != 8 || p[1] != 0 || len(p) != 16 {
-		t.Fatalf("Kopf falsch: %x", p)
+		t.Fatalf("header wrong: %x", p)
 	}
-	// Eine korrekte Prüfsumme ergibt über das ganze Paket 0
+	// A correct checksum gives 0 over the whole packet
 	if c := icmpChecksum(p); c != 0 {
-		t.Errorf("Prüfsumme falsch: Rest %04x", c)
+		t.Errorf("checksum wrong: remainder %04x", c)
 	}
 }
 
 func TestICMPPingLocalhost(t *testing.T) {
-	// Läuft nur, wo ICMP-Datagram-Sockets erlaubt sind (ping_group_range), z. B. auf dem Router
+	// Only runs where ICMP datagram sockets are allowed (ping_group_range), e.g. on the router
 	if rtt, ok := icmpPing(t.Context(), "127.0.0.1", time.Second); ok {
 		if rtt < 0 || rtt > 1000 {
-			t.Errorf("unplausible Antwortzeit %v ms", rtt)
+			t.Errorf("implausible response time %v ms", rtt)
 		}
 	} else {
-		t.Skip("ICMP-Datagram-Socket hier nicht erlaubt")
+		t.Skip("ICMP datagram socket not allowed here")
 	}
 }
 
@@ -58,24 +58,24 @@ func TestMonitorOutages(t *testing.T) {
 		m.record(now, results)
 		now = now.Add(30 * time.Second)
 	}
-	step(1, 15, 14)  // alles gut
-	step(1, -1, 13)  // ein Ziel weg: kein Ausfall
-	step(1, -1, -1)  // beide Internet-Ziele weg: Ausfall beginnt
-	step(-1, -1, -1) // dauert an
+	step(1, 15, 14)  // all good
+	step(1, -1, 13)  // one target gone: no outage
+	step(1, -1, -1)  // both internet targets gone: outage begins
+	step(-1, -1, -1) // still ongoing
 	if c, down := m.OutagesSince(now.Add(-time.Hour)); c != 1 || !down {
-		t.Fatalf("Ausfall nicht erkannt: %d %v", c, down)
+		t.Fatalf("outage not detected: %d %v", c, down)
 	}
-	step(1, 16, 15) // wieder da
+	step(1, 16, 15) // back again
 	snap := m.Snapshot(now.Add(-time.Hour))
 	if snap["internet_down"].(bool) {
-		t.Error("Ausfall nicht beendet")
+		t.Error("outage not ended")
 	}
 	o := snap["outages"].([]Outage)
 	if len(o) != 1 || o[0].End == nil || o[0].End.Sub(o[0].Start) != time.Minute {
-		t.Errorf("Ausfallprotokoll falsch: %+v", o)
+		t.Errorf("outage log wrong: %+v", o)
 	}
 	st := snap["targets"].([]TargetStats)
-	if st[1].Loss != 60 { // 3 von 5 verloren
-		t.Errorf("Paketverlust Google = %v, erwartet 60", st[1].Loss)
+	if st[1].Loss != 60 { // 3 of 5 lost
+		t.Errorf("packet loss Google = %v, expected 60", st[1].Loss)
 	}
 }

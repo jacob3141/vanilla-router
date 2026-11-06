@@ -12,9 +12,9 @@ import (
 
 func (s *Server) registerFirewall() {
 	s.route("GET /api/firewall", s.handleFirewall)
-	s.route("POST /api/portforwards", s.forward("portfw.set", "Weiterleitung aktiv. Bitte innerhalb von 60 Sekunden bestätigen."))
-	s.route("POST /api/portforwards/delete", s.forward("portfw.delete", "Weiterleitung entfernt. Bitte innerhalb von 60 Sekunden bestätigen."))
-	s.route("POST /api/portforwards/confirm", s.forward("portfw.confirm", "Änderung bestätigt."))
+	s.route("POST /api/portforwards", s.forward("portfw.set", "Port forward active. Please confirm within 60 seconds."))
+	s.route("POST /api/portforwards/delete", s.forward("portfw.delete", "Port forward removed. Please confirm within 60 seconds."))
+	s.route("POST /api/portforwards/confirm", s.forward("portfw.confirm", "Change confirmed."))
 }
 
 func (s *Server) handleFirewall(w http.ResponseWriter, r *http.Request) {
@@ -28,13 +28,13 @@ func (s *Server) handleFirewall(w http.ResponseWriter, r *http.Request) {
 		s.helperError(w, err)
 		return
 	}
-	devices := map[string]string{} // IP → Name, für die Auswahl des Ziels
+	devices := map[string]string{} // IP → name, for choosing the target
 	for _, res := range info.State.Reservations {
 		devices[res.IP] = res.Name
 	}
 	fw["port_forwards"] = info.State.PortForwards
 	fw["devices"] = devices
-	// Doppeltes NAT erkennen: private Adresse am Internet-Anschluss heißt, davor steht noch ein Router.
+	// Detect double NAT: a private address on the internet port means another router is in front.
 	gw, dev := sys.DefaultGatewayV4()
 	if dev != "" {
 		for _, a := range sys.ReadInterface(dev).IPv4 {
@@ -46,5 +46,5 @@ func (s *Server) handleFirewall(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, fw)
 }
 
-// isCGNAT: 100.64.0.0/10, Adresse vom Anbieter geteilt, Weiterleitungen sind dann unmöglich.
+// isCGNAT: 100.64.0.0/10, an address shared by the provider, port forwards are then impossible.
 func isCGNAT(a netip.Addr) bool { return netip.MustParsePrefix("100.64.0.0/10").Contains(a) }

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// Zugriff auf die API. Ändernde Anfragen tragen den Header X-Routerui, den der Server
-// als Teil des CSRF-Schutzes verlangt.
+// Access to the API. Changing requests carry the X-Routerui header, which the server
+// as part of the CSRF protection.
 
 export class ApiError extends Error {
   constructor(msg, status) { super(msg); this.status = status; }
@@ -20,14 +20,14 @@ export async function api(path, { method = 'GET', body } = {}) {
   try {
     res = await fetch(path, opts);
   } catch {
-    throw new ApiError('Der Router ist nicht erreichbar.', 0);
+    throw new ApiError('The router is not reachable.', 0);
   }
   let data = null;
-  try { data = await res.json(); } catch { /* leere Antwort */ }
+  try { data = await res.json(); } catch { /* empty response */ }
   if (res.status === 401 && !path.startsWith('/api/login') && !path.startsWith('/api/setup')) {
     onUnauthorized();
   }
-  if (!res.ok) throw new ApiError(data?.error || `Fehler ${res.status}`, res.status);
+  if (!res.ok) throw new ApiError(data?.error || `Error ${res.status}`, res.status);
   return data;
 }
 

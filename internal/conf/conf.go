@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-// Package conf ist die Sicht der Weboberfläche auf die Konfiguration (übernommen aus dem Prototyp,
-// PLAN.md 3.11). Wahrheitsquelle ist config.json (D-02): FromConfig liest die für die Oberfläche
-// bearbeitbaren Teile, ApplyTo schreibt sie zurück. Geprüft wird ausschließlich mit config.Validate,
-// erzeugt ausschließlich mit internal/gen. Die JSON-Formen bleiben die des Prototyps, damit API und
-// Frontend unverändert bleiben.
+// Package conf is the web interface's view of the configuration (taken over from the prototype,
+// PLAN.md 3.11). The source of truth is config.json (D-02): FromConfig reads the parts the web interface
+// can edit, ApplyTo writes them back. Validation is done only with config.Validate,
+// generation only with internal/gen. The JSON forms stay those of the prototype, so the API and
+// frontend stay unchanged.
 package conf
 
 import (
@@ -17,15 +17,15 @@ import (
 	"vanilla-router/internal/config"
 )
 
-// Domain und LAN sind die Werte der geladenen Konfiguration (SetNetwork). Die Vorgaben gelten nur,
-// bis die erste Konfiguration geladen ist.
+// Domain and LAN are the values of the loaded configuration (SetNetwork). The defaults only apply
+// until the first configuration is loaded.
 var (
 	Domain    = "home.arpa"
 	LANPrefix = netip.MustParsePrefix("192.168.42.0/24")
 	RouterIP  = netip.MustParseAddr("192.168.42.1")
 )
 
-// SetNetwork übernimmt Domain und Heimnetz aus der Konfiguration.
+// SetNetwork takes over the domain and home network from the configuration.
 func SetNetwork(c *config.Config) {
 	if p, a, err := c.LANPrefix(); err == nil {
 		LANPrefix, RouterIP = p, a
@@ -35,7 +35,7 @@ func SetNetwork(c *config.Config) {
 	}
 }
 
-// Reservation ist eine feste DHCP-Adresse. Der Name wird zugleich als DNS-Name veröffentlicht.
+// Reservation is a fixed DHCP address. The name is also published as a DNS name.
 type Reservation struct {
 	Name    string `json:"name"`
 	MAC     string `json:"mac"`
@@ -43,19 +43,19 @@ type Reservation struct {
 	Comment string `json:"comment,omitempty"`
 }
 
-// Record ist ein zusätzlicher lokaler DNS-Name ohne DHCP-Reservierung.
+// Record is an additional local DNS name without a DHCP reservation.
 type Record struct {
 	Name string `json:"name"`
 	IP   string `json:"ip"`
 }
 
-// Pool ist der dynamische DHCP-Bereich.
+// Pool is the dynamic DHCP range.
 type Pool struct {
 	Start string `json:"start"`
 	End   string `json:"end"`
 }
 
-// PortForward wie im Prototyp: IntPort 0 = wie extern, Bereich mit ExtPortEnd.
+// PortForward as in the prototype: IntPort 0 = same as external, range with ExtPortEnd.
 type PortForward struct {
 	ID         string `json:"id"`
 	Proto      string `json:"proto"`
@@ -67,7 +67,7 @@ type PortForward struct {
 	Enabled    bool   `json:"enabled"`
 }
 
-// Block sperrt einem Gerät das Internet, immer oder zu Zeiten.
+// Block blocks a device from the internet, always or at certain times.
 type Block struct {
 	MAC     string `json:"mac"`
 	Name    string `json:"name,omitempty"`
@@ -78,7 +78,7 @@ type Block struct {
 	Enabled bool   `json:"enabled"`
 }
 
-// State ist der von der Oberfläche bearbeitbare Teil der Konfiguration.
+// State is the part of the configuration the web interface can edit.
 type State struct {
 	Version      int           `json:"version"`
 	Pool         Pool          `json:"pool"`
@@ -88,7 +88,7 @@ type State struct {
 	Blocks       []Block       `json:"blocks"`
 }
 
-// Clone liefert eine tiefe Kopie.
+// Clone returns a deep copy.
 func (s State) Clone() State {
 	c := s
 	c.Reservations = slices.Clone(s.Reservations)
@@ -98,7 +98,7 @@ func (s State) Clone() State {
 	return c
 }
 
-// FromConfig liest den State aus der Konfiguration.
+// FromConfig reads the State from the configuration.
 func FromConfig(c *config.Config) State {
 	s := State{Version: 1, Pool: Pool{c.DHCP.PoolStart, c.DHCP.PoolEnd},
 		Reservations: []Reservation{}, Records: []Record{}, PortForwards: []PortForward{}, Blocks: []Block{}}
@@ -122,7 +122,7 @@ func FromConfig(c *config.Config) State {
 	return s
 }
 
-// ApplyTo schreibt den State in eine Kopie der Konfiguration. Prüfen muss der Aufrufer (config.Validate).
+// ApplyTo writes the State to a copy of the configuration. The caller must validate (config.Validate).
 func (s State) ApplyTo(c *config.Config) *config.Config {
 	n := *c
 	n.DHCP.PoolStart, n.DHCP.PoolEnd = s.Pool.Start, s.Pool.End
@@ -151,25 +151,25 @@ func (s State) ApplyTo(c *config.Config) *config.Config {
 	return &n
 }
 
-// --- Eingaben normalisieren (Prüfung der Gesamtkonfiguration macht config.Validate) ---------
+// --- Normalize input (config.Validate checks the overall configuration) ---------
 
 var (
 	labelRe = regexp.MustCompile(`^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$`)
 	macRe   = regexp.MustCompile(`^[0-9a-f]{2}(:[0-9a-f]{2}){5}$`)
 )
 
-// NormalizeName macht aus "Drucker-1" oder "drucker-1.home.arpa" den Namen "drucker-1".
+// NormalizeName turns "Printer-1" or "printer-1.home.arpa" into the name "printer-1".
 func NormalizeName(s string) (string, error) {
 	s = strings.ToLower(strings.TrimSpace(s))
 	s = strings.TrimSuffix(s, ".")
 	s = strings.TrimSuffix(s, "."+Domain)
 	if !labelRe.MatchString(s) {
-		return "", fmt.Errorf("„%s“ ist kein gültiger Name: erlaubt sind a–z, 0–9 und Bindestriche, höchstens 63 Zeichen, nicht am Anfang oder Ende ein Bindestrich", s)
+		return "", fmt.Errorf("\"%s\" is not a valid name: allowed are a–z, 0–9 and hyphens, at most 63 characters, no hyphen at the start or end", s)
 	}
 	return s, nil
 }
 
-// NormalizeMAC akzeptiert aa:bb:…, AA-BB-… und aabb.ccdd.eeff.
+// NormalizeMAC accepts aa:bb:…, AA-BB-… and aabb.ccdd.eeff.
 func NormalizeMAC(s string) (string, error) {
 	r := strings.NewReplacer("-", ":", ".", "")
 	m := strings.ToLower(strings.TrimSpace(r.Replace(s)))
@@ -177,33 +177,33 @@ func NormalizeMAC(s string) (string, error) {
 		m = m[0:2] + ":" + m[2:4] + ":" + m[4:6] + ":" + m[6:8] + ":" + m[8:10] + ":" + m[10:12]
 	}
 	if !macRe.MatchString(m) {
-		return "", fmt.Errorf("„%s“ ist keine gültige MAC-Adresse", s)
+		return "", fmt.Errorf("\"%s\" is not a valid MAC address", s)
 	}
 	if m == "00:00:00:00:00:00" || m == "ff:ff:ff:ff:ff:ff" {
-		return "", fmt.Errorf("Die MAC-Adresse %s ist nicht erlaubt", m)
+		return "", fmt.Errorf("The MAC address %s is not allowed", m)
 	}
 	if b := m[1]; strings.ContainsRune("13579bdf", rune(b)) {
-		return "", fmt.Errorf("%s ist eine Multicast-Adresse und kann kein Gerät sein", m)
+		return "", fmt.Errorf("%s is a multicast address and cannot be a device", m)
 	}
 	return m, nil
 }
 
-// LocallyAdministered meldet MACs, die oft zufällig erzeugt sind (zweites Bit gesetzt).
+// LocallyAdministered reports MACs that are often randomly generated (second bit set).
 func LocallyAdministered(mac string) bool {
 	return len(mac) >= 2 && strings.ContainsRune("2367abef", rune(mac[1]))
 }
 
-// ParseLANIP prüft eine IPv4-Adresse im Heimnetz, die einem Gerät gehören darf.
+// ParseLANIP checks an IPv4 address in the home network that may belong to a device.
 func ParseLANIP(s string) (netip.Addr, error) {
 	a, err := netip.ParseAddr(strings.TrimSpace(s))
 	if err != nil || !a.Is4() {
-		return netip.Addr{}, fmt.Errorf("„%s“ ist keine gültige IPv4-Adresse", s)
+		return netip.Addr{}, fmt.Errorf("\"%s\" is not a valid IPv4 address", s)
 	}
 	if !LANPrefix.Contains(a) {
-		return netip.Addr{}, fmt.Errorf("%s liegt nicht im Heimnetz %s", a, LANPrefix)
+		return netip.Addr{}, fmt.Errorf("%s is not in the home network %s", a, LANPrefix)
 	}
 	if a == RouterIP {
-		return netip.Addr{}, fmt.Errorf("%s ist die Adresse des Routers", a)
+		return netip.Addr{}, fmt.Errorf("%s is the router's address", a)
 	}
 	return a, nil
 }

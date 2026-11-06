@@ -9,7 +9,7 @@ import (
 	"unsafe"
 )
 
-// Win32-Aufrufe über syscall, ohne fremde Bibliotheken (D-01, PLAN.md 3.12).
+// Win32 calls via syscall, without third-party libraries (D-01, PLAN.md 3.12).
 var (
 	user32   = syscall.NewLazyDLL("user32.dll")
 	kernel32 = syscall.NewLazyDLL("kernel32.dll")
@@ -177,7 +177,7 @@ type drawItemStruct struct {
 	ItemData                                      uintptr
 }
 
-// rgb macht aus einer Farbe ein COLORREF (0x00BBGGRR).
+// rgb turns a color into a COLORREF (0x00BBGGRR).
 func rgb(c color.NRGBA) uintptr { return uintptr(c.R) | uintptr(c.G)<<8 | uintptr(c.B)<<16 }
 
 func hex(v uint32) color.NRGBA { return color.NRGBA{uint8(v >> 16), uint8(v >> 8), uint8(v), 0xFF} }
@@ -189,7 +189,7 @@ func brush(c color.NRGBA) uintptr {
 
 func fillRect(dc uintptr, r rect, br uintptr) { pFillRect.Call(dc, uintptr(unsafe.Pointer(&r)), br) }
 
-// roundRect füllt ein Rechteck mit runden Ecken, mit Rand in border (border.A == 0: ohne Rand).
+// roundRect fills a rectangle with round corners, with a border in border (border.A == 0: no border).
 func roundRect(dc uintptr, r rect, radius int32, fill, border color.NRGBA) {
 	br := brush(fill)
 	var pen uintptr
@@ -201,7 +201,7 @@ func roundRect(dc uintptr, r rect, radius int32, fill, border color.NRGBA) {
 	oldB, _, _ := pSelectObject.Call(dc, br)
 	oldP, _, _ := pSelectObject.Call(dc, pen)
 	right, bottom := r.Right, r.Bottom
-	if border.A == 0 { // ohne Stift zeichnet RoundRect ein Pixel kleiner
+	if border.A == 0 { // without a pen RoundRect draws one pixel smaller
 		right, bottom = right+1, bottom+1
 	}
 	pRoundRect.Call(dc, uintptr(r.Left), uintptr(r.Top), uintptr(right), uintptr(bottom), uintptr(radius), uintptr(radius))
@@ -314,7 +314,7 @@ func u16(s string) *uint16 {
 	return p
 }
 
-// u16z erzeugt eine Liste nullterminierter Texte mit doppelter Null am Ende (Dateifilter).
+// u16z creates a list of null-terminated texts with a double null at the end (file filter).
 func u16z(parts ...string) *uint16 {
 	var b []uint16
 	for _, p := range parts {
@@ -345,8 +345,8 @@ func messageBox(owner uintptr, text, title string, flags uint32) int {
 	return int(r)
 }
 
-// windowsLocale liefert Gebietsschema (de-AT), Tastatur-KLID (00000407) und Zeitzonen-Schlüssel
-// (W. Europe Standard Time) für vr/stick.json (F-STICK-07).
+// windowsLocale returns the locale (de-AT), keyboard KLID (00000407) and time zone key
+// (W. Europe Standard Time) for vr/stick.json (F-STICK-07).
 func windowsLocale() (locale, klid, zone string) {
 	buf := make([]uint16, 85)
 	if r, _, _ := pGetUserDefaultLocale.Call(uintptr(unsafe.Pointer(&buf[0])), uintptr(len(buf))); r != 0 {
@@ -356,7 +356,7 @@ func windowsLocale() (locale, klid, zone string) {
 	if r, _, _ := pGetKeyboardLayoutNameW.Call(uintptr(unsafe.Pointer(&kb[0]))); r != 0 {
 		klid = syscall.UTF16ToString(kb)
 	}
-	// DYNAMIC_TIME_ZONE_INFORMATION: TimeZoneKeyName beginnt bei Byte 172.
+	// DYNAMIC_TIME_ZONE_INFORMATION: TimeZoneKeyName starts at byte 172.
 	var tz [216]uint16
 	if r, _, _ := pGetDynamicTimeZoneInfo.Call(uintptr(unsafe.Pointer(&tz[0]))); r != 0xFFFFFFFF {
 		zone = syscall.UTF16ToString(tz[86 : 86+128])
@@ -364,7 +364,7 @@ func windowsLocale() (locale, klid, zone string) {
 	return
 }
 
-// germanUI: Ist die Anzeigesprache von Windows Deutsch (F-STICK-09)?
+// germanUI: is the Windows display language German (F-STICK-09)?
 func germanUI() bool {
 	r, _, _ := pGetUserDefaultUILang.Call()
 	return r&0x3ff == 0x07

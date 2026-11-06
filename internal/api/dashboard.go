@@ -13,7 +13,7 @@ import (
 	"vanilla-router/internal/sys"
 )
 
-// Dienste, die auf der Übersicht als Kacheln erscheinen
+// Services that appear as tiles on the overview
 var dashboardUnits = []string{
 	"vr-dnsmasq", "systemd-networkd", "vr-firewall", "vr-pppoe", "ssh", "unattended-upgrades",
 	"smbd", "docker",
@@ -56,11 +56,11 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, resp)
 }
 
-// handleEvents sendet alle 2 Sekunden die Live-Werte als Server-Sent Events.
+// handleEvents sends the live values every 2 seconds as server-sent events.
 func (s *Server) handleEvents(w http.ResponseWriter, r *http.Request) {
 	flusher, ok := w.(http.Flusher)
 	if !ok {
-		writeError(w, http.StatusInternalServerError, "Streaming nicht möglich.")
+		writeError(w, http.StatusInternalServerError, "Streaming is not possible.")
 		return
 	}
 	w.Header().Set("Content-Type", "text/event-stream")
@@ -82,7 +82,7 @@ func (s *Server) handleEvents(w http.ResponseWriter, r *http.Request) {
 	if !send() {
 		return
 	}
-	// Sitzung läuft ab → Stream beenden, das Frontend meldet sich dann neu an
+	// Session expires → end the stream, the frontend then signs in again
 	cookie, _ := r.Cookie(cookieName)
 	for {
 		select {

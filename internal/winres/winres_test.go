@@ -9,7 +9,7 @@ import (
 	"testing"
 )
 
-func TestManifestObjekt(t *testing.T) {
+func TestManifestObject(t *testing.T) {
 	xml := []byte(`<?xml version="1.0"?><assembly/>`)
 	f, err := pe.NewFile(bytes.NewReader(Manifest(xml)))
 	if err != nil {
@@ -27,30 +27,30 @@ func TestManifestObjekt(t *testing.T) {
 		t.Fatal(err)
 	}
 	le := binary.LittleEndian
-	// Typ → Name → Sprache → Dateneintrag
+	// type → name → language → data entry
 	if le.Uint16(data[14:]) != 1 || le.Uint32(data[16:]) != rtManifest || le.Uint32(data[20:]) != 0x80000000|24 {
-		t.Error("Typ-Ebene")
+		t.Error("type level")
 	}
 	if le.Uint32(data[64:]) != langEnUS || le.Uint32(data[68:]) != 72 {
-		t.Error("Sprach-Ebene")
+		t.Error("language level")
 	}
 	if le.Uint32(data[72:]) != 88 || le.Uint32(data[76:]) != uint32(len(xml)) {
-		t.Error("Dateneintrag")
+		t.Error("data entry")
 	}
 	if !bytes.Equal(data[88:88+len(xml)], xml) || len(data)%8 != 0 {
-		t.Error("Daten")
+		t.Error("data")
 	}
 	if len(f.Symbols) != 1 || f.Symbols[0].Name != ".rsrc" || f.Symbols[0].SectionNumber != 1 {
 		t.Errorf("%+v", f.Symbols)
 	}
 }
 
-// fakeICO baut eine .ico-Datei mit zwei Bildern (Inhalt beliebig).
+// fakeICO builds an .ico file with two images (any content).
 func fakeICO() []byte {
 	le := binary.LittleEndian
 	var b bytes.Buffer
 	binary.Write(&b, le, [3]uint16{0, 1, 2})
-	imgs := [][]byte{[]byte("klein"), []byte("groesseres Bild")}
+	imgs := [][]byte{[]byte("small"), []byte("bigger image")}
 	off := 6 + 16*len(imgs)
 	for i, img := range imgs {
 		b.Write([]byte{byte(16 * (i + 1)), byte(16 * (i + 1)), 0, 0})
@@ -64,8 +64,8 @@ func fakeICO() []byte {
 	return b.Bytes()
 }
 
-// TestIconUndManifest geht den Ressourcenbaum durch, wie Windows ihn liest.
-func TestIconUndManifest(t *testing.T) {
+// TestIconAndManifest walks through the resource tree the way Windows reads it.
+func TestIconAndManifest(t *testing.T) {
 	xml := []byte(`<assembly/>`)
 	res := append(Icon(fakeICO(), 1, 1), Resource{rtManifest, 1, xml})
 	f, err := pe.NewFile(bytes.NewReader(Build(res)))
@@ -75,7 +75,7 @@ func TestIconUndManifest(t *testing.T) {
 	s := f.Sections[0]
 	data, _ := s.Data()
 	if len(s.Relocs) != len(res) {
-		t.Fatalf("%d Relokationen", len(s.Relocs))
+		t.Fatalf("%d relocations", len(s.Relocs))
 	}
 	le := binary.LittleEndian
 	type found struct {
@@ -100,26 +100,26 @@ func TestIconUndManifest(t *testing.T) {
 		for _, ie := range entries(te[1] &^ highBit) {
 			le2 := entries(ie[1] &^ highBit)
 			if len(le2) != 1 || le2[0][0] != langEnUS || le2[0][1]&highBit != 0 {
-				t.Fatal("Sprach-Ebene")
+				t.Fatal("language level")
 			}
 			d := le2[0][1]
 			if !relocs[d] {
-				t.Errorf("keine Relokation für Dateneintrag bei %d", d)
+				t.Errorf("no relocation for data entry at %d", d)
 			}
 			off, size := le.Uint32(data[d:]), le.Uint32(data[d+4:])
 			if off%8 != 0 {
-				t.Errorf("Daten bei %d nicht ausgerichtet", off)
+				t.Errorf("data at %d not aligned", off)
 			}
 			got = append(got, found{te[0], ie[0], data[off : off+size]})
 		}
 	}
-	if len(got) != 4 || got[0].typ != rtIcon || string(got[1].data) != "groesseres Bild" ||
+	if len(got) != 4 || got[0].typ != rtIcon || string(got[1].data) != "bigger image" ||
 		got[2].typ != rtGroupIcon || got[3].typ != rtManifest || !bytes.Equal(got[3].data, xml) {
 		t.Fatalf("%+v", got)
 	}
 	grp := got[2].data
 	if le.Uint16(grp[4:]) != 2 || len(grp) != 6+14*2 || le.Uint16(grp[6+12:]) != 1 || le.Uint16(grp[6+14+12:]) != 2 ||
-		le.Uint32(grp[6+14+8:]) != uint32(len("groesseres Bild")) || grp[6+14] != 32 {
-		t.Errorf("Gruppe: % x", grp)
+		le.Uint32(grp[6+14+8:]) != uint32(len("bigger image")) || grp[6+14] != 32 {
+		t.Errorf("group: % x", grp)
 	}
 }

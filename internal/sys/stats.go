@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-// Package sys liest Systemwerte, die ohne root-Rechte zugänglich sind.
+// Package sys reads system values that are accessible without root.
 package sys
 
 import (
@@ -13,7 +13,7 @@ import (
 	"time"
 )
 
-// ProcRoot erlaubt Tests mit nachgebauten /proc- und /sys-Bäumen.
+// ProcRoot allows tests with fake /proc and /sys trees.
 var ProcRoot = "/"
 
 func p(path string) string { return filepath.Join(ProcRoot, path) }
@@ -75,7 +75,7 @@ func ReadMemory() (Memory, error) {
 	return m, sc.Err()
 }
 
-// NetCounters sind die kumulierten Zähler eines Interfaces.
+// NetCounters are the cumulative counters of an interface.
 type NetCounters struct {
 	RxBytes uint64 `json:"rx_bytes"`
 	TxBytes uint64 `json:"tx_bytes"`
@@ -126,7 +126,7 @@ func LoadAvg() [3]float64 {
 	return l
 }
 
-// Temperature liefert die CPU-Temperatur in °C, bevorzugt x86_pkg_temp.
+// Temperature returns the CPU temperature in °C, preferring x86_pkg_temp.
 func Temperature() (float64, bool) {
 	zones, _ := filepath.Glob(p("sys/class/thermal/thermal_zone*"))
 	best, found := 0.0, false
@@ -169,7 +169,7 @@ func Kernel() string {
 	return strings.TrimSpace(string(b))
 }
 
-// Rate ist der aktuelle Durchsatz eines Interfaces in Byte pro Sekunde.
+// Rate is the current throughput of an interface in bytes per second.
 type Rate struct {
 	Rx      float64 `json:"rx"`
 	Tx      float64 `json:"tx"`
@@ -177,17 +177,17 @@ type Rate struct {
 	TxTotal uint64  `json:"tx_total"`
 }
 
-// Live sind die Werte, die der Sampler laufend aktualisiert.
+// Live holds the values the sampler keeps updating.
 type Live struct {
 	Time time.Time       `json:"time"`
-	CPU  float64         `json:"cpu"` // Prozent
+	CPU  float64         `json:"cpu"` // percent
 	Mem  Memory          `json:"mem"`
 	Net  map[string]Rate `json:"net"`
 }
 
-// Sampler misst in festen Abständen CPU-Last und Traffic.
+// Sampler measures CPU load and traffic at fixed intervals.
 type Sampler struct {
-	Labels  []string // Schlüssel in Live.Net je Interface, leer = Name des Interfaces
+	Labels  []string // key in Live.Net per interface, empty = name of the interface
 	mu      sync.RWMutex
 	live    Live
 	lastCPU cpuTimes
@@ -198,8 +198,8 @@ type Sampler struct {
 
 func NewSampler(ifaces ...string) *Sampler { return &Sampler{Ifaces: ifaces} }
 
-// NewWANLANSampler misst das Uplink-Interface (wan0 oder bei PPPoE ppp0) und lan0, meldet sie aber
-// immer unter den Schlüsseln "wan0" und "lan0", wie Verlauf und Frontend sie erwarten.
+// NewWANLANSampler measures the uplink interface (wan0 or with PPPoE ppp0) and lan0, but always reports them
+// under the keys "wan0" and "lan0", as the history and frontend expect.
 func NewWANLANSampler(uplink, lan string) *Sampler {
 	return &Sampler{Ifaces: []string{uplink, lan}, Labels: []string{"wan0", "lan0"}}
 }

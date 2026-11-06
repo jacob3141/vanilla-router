@@ -1,16 +1,16 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-// Package snapshot sichert das System vor Updates und nimmt ein kaputtes Update automatisch zurück
-// (M5, P-06, F-UPD-02/03, Q-03). Ohne snapper (universe, D-10), nur mit btrfs und GRUB:
+// Package snapshot backs up the system before updates and automatically rolls back a broken update
+// (M5, P-06, F-UPD-02/03, Q-03). Without snapper (universe, D-10), only with btrfs and GRUB:
 //
-//  1. Vor jedem apt-Lauf: Snapshot von @ nach @snapshots/<id>, Boot-Eintrag „Stand vor dem Update“
-//     in ESP/vr/rollback.cfg, Status in ESP/vr/grubenv: vr_pending=1 (nächster Start ist ein Versuch).
-//  2. GRUB (42_vanilla_router): Ist vr_pending=1 und vr_trial schon 1, kam der letzte Versuch nie bei
-//     der Gesundheitsprüfung an → Standard ist der Snapshot. Sonst vr_trial=1 setzen und normal starten.
-//     Die Umgebung liegt auf der ESP (FAT), weil GRUB auf btrfs nicht schreiben kann.
-//  3. vr-health.service: Läuft das Heimnetz, wird der Start bestätigt (vr_pending=0, vr_trial=0).
-//     Wurde aus einem Snapshot gestartet (vr.rollback=<id> in der Kernel-Zeile), wird er dauerhaft:
-//     @ wird zu @kaputt-<zeit>, der Snapshot wird das neue @.
+//  1. Before each apt run: snapshot of @ to @snapshots/<id>, boot entry "state before the update"
+//     in ESP/vr/rollback.cfg, status in ESP/vr/grubenv: vr_pending=1 (next start is an attempt).
+//  2. GRUB (42_vanilla_router): if vr_pending=1 and vr_trial is already 1, the last attempt never reached
+//     the health check → the default is the snapshot. Otherwise set vr_trial=1 and start normally.
+//     The environment is on the ESP (FAT), because GRUB cannot write to btrfs.
+//  3. vr-health.service: if the home network works, the start is confirmed (vr_pending=0, vr_trial=0).
+//     If started from a snapshot (vr.rollback=<id> on the kernel line), it becomes permanent:
+//     @ becomes @broken-<time>, the snapshot becomes the new @.
 package snapshot
 
 import (
@@ -24,24 +24,24 @@ import (
 	"time"
 )
 
-// Runner führt Programme aus.
+// Runner runs programs.
 type Runner interface {
 	Run(env []string, name string, args ...string) ([]byte, error)
 }
 
-// Manager verwaltet Snapshots.
+// Manager manages snapshots.
 type Manager struct {
 	Run      Runner
-	Root     string // "/" im Betrieb
-	SnapDir  string // Einhängepunkt von @snapshots, Vorgabe /.snapshots
-	ESP      string // Vorgabe /boot/efi
-	Device   string // btrfs-Gerät für das Einhängen der obersten Ebene, Vorgabe aus findmnt
-	RootUUID string // UUID des btrfs, Vorgabe aus findmnt
+	Root     string // "/" in production
+	SnapDir  string // mount point of @snapshots, default /.snapshots
+	ESP      string // default /boot/efi
+	Device   string // btrfs device for mounting the top level, default from findmnt
+	RootUUID string // UUID of the btrfs, default from findmnt
 	Now      func() time.Time
-	Keep     int // so viele Update-Snapshots aufheben, Vorgabe 5
+	Keep     int // keep this many update snapshots, default 5
 }
 
-// Info beschreibt einen Snapshot.
+// Info describes a snapshot.
 type Info struct {
 	ID      string    `json:"id"`
 	Created time.Time `json:"created"`
@@ -92,7 +92,7 @@ func (m *Manager) setEnv(kv ...string) error {
 	return err
 }
 
-// List liefert die Snapshots, älteste zuerst.
+// List returns the snapshots, oldest first.
 func (m *Manager) List() ([]Info, error) {
 	files, err := filepath.Glob(m.p(filepath.Join(m.snapDir(), "*.json")))
 	if err != nil {
@@ -113,8 +113,8 @@ func (m *Manager) List() ([]Info, error) {
 	return out, nil
 }
 
-// PreUpdate legt vor einem apt-Lauf einen Snapshot an. Mehrere dpkg-Aufrufe in einem apt-Lauf
-// ergeben nur einen Snapshot (Abstand mindestens 10 Minuten).
+// PreUpdate creates a snapshot before an apt run. Several dpkg calls in one apt run
+// result in only one snapshot (at least 10 minutes apart).
 func (m *Manager) PreUpdate(note string) (*Info, error) {
 	list, err := m.List()
 	if err != nil {
@@ -139,7 +139,7 @@ func (m *Manager) PreUpdate(note string) (*Info, error) {
 	return info, nil
 }
 
-// Create legt einen Snapshot von / an.
+// Create creates a snapshot of /.
 func (m *Manager) Create(kind, note string) (*Info, error) {
 	id := m.now().UTC().Format("20060102-150405") + "-" + kind
 	dst := filepath.Join(m.snapDir(), id)
@@ -154,7 +154,7 @@ func (m *Manager) Create(kind, note string) (*Info, error) {
 	return info, nil
 }
 
-// Pending meldet, ob der laufende Start ein Versuch nach einem Update ist (vr_pending=1).
+// Pending reports whether the running start is an attempt after an update (vr_pending=1).
 func (m *Manager) Pending() bool {
 	out, err := m.run("grub-editenv", m.p(m.grubenv()), "list")
 	if err != nil {
@@ -168,9 +168,9 @@ func (m *Manager) Pending() bool {
 	return false
 }
 
-// writeRollbackEntry schreibt den GRUB-Eintrag für den Snapshot auf die ESP. Kernel und initrd kommen
-// aus dem Snapshot selbst, passen also immer zum System darin. Direkt mit rw: Die fstab im Snapshot
-// nennt subvol=@, ein späteres Umhängen von ro auf rw würde daran scheitern.
+// writeRollbackEntry writes the GRUB entry for the snapshot to the ESP. Kernel and initrd come
+// from the snapshot itself, so they always match the system in it. Directly with rw: the fstab in the
+// snapshot names subvol=@, a later remount from ro to rw would fail on that.
 func (m *Manager) writeRollbackEntry(i Info) error {
 	uuid, err := m.rootUUID()
 	if err != nil {
@@ -178,8 +178,8 @@ func (m *Manager) writeRollbackEntry(i Info) error {
 	}
 	sub := "@snapshots/" + i.ID
 	when := i.Created.Local().Format("02.01.2006 15:04")
-	cfg := fmt.Sprintf(`# Von vanilla-router erzeugt (vrctl snapshot), nicht von Hand ändern.
-menuentry 'vanilla-router: Stand vor dem Update vom %s' --id vr-rollback {
+	cfg := fmt.Sprintf(`# Generated by vanilla-router (vrctl snapshot), do not edit by hand.
+menuentry 'vanilla-router: state before the update of %s' --id vr-rollback {
 	insmod btrfs
 	search --no-floppy --fs-uuid --set=root %s
 	linux /%s/boot/vmlinuz root=UUID=%s rootflags=subvol=%s rw quiet vr.rollback=%s
@@ -199,7 +199,7 @@ func (m *Manager) rootUUID() (string, error) {
 	return m.run("findmnt", "-no", "UUID", "/")
 }
 
-// Prune löscht alte Update-Snapshots, die neuesten Keep bleiben.
+// Prune deletes old update snapshots, the newest Keep stay.
 func (m *Manager) Prune() {
 	keep := m.Keep
 	if keep == 0 {
@@ -222,7 +222,7 @@ func (m *Manager) Prune() {
 	}
 }
 
-// BootedSnapshot liefert die ID, wenn aus einem Rücknahme-Eintrag gestartet wurde.
+// BootedSnapshot returns the ID if started from a rollback entry.
 func (m *Manager) BootedSnapshot() string {
 	b, err := os.ReadFile(m.p("/proc/cmdline"))
 	if err != nil {
@@ -236,8 +236,8 @@ func (m *Manager) BootedSnapshot() string {
 	return ""
 }
 
-// MarkGood bestätigt den aktuellen Start. Lief das System aus einem Snapshot, wird dieser dauerhaft
-// zum System (Rücknahme abschließen) und es wird true geliefert.
+// MarkGood confirms the current start. If the system ran from a snapshot, it permanently
+// becomes the system (finishing the rollback) and true is returned.
 func (m *Manager) MarkGood() (rolledBack bool, err error) {
 	if id := m.BootedSnapshot(); id != "" {
 		if err := m.MakePermanent(id); err != nil {
@@ -248,11 +248,11 @@ func (m *Manager) MarkGood() (rolledBack bool, err error) {
 	return rolledBack, m.setEnv("vr_pending=0", "vr_trial=0")
 }
 
-// MakePermanent macht den Snapshot id zum neuen @. Das alte @ bleibt als @kaputt-<zeit> zur Analyse.
-// Wirkt beim nächsten Start, das laufende System bleibt unberührt.
+// MakePermanent makes snapshot id the new @. The old @ stays as @broken-<time> for analysis.
+// Takes effect at the next start, the running system stays untouched.
 func (m *Manager) MakePermanent(id string) error {
 	if strings.ContainsAny(id, "/ ") || id == "" {
-		return fmt.Errorf("ungültige Snapshot-Kennung %q", id)
+		return fmt.Errorf("invalid snapshot ID %q", id)
 	}
 	dev := m.Device
 	if dev == "" {
@@ -270,12 +270,12 @@ func (m *Manager) MakePermanent(id string) error {
 		return err
 	}
 	defer m.run("umount", top)
-	broken := "@kaputt-" + m.now().UTC().Format("20060102-150405")
+	broken := "@broken-" + m.now().UTC().Format("20060102-150405")
 	if err := os.Rename(filepath.Join(top, "@"), filepath.Join(top, broken)); err != nil {
-		return fmt.Errorf("@ umbenennen: %w", err)
+		return fmt.Errorf("renaming @: %w", err)
 	}
 	if _, err := m.run("btrfs", "subvolume", "snapshot", filepath.Join(top, "@snapshots", id), filepath.Join(top, "@")); err != nil {
-		os.Rename(filepath.Join(top, broken), filepath.Join(top, "@")) // zurück, nichts kaputt machen
+		os.Rename(filepath.Join(top, broken), filepath.Join(top, "@")) // back, break nothing
 		return err
 	}
 	return nil

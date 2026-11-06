@@ -11,23 +11,23 @@ import (
 	"vanilla-router/internal/gen"
 )
 
-// HealthCheck prüft einmal, ob der Router seine Grundaufgabe erfüllt: Firewall geladen, DNS/DHCP läuft,
-// Heimnetz hat seine Adresse. Das Internet wird bewusst nicht geprüft (Modem kann aus sein).
+// HealthCheck checks once whether the router does its basic job: firewall loaded, DNS/DHCP running,
+// home network has its address. The internet is deliberately not checked (the modem may be off).
 func HealthCheck(r Runner, c *config.Config) error {
 	if _, err := r.Run(nil, "nft", "list", "table", "inet", "vr_filter"); err != nil {
-		return fmt.Errorf("Firewall ist nicht geladen")
+		return fmt.Errorf("firewall is not loaded")
 	}
 	if _, err := r.Run(nil, "systemctl", "is-active", "--quiet", "vr-dnsmasq.service"); err != nil {
-		return fmt.Errorf("DNS/DHCP-Dienst läuft nicht")
+		return fmt.Errorf("DNS/DHCP service is not running")
 	}
 	out, err := r.Run(nil, "ip", "-4", "-o", "addr", "show", "dev", gen.LANIf)
 	if err != nil || !strings.Contains(string(out), c.LAN.IPv4) {
-		return fmt.Errorf("Heimnetz-Adresse %s fehlt an %s", c.LAN.IPv4, gen.LANIf)
+		return fmt.Errorf("home network address %s is missing on %s", c.LAN.IPv4, gen.LANIf)
 	}
 	return nil
 }
 
-// WaitHealthy wiederholt HealthCheck bis zum Erfolg oder bis timeout.
+// WaitHealthy repeats HealthCheck until it succeeds or until timeout.
 func WaitHealthy(r Runner, c *config.Config, timeout time.Duration, sleep func(time.Duration)) error {
 	if sleep == nil {
 		sleep = time.Sleep

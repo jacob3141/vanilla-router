@@ -86,7 +86,7 @@ func newServer(t *testing.T, f *fixture) *server {
 
 func testKeys() []manifest.PublicKey { return []manifest.PublicKey{manifest.Public(seed)} }
 
-func TestManifestUndOffline(t *testing.T) {
+func TestManifestAndOffline(t *testing.T) {
 	f := newFixture(t, "0.1.0")
 	srv := newServer(t, f)
 	cache := t.TempDir()
@@ -100,14 +100,14 @@ func TestManifestUndOffline(t *testing.T) {
 	if err != nil || !offline || m.Version != "0.1.0" {
 		t.Fatalf("offline: %v %v %v", m, offline, err)
 	}
-	// Ohne Zwischenspeicher: klare Meldung
+	// Without a cache: a clear message
 	src2 := newSource(srv.URL+"/stick/manifest.json", t.TempDir(), testKeys())
 	if _, _, err := src2.manifest(context.Background()); !errors.Is(err, errOffline) {
 		t.Fatal(err)
 	}
 }
 
-func TestFremderSchluessel(t *testing.T) {
+func TestForeignKey(t *testing.T) {
 	f := newFixture(t, "0.1.0")
 	f.sig, _ = manifest.Sign(f.mdata, bytes.Repeat([]byte{1}, 32))
 	srv := newServer(t, f)
@@ -123,7 +123,7 @@ func TestFremderSchluessel(t *testing.T) {
 	}
 }
 
-func TestDownloadFortsetzenUndAufraeumen(t *testing.T) {
+func TestDownloadResumeAndCleanup(t *testing.T) {
 	f := newFixture(t, "0.2.0")
 	srv := newServer(t, f)
 	cache := t.TempDir()
@@ -138,22 +138,22 @@ func TestDownloadFortsetzenUndAufraeumen(t *testing.T) {
 	}
 	got, _ := os.ReadFile(im.path)
 	if !bytes.Equal(got, f.file) || last != f.m.File.Size || !im.cached {
-		t.Fatal("Datei falsch")
+		t.Fatal("wrong file")
 	}
 	if len(srv.ranges) != 1 || !strings.HasPrefix(srv.ranges[0], "bytes=") {
-		t.Errorf("kein Fortsetzen: %v", srv.ranges)
+		t.Errorf("no resume: %v", srv.ranges)
 	}
 	if _, err := os.Stat(filepath.Join(cache, "vanilla-router-stick-0.1.0.img.gz")); !os.IsNotExist(err) {
-		t.Error("altes Abbild nicht gelöscht")
+		t.Error("old image not deleted")
 	}
-	// Zweiter Aufruf lädt nichts mehr.
+	// The second call downloads nothing.
 	srv.Close()
 	if _, err := src.download(context.Background(), f.m, nil); err != nil {
 		t.Fatal(err)
 	}
 }
 
-// fakeDev ist ein Stick im Speicher.
+// fakeDev is a stick in memory.
 type fakeDev struct {
 	b      []byte
 	closed bool
@@ -173,7 +173,7 @@ func runJob(t *testing.T, src *source, im *image, d windisk.Disk, p platform) jo
 	return j.state()
 }
 
-func TestAblauf(t *testing.T) {
+func TestFlow(t *testing.T) {
 	f := newFixture(t, "0.1.0")
 	srv := newServer(t, f)
 	cache := t.TempDir()
@@ -197,23 +197,23 @@ func TestAblauf(t *testing.T) {
 		t.Fatalf("stick.json: %+v %v", in, err)
 	}
 	if !bytes.Equal(dev.b[:2<<20], f.img[:2<<20]) {
-		t.Error("Inhalt falsch")
+		t.Error("wrong content")
 	}
 
-	// Zu kleiner Stick: nichts laden, nichts schreiben
+	// Stick too small: download nothing, write nothing
 	small := windisk.Disk{Number: 3, Size: 1 << 20}
 	if s := runJob(t, src, ps.im, small, p); !errors.Is(s.err, stickwrite.ErrTooSmall) || s.wrote {
 		t.Fatalf("%+v", s)
 	}
 
-	// Abbild liegt auf dem Ziel-Stick
+	// Image is on the target stick
 	p2 := p
 	p2.disksOfPath = func(string) []int { return []int{3} }
 	if s := runJob(t, src, ps.im, d, p2); !errors.Is(s.err, errOnStick) || s.wrote {
 		t.Fatalf("%+v", s)
 	}
 
-	// Beschädigtes Abbild im Zwischenspeicher wird gelöscht
+	// A damaged image in the cache is deleted
 	cached := filepath.Join(cache, f.m.File.Name)
 	bad := append([]byte(nil), f.file...)
 	bad[100] ^= 1
@@ -222,17 +222,17 @@ func TestAblauf(t *testing.T) {
 		t.Fatalf("%+v", s)
 	}
 	if _, err := os.Stat(cached); !os.IsNotExist(err) {
-		t.Error("beschädigtes Abbild nicht gelöscht")
+		t.Error("damaged image not deleted")
 	}
-	if txt := errText(stickwrite.ErrCorrupt, false, false); !strings.Contains(txt, "neu heruntergeladen") {
+	if txt := errText(stickwrite.ErrCorrupt, false, false); !strings.Contains(txt, "downloaded") {
 		t.Error(txt)
 	}
 }
 
-func TestLokaleDatei(t *testing.T) {
+func TestLocalFile(t *testing.T) {
 	f := newFixture(t, "0.1.0")
 	dir := t.TempDir()
-	path := filepath.Join(dir, "abbild.img.gz")
+	path := filepath.Join(dir, "image.img.gz")
 	os.WriteFile(path, f.file, 0o644)
 	if _, err := localImage(path, testKeys()); !errors.Is(err, errLocalManifest) {
 		t.Fatal(err)
@@ -249,12 +249,12 @@ func TestLokaleDatei(t *testing.T) {
 	}
 }
 
-func TestTexte(t *testing.T) {
+func TestTexts(t *testing.T) {
 	for _, l := range []lang{langDE, langEN} {
 		uiLang = l
 		for k, v := range texts {
 			if v[0] == "" || v[1] == "" {
-				t.Errorf("%s: Text fehlt", k)
+				t.Errorf("%s: text is missing", k)
 			}
 		}
 		for _, e := range []error{windisk.ErrWriteProtected, windisk.ErrRemoved, windisk.ErrBusy, windisk.ErrChanged,
@@ -265,7 +265,7 @@ func TestTexte(t *testing.T) {
 			}
 		}
 		if errText(context.Canceled, false, true) != tr("canceled_wrote") {
-			t.Error("Abbruch")
+			t.Error("abort")
 		}
 	}
 	uiLang = langDE

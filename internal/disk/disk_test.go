@@ -28,11 +28,11 @@ func mk(t *testing.T, root, devPath string, files map[string]string) {
 	}
 }
 
-func TestListUndKandidaten(t *testing.T) {
+func TestListAndCandidates(t *testing.T) {
 	root := t.TempDir()
 	gb := func(n int64) string { return strconv.FormatInt(n*1e9/512, 10) }
-	mk(t, root, "pci0000:00/0000:00:1d.0/0000:03:00.0/nvme/nvme0/nvme0n1", map[string]string{"size": gb(256), "removable": "0", "queue/rotational": "0", "device/model": "Beispiel NVMe 256GB  "})
-	mk(t, root, "pci0000:00/0000:00:17.0/ata1/host0/target0:0:0/0:0:0:0/block/sda", map[string]string{"size": gb(1000), "removable": "0", "queue/rotational": "1", "device/model": "Beispiel HDD"})
+	mk(t, root, "pci0000:00/0000:00:1d.0/0000:03:00.0/nvme/nvme0/nvme0n1", map[string]string{"size": gb(256), "removable": "0", "queue/rotational": "0", "device/model": "Example NVMe 256GB  "})
+	mk(t, root, "pci0000:00/0000:00:17.0/ata1/host0/target0:0:0/0:0:0:0/block/sda", map[string]string{"size": gb(1000), "removable": "0", "queue/rotational": "1", "device/model": "Example HDD"})
 	mk(t, root, "pci0000:00/0000:00:14.0/usb2/2-1/2-1:1.0/host6/target6:0:0/6:0:0:0/block/sdb", map[string]string{"size": gb(32), "removable": "1", "queue/rotational": "0", "device/model": "Stick"})
 	mk(t, root, "pci0000:00/0000:00:14.0/usb2/2-2/2-2:1.0/host7/target7:0:0/7:0:0:0/block/sdc", map[string]string{"size": gb(8), "removable": "1", "queue/rotational": "0"})
 	mk(t, root, "virtual/block/loop0", map[string]string{"size": gb(1)})
@@ -43,21 +43,21 @@ func TestListUndKandidaten(t *testing.T) {
 		t.Fatal(err)
 	}
 	if len(ds) != 4 {
-		t.Fatalf("%d Datenträger: %+v", len(ds), ds)
+		t.Fatalf("%d disks: %+v", len(ds), ds)
 	}
 	c := Candidates(ds)
 	var names []string
 	for _, d := range c {
 		names = append(names, d.Name)
 	}
-	// sda (1 TB) vor nvme0n1 (256 GB), Stick sdb ausgeschlossen (Boot), sdc zu klein
+	// sda (1 TB) before nvme0n1 (256 GB), stick sdb excluded (boot), sdc too small
 	if strings.Join(names, " ") != "sda nvme0n1" {
-		t.Errorf("Kandidaten %v", names)
+		t.Errorf("candidates %v", names)
 	}
-	if l := c[1].Label(); l != "NVMe-SSD Beispiel NVMe 256GB (256 GB)" {
+	if l := c[1].Label(); l != "NVMe SSD Example NVMe 256GB (256 GB)" {
 		t.Errorf("Label %q", l)
 	}
-	if l := c[0].Label(); l != "Festplatte Beispiel HDD (1.0 TB)" {
+	if l := c[0].Label(); l != "Hard disk Example HDD (1.0 TB)" {
 		t.Errorf("Label %q", l)
 	}
 }
@@ -81,7 +81,7 @@ func TestBootDisk(t *testing.T) {
 	if got := BootDisk(root, mi, "/"); got != "sdb" {
 		t.Errorf("BootDisk = %q", got)
 	}
-	if got := BootDisk(root, mi, "/run/fehlt"); got != "" {
+	if got := BootDisk(root, mi, "/run/missing"); got != "" {
 		t.Errorf("%q", got)
 	}
 }

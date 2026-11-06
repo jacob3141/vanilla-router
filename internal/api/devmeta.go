@@ -21,24 +21,24 @@ import (
 	"vanilla-router/internal/sys"
 )
 
-// DevMeta sind Angaben zu einem Gerät, die nur die Oberfläche betreffen (wie bei der FRITZ!Box):
-// eigener Name, Notiz und wann es zuerst und zuletzt gesehen wurde.
+// DevMeta holds details about a device that only concern the web interface (as on the FRITZ!Box):
+// a custom name, a note, and when it was first and last seen.
 type DevMeta struct {
 	Alias     string    `json:"alias,omitempty"`
 	Note      string    `json:"note,omitempty"`
 	FirstSeen time.Time `json:"first_seen,omitzero"`
 	LastSeen  time.Time `json:"last_seen,omitzero"`
-	Baseline  bool      `json:"baseline,omitempty"` // war schon beim ersten Durchlauf da, gilt nie als „neu“
+	Baseline  bool      `json:"baseline,omitempty"` // was already there on the first pass, never counts as "new"
 }
 
-// NewWindow: so lange gilt ein Gerät nach dem ersten Auftauchen als neu.
+// NewWindow: how long a device counts as new after it first appears.
 const NewWindow = 24 * time.Hour
 
 type DeviceStore struct {
 	mu    sync.Mutex
 	m     map[string]*DevMeta
 	file  string
-	fresh bool // Datei gab es noch nicht: der erste Durchlauf legt nur die Ausgangslage fest
+	fresh bool // The file did not exist yet: the first pass only sets the baseline
 }
 
 func NewDeviceStore(dataDir string) *DeviceStore {
@@ -56,7 +56,7 @@ func NewDeviceStore(dataDir string) *DeviceStore {
 	return s
 }
 
-// Seen vermerkt Geräte, die gerade online sind oder eine aktive Lease haben.
+// Seen records devices that are currently online or have an active lease.
 func (s *DeviceStore) Seen(macs []string, now time.Time) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -93,7 +93,7 @@ func (s *DeviceStore) SetMeta(mac, alias, note string) {
 	s.saveLocked()
 }
 
-// NewSince zählt Geräte, die seit dem Zeitpunkt zum ersten Mal aufgetaucht sind.
+// NewSince counts devices that have appeared for the first time since the given moment.
 func (s *DeviceStore) NewSince(t time.Time) int {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -117,7 +117,7 @@ func (s *DeviceStore) saveLocked() {
 	}
 }
 
-// track vermerkt alle 2 Minuten, welche Geräte da sind, auch wenn niemand die Oberfläche offen hat.
+// track records every 2 minutes which devices are there, even if nobody has the web interface open.
 func (s *Server) track(stop <-chan struct{}) {
 	scan := func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -154,13 +154,13 @@ func (s *Server) track(stop <-chan struct{}) {
 	}
 }
 
-// --- Endpunkte -----------------------------------------------------------------------
+// --- Endpoints -----------------------------------------------------------------------
 
 func (s *Server) registerDeviceExtras() {
 	s.route("POST /api/devices/meta", s.handleDeviceMeta)
 	s.route("POST /api/devices/wake", s.handleWake)
-	s.route("POST /api/blocks", s.forward("block.set", "Sperre gespeichert."))
-	s.route("POST /api/blocks/delete", s.forward("block.delete", "Sperre aufgehoben."))
+	s.route("POST /api/blocks", s.forward("block.set", "Block saved."))
+	s.route("POST /api/blocks/delete", s.forward("block.delete", "Block removed."))
 }
 
 func (s *Server) handleDeviceMeta(w http.ResponseWriter, r *http.Request) {
@@ -179,14 +179,14 @@ func (s *Server) handleDeviceMeta(w http.ResponseWriter, r *http.Request) {
 	}
 	req.Alias, req.Note = strings.TrimSpace(req.Alias), strings.TrimSpace(req.Note)
 	if len([]rune(req.Alias)) > 64 || len([]rune(req.Note)) > 500 {
-		writeError(w, http.StatusBadRequest, "Name höchstens 64, Notiz höchstens 500 Zeichen.")
+		writeError(w, http.StatusBadRequest, "Name at most 64, note at most 500 characters.")
 		return
 	}
 	s.devices.SetMeta(mac, req.Alias, req.Note)
-	writeJSON(w, map[string]any{"ok": true, "message": "Gespeichert."})
+	writeJSON(w, map[string]any{"ok": true, "message": "Saved."})
 }
 
-// handleWake schickt ein Wake-on-LAN-Paket (Magic Packet) als Broadcast ins Heimnetz.
+// handleWake sends a Wake-on-LAN packet (magic packet) as a broadcast into the home network.
 func (s *Server) handleWake(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		MAC string `json:"mac"`
@@ -201,17 +201,17 @@ func (s *Server) handleWake(w http.ResponseWriter, r *http.Request) {
 	}
 	if err := sendWOL(r.Context(), mac); err != nil {
 		s.cfg.Log.Error("wake-on-lan", "err", err)
-		writeError(w, http.StatusInternalServerError, "Das Weckpaket ließ sich nicht senden.")
+		writeError(w, http.StatusInternalServerError, "The wake packet could not be sent.")
 		return
 	}
-	s.cfg.Log.Info("wake-on-lan gesendet", "mac", mac)
-	writeJSON(w, map[string]any{"ok": true, "message": "Weckpaket gesendet. Das Gerät muss Wake-on-LAN unterstützen und per Kabel verbunden sein."})
+	s.cfg.Log.Info("wake-on-lan sent", "mac", mac)
+	writeJSON(w, map[string]any{"ok": true, "message": "Wake packet sent. The device must support Wake-on-LAN and be connected by cable."})
 }
 
 func magicPacket(mac string) ([]byte, error) {
 	hw, err := net.ParseMAC(mac)
 	if err != nil || len(hw) != 6 {
-		return nil, errors.New("ungültige MAC")
+		return nil, errors.New("invalid MAC")
 	}
 	return append(bytes.Repeat([]byte{0xff}, 6), bytes.Repeat(hw, 16)...), nil
 }
@@ -231,7 +231,7 @@ func sendWOL(ctx context.Context, mac string) error {
 		return err
 	}
 	defer conn.Close()
-	// Broadcast-Adresse des Heimnetzes, z. B. 192.168.42.255 für 192.168.42.0/24
+	// Broadcast address of the home network, e.g. 192.168.42.255 for 192.168.42.0/24
 	b := conf.LANPrefix.Masked().Addr().As4()
 	host := uint32(1)<<(32-conf.LANPrefix.Bits()) - 1
 	bcast := net.IPv4(b[0]|byte(host>>24), b[1]|byte(host>>16), b[2]|byte(host>>8), b[3]|byte(host))

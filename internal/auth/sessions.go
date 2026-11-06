@@ -11,8 +11,8 @@ import (
 	"time"
 )
 
-// Session ist eine angemeldete Browser-Sitzung. Sitzungen liegen nur im Speicher,
-// ein Neustart des Dienstes meldet also alle ab.
+// Session is a signed-in browser session. Sessions only live in memory,
+// so a restart of the service signs everyone out.
 type Session struct {
 	Created  time.Time
 	LastSeen time.Time
@@ -21,7 +21,7 @@ type Session struct {
 
 type Sessions struct {
 	mu   sync.Mutex
-	m    map[string]*Session // Schlüssel: SHA-256 des Tokens, das Token selbst wird nicht gespeichert
+	m    map[string]*Session // key: SHA-256 of the token, the token itself is not stored
 	Idle time.Duration
 	Max  time.Duration
 	now  func() time.Time
@@ -36,7 +36,7 @@ func key(token string) string {
 	return hex.EncodeToString(h[:])
 }
 
-// Create legt eine Sitzung an und liefert das Token für das Cookie (256 Bit).
+// Create creates a session and returns the token for the cookie (256 bits).
 func (s *Sessions) Create(ip string) string {
 	raw := make([]byte, 32)
 	rand.Read(raw)
@@ -48,7 +48,7 @@ func (s *Sessions) Create(ip string) string {
 	return token
 }
 
-// Touch prüft das Token, verlängert die Sitzung und meldet, ob sie gültig ist.
+// Touch checks the token, extends the session and reports whether it is valid.
 func (s *Sessions) Touch(token string) bool {
 	if token == "" {
 		return false
@@ -69,8 +69,8 @@ func (s *Sessions) Touch(token string) bool {
 	return true
 }
 
-// Valid prüft das Token, ohne die Sitzung zu verlängern. Für Hintergrundabfragen wie den
-// Live-Stream, damit eine offene Seite allein nicht vor der Abmeldung wegen Untätigkeit schützt.
+// Valid checks the token without extending the session. For background requests like the
+// live stream, so that an open page alone does not protect against being signed out for inactivity.
 func (s *Sessions) Valid(token string) bool {
 	if token == "" {
 		return false
@@ -88,7 +88,7 @@ func (s *Sessions) Delete(token string) {
 	s.mu.Unlock()
 }
 
-// DeleteAll meldet alle Sitzungen ab, z. B. nach einer Passwortänderung.
+// DeleteAll signs out all sessions, e.g. after a password change.
 func (s *Sessions) DeleteAll() {
 	s.mu.Lock()
 	s.m = map[string]*Session{}
@@ -102,8 +102,8 @@ func (s *Sessions) Count() int {
 	return len(s.m)
 }
 
-// SessionInfo beschreibt eine Sitzung für die Oberfläche. Die ID ist ein Teil des Hashes,
-// nie das Token selbst.
+// SessionInfo describes a session for the web interface. The ID is part of the hash,
+// never the token itself.
 type SessionInfo struct {
 	ID       string    `json:"id"`
 	IP       string    `json:"ip"`
@@ -114,7 +114,7 @@ type SessionInfo struct {
 
 func shortID(k string) string { return k[:16] }
 
-// List liefert alle gültigen Sitzungen; current markiert die eigene.
+// List returns all valid sessions; current marks your own.
 func (s *Sessions) List(currentToken string) []SessionInfo {
 	s.Cleanup()
 	cur := ""
@@ -130,7 +130,7 @@ func (s *Sessions) List(currentToken string) []SessionInfo {
 	return out
 }
 
-// DeleteID meldet die Sitzung mit dieser ID ab.
+// DeleteID signs out the session with this ID.
 func (s *Sessions) DeleteID(id string) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -143,7 +143,7 @@ func (s *Sessions) DeleteID(id string) bool {
 	return false
 }
 
-// Cleanup entfernt abgelaufene Sitzungen.
+// Cleanup removes expired sessions.
 func (s *Sessions) Cleanup() {
 	now := s.now()
 	s.mu.Lock()

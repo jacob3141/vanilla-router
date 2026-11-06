@@ -35,7 +35,7 @@ router. That is what those credentials are for.
 ## How the project is protected
 
 The security model with all its boundaries is described in
-[docs/architektur.md, section 12](docs/architektur.md#12-sicherheitsmodell) (German). In short: a
+[docs/architecture.md, section 12](docs/architecture.md#12-security-model). In short: a
 firewall in front of the network covering IPv4 and IPv6 in one table, a web server that never runs as
 root and has a hardened systemd unit, privileged actions only through a helper with a fixed list of
 actions, no third-party libraries, packages only from Ubuntu *main* with automatic security updates, and

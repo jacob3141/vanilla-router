@@ -1,79 +1,81 @@
-# vanilla-router: Anleitung für KI-Agenten
+# vanilla-router: guide for AI agents
 
-Ein Router aus einem unveränderten Ubuntu LTS auf Standardhardware, mit einem Installer, der Laien Schritt
-für Schritt führt. **Führend ist [PLAN.md](PLAN.md).** Lies es vor jeder größeren Aufgabe.
+A router built from an unmodified Ubuntu LTS on standard hardware, with an installer that guides non-experts step
+by step. **[PLAN.md](PLAN.md) is authoritative.** Read it before any larger task.
 
-Lizenz: **AGPL-3.0-or-later** (D-11). Leitlinie: **Komfort vor Optimierung, aber nie auf Kosten der
-Sicherheit** (P-10).
+License: **AGPL-3.0-or-later** (D-11). Guideline: **comfort over optimization, but never at the expense of
+security** (P-10).
 
-## Mit PLAN.md arbeiten
+## Working with PLAN.md
 
-- IDs (`P-`, `L-`, `F-…-`, `NF-`, `D-`, `Q-`, `R-`, `M`, `T-M…-`, `S-`) sind stabil. Nie umnummerieren,
-  nie neu vergeben. Was entfällt, bekommt den Status `verworfen` und bleibt stehen.
-- Beziehe dich in Commits, Code-Kommentaren und Tests auf IDs, z. B. `F-INST-03`, `D-05`.
-- Ändert eine Aufgabe den Stand, aktualisiere den Status in PLAN.md im selben Commit, dazu `version`,
-  `updated` und den Änderungsverlauf.
-- Entscheidungen (`D-`) nur mit Begründung ändern. Offene Fragen (`Q-`) entscheidet der Projektinhaber.
-  Schlage eine Tendenz vor, aber setze sie nicht eigenmächtig um.
-- Neue Recherche-Ergebnisse mit Quelle unter `S-NN` eintragen. Forenquellen als solche kennzeichnen.
+- IDs (`P-`, `L-`, `F-…-`, `NF-`, `D-`, `Q-`, `R-`, `M`, `T-M…-`, `S-`) are stable. Never renumber, never
+  reassign. What is dropped gets the status `rejected` and stays.
+- Refer to IDs in commits, code comments and tests, e.g. `F-INST-03`, `D-05`.
+- If a task changes the status, update the status in PLAN.md in the same commit, plus `version`, `updated` and
+  the change history.
+- Change decisions (`D-`) only with a reason. The project owner decides open questions (`Q-`). Suggest a
+  tendency, but do not implement it on your own.
+- Record new research results with a source under `S-NN`. Mark forum sources as such.
 
-## Grundregeln für Code
+## Basic rules for code
 
-- **Go nur mit der Standardbibliothek** (D-01, NF-03). Keine externen Module. Frontend ohne Frameworks,
-  ohne Build-Schritt, ohne CDN.
-- **Jede neue Quelldatei** beginnt mit `SPDX-License-Identifier: AGPL-3.0-or-later` im Kommentarstil der
-  Sprache (NF-08).
-- **Paket-Abhängigkeiten nur aus Ubuntu *main*** (D-10, NF-09). Also `dnsmasq-base` statt `dnsmasq`, kein
-  `fail2ban`. Ausnahmen aus *universe* nur für Erweiterungen und nur mit einer begründeten Entscheidung.
-- **Eine Wahrheitsquelle** (`config.json`, D-02). Konfigurationsdateien von Diensten werden immer
-  vollständig erzeugt, nie per Textsuche bearbeitet.
-- **Prüfen vor Einspielen** (P-05): erzeugen → mit dem Werkzeug des Dienstes prüfen → atomar ersetzen →
-  neu laden → Gesundheitsprüfung → bei Fehler zurück.
-- **nftables:** eigene Tabellen je Aufgabe, ersetzen mit `table x; delete table x; table x { … }`,
-  **niemals `flush ruleset`** (D-03). Vergleiche von Regelwerken immer mit `nft -s` (ohne Zähler, L-10).
-- **Privilegientrennung** (D-04): Der Webserver läuft nie als root. Alles Privilegierte geht über den
-  Helper mit fester Aktionsliste. Jede Aktion prüft ihre Parameter selbst, egal was der Webserver geprüft hat.
-- **Keine externen Programme mit Datei-Capabilities** (z. B. `ping`) aus gehärteten Diensten starten,
-  native Umsetzung bevorzugen (L-09).
-- **Frontend:** DOM nur über die `h()`-Hilfsfunktion, nie `innerHTML` mit Daten. Keine `style`-Attribute
-  (CSP), nur `el.style`. Daten aus dem Netz (Hostnamen, Logzeilen) sind nicht vertrauenswürdig.
+- **Go with the standard library only** (D-01, NF-03). No external modules. Frontend without frameworks, without
+  a build step, without a CDN.
+- **Every new source file** starts with `SPDX-License-Identifier: AGPL-3.0-or-later` in the language's comment
+  style (NF-08).
+- **Package dependencies only from Ubuntu *main*** (D-10, NF-09). So `dnsmasq-base` instead of `dnsmasq`, no
+  `fail2ban`. Exceptions from *universe* only for extensions and only with a justified decision.
+- **One source of truth** (`config.json`, D-02). Service configuration files are always generated completely,
+  never edited by text search.
+- **Check before applying** (P-05): generate → check with the service's tool → replace atomically → reload →
+  health check → on failure restore.
+- **nftables:** own tables per purpose, replace with `table x; delete table x; table x { … }`, **never `flush
+  ruleset`** (D-03). Always compare rule sets with `nft -s` (without counters, L-10).
+- **Privilege separation** (D-04): the web server never runs as root. Everything privileged goes through the helper
+  with a fixed list of actions. Each action checks its parameters itself, regardless of what the web server
+  checked.
+- **Do not start external programs with file capabilities** (e.g. `ping`) from hardened services, prefer native
+  code (L-09).
+- **Frontend:** DOM only through the `h()` helper, never `innerHTML` with data. No `style` attributes (CSP), only
+  `el.style`. Data from the network (host names, log lines) is not trustworthy.
 - **Tests:**
-  - Prüfregeln und Generatoren mit Unit-Tests und Golden Files (NF-04).
-  - Zeit- und Kalenderlogik immer mit Tests (L-16).
-  - Die Testumgebung hat dieselbe systemd-Härtung wie der Betrieb (NF-05).
+  - Validation rules and generators with unit tests and golden files (NF-04).
+  - Time and calendar logic always with tests (L-16).
+  - The test environment has the same systemd hardening as production (NF-05).
 
-## Doku für Menschen
+## Documentation for humans
 
-[docs/architektur.md](docs/architektur.md) (Aufbau), [docs/entwicklung.md](docs/entwicklung.md)
-(Einrichtung, Testen, Bauen), [CONTRIBUTING.md](CONTRIBUTING.md) (Regeln, ausführlich mit Begründung).
-Wer Programme, Pakete, Befehle oder Abläufe ändert, hält diese Dokumente im selben Commit aktuell.
+[docs/architecture.md](docs/architecture.md) (structure), [docs/development.md](docs/development.md) (setup,
+testing, building), [CONTRIBUTING.md](CONTRIBUTING.md) (rules, in detail with reasons). Anyone changing programs,
+packages, commands or flows keeps these documents up to date in the same commit.
 
-## Prüfen vor jedem Commit
+## Check before every commit
 
 ```
-test/check-all.sh               # gofmt, go vet (Linux + Windows), go test, SPDX (NF-08), Pakete aus main (NF-09)
-sudo test/lab/netns-lab.sh test # WAN-Erkennung im Namespace-Labor (Root, siehe Kopf des Skripts)
+test/check-all.sh               # gofmt, go vet (Linux + Windows), go test, SPDX (NF-08), packages from main (NF-09)
+sudo test/lab/netns-lab.sh test # WAN detection in the namespace lab (root, see the top of the script)
 ```
 
-Werkzeugausgaben (apt, ip, …) nur mit `LC_ALL=C` auswerten, Prüfungen schlagen bei fehlenden Daten
-fehl (L-17).
+Evaluate tool output (apt, ip, …) only with `LC_ALL=C`, checks fail on missing data (L-17).
 
-## Sprache und Texte
+## Language and texts
 
-- **Auf GitHub immer Englisch:** Commit-Nachrichten, Issues, Pull Requests, Releases, Repo-Beschreibung.
-  `README.md` und `SECURITY.md` sind englisch.
-- Oberfläche, übrige Doku und Kommentare derzeit auf Deutsch (Q-07 offen). Texte für Laien ohne Fachbegriffe:
-  „Internet-Anschluss“ statt „WAN“, „Heimnetz“ statt „LAN“.
-- Beispiele nur mit Dokumentations-Adressen: IPv4 `192.0.2.0/24`, `198.51.100.0/24`, `203.0.113.0/24`
-  (RFC 5737), IPv6 `2001:db8::/32` (RFC 3849), Domain `home.arpa` oder `example.org`.
+- **Everything is in English:** code, comments, documentation, PLAN.md and everything on GitHub (commit messages,
+  issues, pull requests, releases, repo description). Q-07.
+- **The product is English by default, German is selectable.** New user-visible texts: English in the code, German
+  in `internal/i18n/de.json` ([docs/architecture.md, section 14](docs/architecture.md#14-languages)). The stick
+  creator has its own table in `cmd/vr-stick/texts.go`.
+- Texts for non-experts without jargon: "internet port" instead of "WAN", "home network" instead of "LAN".
+- Examples only with documentation addresses: IPv4 `192.0.2.0/24`, `198.51.100.0/24`, `203.0.113.0/24` (RFC 5737),
+  IPv6 `2001:db8::/32` (RFC 3849), domain `home.arpa` or `example.org`.
 
-## Datenschutz im Repo
+## Privacy in the repo
 
-Das Projekt ist öffentlich (GitHub). **Keine** echten MAC-, IP- oder IPv6-Adressen, Hostnamen, Zugangsdaten,
-Schlüssel, Backups, Audit-Ergebnisse oder Logs aus einem echten Netz ins Repo. Der Prototyp liegt in einem
-privaten Repo; was von dort übernommen wird, wird vorher bereinigt (PLAN.md 3.11).
+The project is public (GitHub). **No** real MAC, IP or IPv6 addresses, host names, credentials, keys, backups, audit
+results or logs from a real network in the repo. The prototype is in a private repo; whatever is taken over from
+there is cleaned first (PLAN.md 3.11).
 
-## Lokale Hinweise
+## Local notes
 
-Umgebungsspezifisches (Werkzeuge auf dem Entwicklungsrechner, Zugang zum Prototyp) steht in
-`CLAUDE.local.md`. Die Datei ist per `.gitignore` ausgeschlossen und wird nie committet.
+Environment-specific things (tools on the development machine, access to the prototype) are in `CLAUDE.local.md`.
+The file is excluded by `.gitignore` and never committed.

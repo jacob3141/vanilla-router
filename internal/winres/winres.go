@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-// Package winres erzeugt eine COFF-Objektdatei (.syso) mit Windows-Ressourcen (Anwendungsmanifest,
-// Icon). Der Go-Linker bindet .syso-Dateien im Paketordner automatisch ein, so braucht der
-// Stick-Ersteller kein fremdes Ressourcen-Werkzeug (D-01, PLAN.md 3.12).
+// Package winres creates a COFF object file (.syso) with Windows resources (application manifest,
+// icon). The Go linker automatically includes .syso files in the package folder, so the
+// stick creator needs no third-party resource tool (D-01, PLAN.md 3.12).
 //
-// Aufbau nach „PE Format“ (Microsoft): ein Abschnitt .rsrc mit dem Ressourcenbaum
-// Typ → Name (ID) → Sprache → Dateneintrag. Jeder Dateneintrag enthält eine RVA, deshalb gibt es je
-// Eintrag eine Relokation (IMAGE_REL_AMD64_ADDR32NB) auf das Abschnittssymbol.
+// Layout per "PE Format" (Microsoft): a .rsrc section with the resource tree
+// type → name (ID) → language → data entry. Each data entry contains an RVA, so there is one
+// relocation (IMAGE_REL_AMD64_ADDR32NB) per entry to the section symbol.
 package winres
 
 import (
@@ -31,7 +31,7 @@ const (
 	highBit          = 0x80000000
 )
 
-// Resource ist eine Ressource mit numerischem Typ und numerischer ID (Sprache en-US).
+// Resource is a resource with a numeric type and numeric ID (language en-US).
 type Resource struct {
 	Type, ID uint16
 	Data     []byte
@@ -47,7 +47,7 @@ type dirEntry struct{ NameOrID, Offset uint32 }
 
 type dataEntry struct{ OffsetToData, Size, CodePage, Reserved uint32 }
 
-// Build liefert die .syso-Datei für amd64 mit den Ressourcen.
+// Build returns the .syso file for amd64 with the resources.
 func Build(res []Resource) []byte {
 	le := binary.LittleEndian
 	res = append([]Resource(nil), res...)
@@ -63,8 +63,8 @@ func Build(res []Resource) []byte {
 			types = append(types, r.Type)
 		}
 	}
-	// Platz der Ebenen: Wurzel, je Typ eine Tabelle, je Ressource eine Sprachtabelle, dann die
-	// Dateneinträge und zuletzt die Daten.
+	// Space of the levels: root, one table per type, one language table per resource, then the
+	// data entries and finally the data.
 	const tbl, ent = 16, 8
 	typeAt := make(map[uint16]int)
 	off := tbl + ent*len(types)
@@ -163,15 +163,15 @@ func Build(res []Resource) []byte {
 		Type          uint16
 		Class, NumAux uint8
 	}{name, 0, 1, 0, symClassStatic, 0})
-	binary.Write(&out, le, uint32(4)) // leere Stringtabelle
+	binary.Write(&out, le, uint32(4)) // empty string table
 	return out.Bytes()
 }
 
-// Manifest liefert die .syso-Datei mit dem Manifest als Ressource 1.
+// Manifest returns the .syso file with the manifest as resource 1.
 func Manifest(xml []byte) []byte { return Build([]Resource{{rtManifest, 1, xml}}) }
 
-// Icon liefert die Ressourcen für ein Icon aus einer .ico-Datei: je Bild ein RT_ICON (IDs ab first)
-// und eine RT_GROUP_ICON mit der ID group. Das Icon mit der kleinsten ID nimmt der Explorer für die Exe.
+// Icon returns the resources for an icon from an .ico file: one RT_ICON per image (IDs from first)
+// and an RT_GROUP_ICON with the ID group. Explorer takes the icon with the smallest ID for the exe.
 func Icon(ico []byte, group, first uint16) []Resource {
 	le := binary.LittleEndian
 	n := int(le.Uint16(ico[4:]))
@@ -183,7 +183,7 @@ func Icon(ico []byte, group, first uint16) []Resource {
 		size, off := le.Uint32(e[8:]), le.Uint32(e[12:])
 		id := first + uint16(i)
 		out = append(out, Resource{rtIcon, id, ico[off : off+size]})
-		grp.Write(e[:12]) // Breite … Bytes wie in der .ico-Datei, statt des Offsets die ID
+		grp.Write(e[:12]) // width … bytes as in the .ico file, instead of the offset the ID
 		binary.Write(&grp, le, id)
 	}
 	return append(out, Resource{rtGroupIcon, group, grp.Bytes()})

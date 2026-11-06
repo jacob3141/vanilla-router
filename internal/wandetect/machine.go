@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-// Package wandetect führt den Nutzer durch die Erkennung des Internet-Anschlusses
-// („Ziehen Sie alle Kabel ab … stecken Sie jetzt nur das Kabel vom Modem ein“, PLAN.md 3.9.3, T-M1-04).
+// Package wandetect guides the user through detecting the internet port
+// ("Unplug all cables … now plug in only the cable from the modem", PLAN.md 3.9.3, T-M1-04).
 //
-// Machine ist ein reiner Zustandsautomat ohne eigene Ein- und Ausgabe: Er bekommt Ereignisse
-// (Link an/aus, Zeit, Ergebnis einer Probe, Eingaben des Nutzers) und gibt Aktionen zurück
-// (Text anzeigen, Probe starten/abbrechen, fertig). Zeit wird immer übergeben, nie gelesen.
-// So ist jeder Übergang ohne Hardware und ohne Warten testbar.
+// Machine is a pure state machine without input or output of its own: it receives events
+// (link on/off, time, result of a probe, user input) and returns actions
+// (show text, start/cancel probe, done). Time is always passed in, never read.
+// That makes every transition testable without hardware and without waiting.
 package wandetect
 
 import (
@@ -16,17 +16,17 @@ import (
 	"time"
 )
 
-// State ist der Zustand des Ablaufs.
+// State is the state of the flow.
 type State int
 
 const (
 	StateInit      State = iota
-	StateUnplug          // es stecken noch Kabel, warten bis alle ab sind
-	StateWaitModem       // alle ab, warten auf das Modem-Kabel
-	StateSettling        // ein Port hat Link, kurz warten, ob noch einer dazukommt
-	StateProbing         // DHCP/PPPoE wird auf dem Kandidaten versucht
-	StateRetryWait       // Probe ohne Antwort, Pause vor dem nächsten Versuch
-	StateNoAnswer        // mehrere Proben ohne Antwort, Nutzer entscheidet
+	StateUnplug          // cables are still plugged in, wait until all are out
+	StateWaitModem       // all out, waiting for the modem cable
+	StateSettling        // a port has link, wait briefly in case another one joins
+	StateProbing         // DHCP/PPPoE is being tried on the candidate
+	StateRetryWait       // probe without an answer, pause before the next attempt
+	StateNoAnswer        // several probes without an answer, the user decides
 	StateDone
 )
 
@@ -39,67 +39,67 @@ func (s State) String() string {
 	return fmt.Sprintf("state(%d)", int(s))
 }
 
-// Config enthält die Zeiten des Ablaufs.
+// Config contains the times of the flow.
 type Config struct {
-	Settle     time.Duration // nach dem ersten Link so lange auf weitere warten
-	HintAfter  time.Duration // ohne Modem-Kabel nach dieser Zeit einen Tipp zeigen
-	RetryDelay time.Duration // Pause zwischen zwei Proben ohne Antwort
-	MaxProbes  int           // so viele Proben, bevor der Nutzer gefragt wird
+	Settle     time.Duration // after the first link, wait this long for more
+	HintAfter  time.Duration // show a tip after this time without a modem cable
+	RetryDelay time.Duration // pause between two probes without an answer
+	MaxProbes  int           // this many probes before asking the user
 }
 
-// DefaultConfig: Modems brauchen nach dem Einstecken oft einige Sekunden, bis sie DHCP beantworten,
-// Kabelmodems nach dem Einschalten auch Minuten. Drei Versuche mit 20 s Pause decken den
-// häufigen Fall ab, ohne dass jemand lange vor einem stummen Bildschirm sitzt.
+// DefaultConfig: modems often need a few seconds after plugging in before they answer DHCP,
+// cable modems even minutes after being turned on. Three attempts with 20 s pauses cover the
+// common case without anyone sitting long in front of a silent screen.
 var DefaultConfig = Config{Settle: 3 * time.Second, HintAfter: 60 * time.Second, RetryDelay: 20 * time.Second, MaxProbes: 3}
 
-// ProbeResult ist das Ergebnis einer Probe auf dem Kandidaten-Port.
+// ProbeResult is the result of a probe on the candidate port.
 type ProbeResult struct {
 	Port      string
-	DHCP      bool   // DHCP-Angebot erhalten
-	Offer     string // z. B. "192.0.2.10/24 über 192.0.2.1", nur zur Anzeige
-	OfferNet  string // angebotenes Netz, z. B. "192.0.2.0/24" (das Heimnetz muss es meiden)
-	PPPoE     bool   // PPPoE-Zugangsserver gefunden
-	PPPoEVLAN int    // 0 = ohne VLAN, sonst VLAN-ID (Telekom: 7)
-	ACName    string // Name des PPPoE-Zugangsservers
-	Err       string // technischer Fehler (z. B. Socket), wird wie „keine Antwort“ behandelt
+	DHCP      bool   // DHCP offer received
+	Offer     string // e.g. "192.0.2.10/24 via 192.0.2.1", for display only
+	OfferNet  string // offered network, e.g. "192.0.2.0/24" (the home network must avoid it)
+	PPPoE     bool   // PPPoE access server found
+	PPPoEVLAN int    // 0 = without VLAN, otherwise VLAN ID (Telekom: 7)
+	ACName    string // name of the PPPoE access server
+	Err       string // technical error (e.g. socket), treated like "no answer"
 }
 
 func (r ProbeResult) answered() bool { return r.DHCP || r.PPPoE }
 
-// Method beschreibt, woran der Port erkannt wurde.
+// Method describes how the port was recognized.
 type Method string
 
 const (
 	MethodDHCP   Method = "dhcp"
 	MethodPPPoE  Method = "pppoe"
-	MethodLink   Method = "link"   // nur Link, keine Antwort, vom Nutzer bestätigt
-	MethodManual Method = "manual" // vom Nutzer aus der Liste gewählt
+	MethodLink   Method = "link"   // only link, no answer, confirmed by the user
+	MethodManual Method = "manual" // chosen by the user from the list
 )
 
-// Result ist das Ergebnis des ganzen Ablaufs.
+// Result is the result of the whole flow.
 type Result struct {
 	Port   string
 	Method Method
 	Probe  ProbeResult
 }
 
-// Ereignisse an den Automaten.
+// Events to the automaton.
 type (
 	Event interface{ isEvent() }
-	// LinkChanged meldet den Link-Zustand eines Ports. Ports, die nicht in Start vorkamen, werden ignoriert.
+	// LinkChanged reports the link state of a port. Ports not in Start are ignored.
 	LinkChanged struct {
 		Port string
 		Up   bool
 	}
-	// Tick meldet nur, dass Zeit vergangen ist.
+	// Tick only reports that time has passed.
 	Tick struct{}
-	// ProbeDone liefert das Ergebnis der zuletzt gestarteten Probe.
+	// ProbeDone returns the result of the most recently started probe.
 	ProbeDone struct{ Result ProbeResult }
-	// UserRetry: Nutzer will es noch einmal versuchen (im Zustand NoAnswer).
+	// UserRetry: the user wants to try again (in state NoAnswer).
 	UserRetry struct{}
-	// UserAccept: Nutzer bestätigt den Port trotz fehlender Antwort (z. B. feste IP).
+	// UserAccept: the user confirms the port despite no answer (e.g. fixed IP).
 	UserAccept struct{}
-	// UserManual: Nutzer wählt den Port selbst aus der Liste (Rückfall, jederzeit möglich).
+	// UserManual: the user chooses the port themselves from the list (fallback, possible at any time).
 	UserManual struct{ Port string }
 )
 
@@ -110,16 +110,16 @@ func (UserRetry) isEvent()   {}
 func (UserAccept) isEvent()  {}
 func (UserManual) isEvent()  {}
 
-// Aktionen des Automaten.
+// Actions of the automaton.
 type (
 	Action interface{ isAction() }
-	// Say zeigt einen Text. ID ist stabil (für Tests und Übersetzungen), Text ist für Laien.
+	// Say shows a text. ID is stable (for tests and translations), Text is for non-experts.
 	Say struct{ ID, Text string }
-	// StartProbe startet DHCP- und PPPoE-Probe auf dem Port. Das Ergebnis kommt als ProbeDone.
+	// StartProbe starts DHCP and PPPoE probes on the port. The result comes as ProbeDone.
 	StartProbe struct{ Port string }
-	// CancelProbe bricht eine laufende Probe ab. Ein später noch eintreffendes Ergebnis wird ignoriert.
+	// CancelProbe cancels a running probe. A result arriving later is ignored.
 	CancelProbe struct{ Port string }
-	// Finished: Der Internet-Anschluss steht fest.
+	// Finished: the internet port is determined.
 	Finished struct{ Result Result }
 )
 
@@ -128,21 +128,21 @@ func (StartProbe) isAction()  {}
 func (CancelProbe) isAction() {}
 func (Finished) isAction()    {}
 
-// Machine ist der Automat. Der Nullwert ist nicht nutzbar, siehe New.
+// Machine is the automaton. The zero value is not usable, see New.
 type Machine struct {
 	cfg       Config
-	labels    map[string]string // Port → Text für Laien („Anschluss 2“)
+	labels    map[string]string // port → text for non-experts ("Port 2")
 	links     map[string]bool
 	state     State
 	candidate string
-	since     time.Time // Eintritt in den aktuellen Zustand
+	since     time.Time // entry into the current state
 	attempts  int
 	hinted    bool
 	result    Result
 }
 
-// New legt den Automaten an. labels ordnet jedem Port eine Bezeichnung für Laien zu und legt
-// fest, welche Ports überhaupt beachtet werden.
+// New creates the automaton. labels assigns each port a name for non-experts and determines
+// which ports are considered at all.
 func New(cfg Config, labels map[string]string) *Machine {
 	if cfg.MaxProbes < 1 {
 		cfg.MaxProbes = 1
@@ -150,16 +150,16 @@ func New(cfg Config, labels map[string]string) *Machine {
 	return &Machine{cfg: cfg, labels: labels, links: map[string]bool{}}
 }
 
-// State liefert den aktuellen Zustand.
+// State returns the current state.
 func (m *Machine) State() State { return m.state }
 
-// Candidate liefert den Port, der gerade geprüft wird (oder leer).
+// Candidate returns the port currently being checked (or empty).
 func (m *Machine) Candidate() string { return m.candidate }
 
-// Result liefert das Ergebnis, sobald State() == StateDone.
+// Result returns the result once State() == StateDone.
 func (m *Machine) Result() Result { return m.result }
 
-// Start setzt den Anfangszustand aus den aktuellen Link-Zuständen.
+// Start sets the initial state from the current link states.
 func (m *Machine) Start(links map[string]bool, now time.Time) []Action {
 	for p := range m.labels {
 		m.links[p] = links[p]
@@ -167,14 +167,14 @@ func (m *Machine) Start(links map[string]bool, now time.Time) []Action {
 	return m.toUnplugOrWait(now, nil)
 }
 
-// Handle verarbeitet ein Ereignis.
+// Handle processes an event.
 func (m *Machine) Handle(ev Event, now time.Time) []Action {
 	if m.state == StateDone {
 		return nil
 	}
 	if um, ok := ev.(UserManual); ok {
 		if _, known := m.labels[um.Port]; !known {
-			return []Action{Say{"manual-unknown", "Diesen Anschluss gibt es nicht."}}
+			return []Action{Say{"manual-unknown", "That port does not exist."}}
 		}
 		var acts []Action
 		if m.state == StateProbing {
@@ -187,7 +187,7 @@ func (m *Machine) Handle(ev Event, now time.Time) []Action {
 			return nil
 		}
 		if m.links[lc.Port] == lc.Up {
-			return m.handleTime(now) // doppelte Meldung, nur Zeit auswerten
+			return m.handleTime(now) // duplicate message, only evaluate the time
 		}
 		m.links[lc.Port] = lc.Up
 		return m.handleLink(lc, now)
@@ -216,16 +216,16 @@ func (m *Machine) handleLink(lc LinkChanged, now time.Time) []Action {
 		if len(m.up()) == 0 {
 			return m.enter(StateWaitModem, now, m.sayPlugModem())
 		}
-		return []Action{m.sayUnplug()} // Liste der noch steckenden Ports aktualisieren
+		return []Action{m.sayUnplug()} // update the list of ports still plugged in
 	case StateWaitModem:
 		if lc.Up {
 			m.candidate = lc.Port
-			return m.enter(StateSettling, now, Say{"settling", "Kabel erkannt an " + m.label(lc.Port) + ". Einen Moment …"})
+			return m.enter(StateSettling, now, Say{"settling", "Cable detected on " + m.label(lc.Port) + ". One moment …"})
 		}
 	case StateSettling:
 		if lc.Up {
 			m.candidate = ""
-			return m.toUnplugOrWait(now, &Say{"ambiguous", "Es stecken mehrere Kabel. Bitte nur das Kabel vom Modem einstecken."})
+			return m.toUnplugOrWait(now, &Say{"ambiguous", "Several cables are plugged in. Please plug in only the cable from the modem."})
 		}
 		if lc.Port == m.candidate {
 			m.candidate = ""
@@ -238,11 +238,11 @@ func (m *Machine) handleLink(lc LinkChanged, now time.Time) []Action {
 		}
 		if lc.Up {
 			m.candidate = ""
-			return append(acts, m.toUnplugOrWait(now, &Say{"ambiguous", "Es stecken mehrere Kabel. Bitte nur das Kabel vom Modem einstecken."})...)
+			return append(acts, m.toUnplugOrWait(now, &Say{"ambiguous", "Several cables are plugged in. Please plug in only the cable from the modem."})...)
 		}
 		if lc.Port == m.candidate {
 			m.candidate = ""
-			return append(acts, m.toUnplugOrWait(now, &Say{"lost", "Die Verbindung zum Modem ist weg. Steckt das Kabel noch richtig?"})...)
+			return append(acts, m.toUnplugOrWait(now, &Say{"lost", "The connection to the modem is gone. Is the cable still plugged in properly?"})...)
 		}
 	}
 	return nil
@@ -262,8 +262,8 @@ func (m *Machine) handleTime(now time.Time) []Action {
 	case StateWaitModem:
 		if !m.hinted && m.cfg.HintAfter > 0 && now.Sub(m.since) >= m.cfg.HintAfter {
 			m.hinted = true
-			return []Action{Say{"hint-modem", "Noch kein Kabel erkannt. Ist das Modem eingeschaltet? " +
-				"Das Kabel gehört am Modem in die Buchse „LAN“ oder „Ethernet“, nicht in „DSL“ oder „Kabel“."}}
+			return []Action{Say{"hint-modem", "No cable detected yet. Is the modem turned on? " +
+				"On the modem, the cable goes into the socket marked \"LAN\" or \"Ethernet\", not \"DSL\" or \"Cable\"."}}
 		}
 	}
 	return nil
@@ -271,7 +271,7 @@ func (m *Machine) handleTime(now time.Time) []Action {
 
 func (m *Machine) handleProbe(r ProbeResult, now time.Time) []Action {
 	if m.state != StateProbing || r.Port != m.candidate {
-		return nil // veraltetes Ergebnis nach Abbruch
+		return nil // outdated result after cancelling
 	}
 	if r.answered() {
 		method := MethodDHCP
@@ -282,16 +282,16 @@ func (m *Machine) handleProbe(r ProbeResult, now time.Time) []Action {
 	}
 	if m.attempts < m.cfg.MaxProbes {
 		return m.enter(StateRetryWait, now, Say{"retry", fmt.Sprintf(
-			"Das Modem antwortet noch nicht. Manche Modems brauchen etwas Zeit, neuer Versuch in %d Sekunden …",
+			"The modem is not answering yet. Some modems need a little time, trying again in %d seconds …",
 			int(m.cfg.RetryDelay.Seconds()))})
 	}
-	return m.enter(StateNoAnswer, now, Say{"no-answer", "An " + m.label(m.candidate) + " antwortet kein Modem. " +
-		"Ist das wirklich das Kabel vom Modem? Sie können es noch einmal versuchen oder diesen Anschluss trotzdem verwenden."})
+	return m.enter(StateNoAnswer, now, Say{"no-answer", "On " + m.label(m.candidate) + " no modem is answering. " +
+		"Is this really the cable from the modem? You can try again or use this port anyway."})
 }
 
 func (m *Machine) probe(now time.Time) []Action {
 	m.attempts++
-	acts := m.enter(StateProbing, now, Say{"probing", fmt.Sprintf("Prüfe die Verbindung zum Modem an %s (Versuch %d von %d) …",
+	acts := m.enter(StateProbing, now, Say{"probing", fmt.Sprintf("Checking the connection to the modem on %s (attempt %d of %d) …",
 		m.label(m.candidate), m.attempts, m.cfg.MaxProbes)})
 	return append(acts, StartProbe{m.candidate})
 }
@@ -299,12 +299,12 @@ func (m *Machine) probe(now time.Time) []Action {
 func (m *Machine) finish(r Result, now time.Time) []Action {
 	m.result = r
 	m.candidate = r.Port
-	text := m.label(r.Port) + " ist jetzt Ihr Internet-Anschluss."
+	text := m.label(r.Port) + " is now your internet port."
 	switch r.Method {
 	case MethodDHCP:
-		text = "Erkannt: " + text + " Das Modem vergibt automatisch eine Adresse."
+		text = "Detected: " + text + " The modem hands out an address automatically."
 	case MethodPPPoE:
-		text = "Erkannt: " + text + " Ihr Anschluss braucht Zugangsdaten (PPPoE)."
+		text = "Detected: " + text + " Your connection needs credentials (PPPoE)."
 	}
 	acts := m.enter(StateDone, now, Say{"done", text})
 	return append(acts, Finished{r})
@@ -332,14 +332,14 @@ func (m *Machine) sayUnplug() Say {
 	for _, p := range m.up() {
 		names = append(names, m.label(p))
 	}
-	return Say{"unplug", "Bitte ziehen Sie alle Netzwerkkabel aus diesem Rechner ab. Noch eingesteckt: " + strings.Join(names, ", ") + "."}
+	return Say{"unplug", "Please unplug all network cables from this computer. Still plugged in: " + strings.Join(names, ", ") + "."}
 }
 
 func (m *Machine) sayPlugModem() Say {
-	return Say{"plug-modem", "Stecken Sie jetzt nur das Kabel vom Modem oder Internet-Router in einen der Netzwerkanschlüsse."}
+	return Say{"plug-modem", "Now plug only the cable from the modem or internet router into one of the network ports."}
 }
 
-// up liefert die Ports mit Link, nach Bezeichnung sortiert.
+// up returns the ports with link, sorted by name.
 func (m *Machine) up() []string {
 	var ps []string
 	for p, up := range m.links {

@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-// Package stick liest die Vorgaben, die der Stick-Ersteller aus Windows mitgibt (vr/stick.json auf
-// der EFI-Partition des Sticks, PLAN.md 3.9.1, 3.12). Die Datei hat eine feste Größe und ist mit
-// Leerzeichen aufgefüllt, damit der Ersteller sie im Abbild überschreiben kann, ohne FAT zu kennen.
+// Package stick reads the defaults the stick creator brings from Windows (vr/stick.json on
+// the stick's EFI partition, PLAN.md 3.9.1, 3.12). The file has a fixed size and is padded with
+// spaces, so that the creator can overwrite it in the image without knowing FAT.
 package stick
 
 import (
@@ -15,25 +15,25 @@ import (
 	"vanilla-router/internal/config"
 )
 
-// Size ist die reservierte Größe der Datei im Abbild.
+// Size is the reserved size of the file in the image.
 const Size = 4096
 
-// RelPath ist der Ort auf der EFI-Partition des Sticks.
+// RelPath is the location on the stick's EFI partition.
 const RelPath = "vr/stick.json"
 
-// Info sind die Vorgaben aus Windows. Leere Felder: keine Vorgabe.
+// Info holds the defaults from Windows. Empty fields: no default.
 type Info struct {
 	Schema   int    `json:"schema"`
 	Locale   string `json:"locale"`   // z. B. de_DE.UTF-8
-	Keymap   string `json:"keymap"`   // Konsolen-Tastatur, z. B. de
+	Keymap   string `json:"keymap"`   // console keyboard, e.g. de
 	Timezone string `json:"timezone"` // IANA, z. B. Europe/Berlin
 }
 
-// Mounts sind die Orte, an denen die EFI-Partition des Sticks eingehängt sein kann
-// (systemd-gpt-auto-generator nimmt /efi oder /boot).
+// Mounts are the places where the stick's EFI partition can be mounted
+// (systemd-gpt-auto-generator takes /efi or /boot).
 var Mounts = []string{"/efi", "/boot/efi", "/boot"}
 
-// Find sucht stick.json. ok = false: Es gibt keine (Stick mit fremdem Programm geschrieben oder leer).
+// Find looks for stick.json. ok = false: there is none (stick written with another program, or empty).
 func Find(mounts []string) (Info, bool) {
 	for _, m := range mounts {
 		b, err := os.ReadFile(filepath.Join(m, filepath.FromSlash(RelPath)))
@@ -47,7 +47,7 @@ func Find(mounts []string) (Info, bool) {
 	return Info{}, false
 }
 
-// Parse liest die Datei. Eine leere Reservierung (nur Leerzeichen) zählt als „keine Vorgaben“.
+// Parse reads the file. An empty reservation (only spaces) counts as "no defaults".
 func Parse(b []byte) (Info, error) {
 	b = bytes.TrimRight(b, " \n\r\t\x00")
 	if len(bytes.TrimSpace(b)) == 0 {
@@ -58,12 +58,12 @@ func Parse(b []byte) (Info, error) {
 		return Info{}, err
 	}
 	if in.Schema != 1 {
-		return Info{}, errors.New("unbekanntes Schema")
+		return Info{}, errors.New("unknown schema")
 	}
 	return in, nil
 }
 
-// Encode erzeugt den Inhalt der reservierten Datei: JSON, mit Leerzeichen auf Size aufgefüllt.
+// Encode creates the content of the reserved file: JSON, padded with spaces to Size.
 func (in Info) Encode() ([]byte, error) {
 	b, err := json.Marshal(in)
 	if err != nil {
@@ -71,19 +71,19 @@ func (in Info) Encode() ([]byte, error) {
 	}
 	b = append(b, '\n')
 	if len(b) > Size {
-		return nil, errors.New("stick.json zu groß")
+		return nil, errors.New("stick.json too big")
 	}
 	return append(b, bytes.Repeat([]byte{' '}, Size-len(b))...), nil
 }
 
-// Blank meldet, ob b eine leere Reservierung ist (nur Leerzeichen, Größe Size). Der Stick-Ersteller
-// überschreibt nur eine solche Stelle im Abbild.
+// Blank reports whether b is an empty reservation (only spaces, size Size). The stick creator
+// only overwrites such a place in the image.
 func Blank(b []byte) bool {
 	return len(b) == Size && len(bytes.Trim(b, " ")) == 0
 }
 
-// Apply übernimmt die Vorgaben in die Konfiguration. Ungültige Werte werden einzeln verworfen,
-// damit eine kaputte Angabe nie die Installation verhindert.
+// Apply takes the defaults into the configuration. Invalid values are discarded individually,
+// so that a broken value never prevents the installation.
 func (in Info) Apply(c *config.Config) {
 	try := func(set func(*config.System)) {
 		old := c.System
@@ -105,21 +105,21 @@ func (in Info) Apply(c *config.Config) {
 	}
 }
 
-// Language ist eine Auswahl für S1, wenn es keine stick.json gibt.
+// Language is a choice for S1 if there is no stick.json.
 type Language struct {
 	Label                    string
 	Locale, Keymap, Timezone string
 }
 
-// Languages für die Auswahl in S1. Texte des Assistenten sind vorerst deutsch (F-INST-10).
+// Languages for the choice in S1 (F-INST-10).
 var Languages = []Language{
+	{"English", "en_US.UTF-8", "us", "UTC"},
 	{"Deutsch (Deutschland)", "de_DE.UTF-8", "de", "Europe/Berlin"},
 	{"Deutsch (Österreich)", "de_AT.UTF-8", "de", "Europe/Vienna"},
 	{"Deutsch (Schweiz)", "de_CH.UTF-8", "ch", "Europe/Zurich"},
-	{"English", "en_US.UTF-8", "us", "UTC"},
 }
 
-// Info liefert die Vorgaben einer Sprache.
+// Info returns the defaults of a language.
 func (l Language) Info() Info {
 	return Info{Schema: 1, Locale: l.Locale, Keymap: l.Keymap, Timezone: l.Timezone}
 }

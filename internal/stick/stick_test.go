@@ -22,13 +22,13 @@ func defaultConfig(t *testing.T) *config.Config {
 	return c
 }
 
-func TestFindMitAuffuellung(t *testing.T) {
+func TestFindWithPadding(t *testing.T) {
 	dir := t.TempDir()
 	body := `{"schema":1,"locale":"de_AT.UTF-8","keymap":"de","timezone":"UTC"}`
 	padded := body + strings.Repeat(" ", Size-len(body))
 	os.MkdirAll(filepath.Join(dir, "vr"), 0o755)
 	os.WriteFile(filepath.Join(dir, "vr", "stick.json"), []byte(padded), 0o644)
-	in, ok := Find([]string{"/gibt/es/nicht", dir})
+	in, ok := Find([]string{"/does/not/exist", dir})
 	if !ok || in.Locale != "de_AT.UTF-8" || in.Timezone != "UTC" {
 		t.Fatalf("%+v %v", in, ok)
 	}
@@ -39,13 +39,13 @@ func TestFindMitAuffuellung(t *testing.T) {
 	}
 }
 
-func TestLeereReservierung(t *testing.T) {
+func TestEmptyReservation(t *testing.T) {
 	if _, err := Parse([]byte(strings.Repeat(" ", Size))); err == nil {
-		t.Error("leere Reservierung muss als „keine Vorgaben“ gelten")
+		t.Error("an empty reservation must count as \"no defaults\"")
 	}
 }
 
-func TestEncodeRundlauf(t *testing.T) {
+func TestEncodeRoundTrip(t *testing.T) {
 	in := Info{Schema: 1, Locale: "de_CH.UTF-8", Keymap: "ch", Timezone: "Europe/Zurich"}
 	b, err := in.Encode()
 	if err != nil || len(b) != Size || Blank(b) {
@@ -59,14 +59,14 @@ func TestEncodeRundlauf(t *testing.T) {
 		t.Error("Blank")
 	}
 	if _, err := (Info{Schema: 1, Locale: strings.Repeat("x", Size)}).Encode(); err == nil {
-		t.Error("zu groß muss scheitern")
+		t.Error("too big must fail")
 	}
 }
 
-func TestUngueltigeWerteVerworfen(t *testing.T) {
+func TestInvalidValuesDiscarded(t *testing.T) {
 	c := defaultConfig(t)
 	Info{Schema: 1, Locale: "de_DE.UTF-8; rm -rf /", Timezone: "../../etc/passwd", Keymap: "us"}.Apply(c)
-	if c.System.Locale != "de_DE.UTF-8" || c.System.Timezone != "Europe/Berlin" || c.System.Keymap != "us" {
+	if c.System.Locale != "en_US.UTF-8" || c.System.Timezone != "UTC" || c.System.Keymap != "us" {
 		t.Errorf("%+v", c.System)
 	}
 	if err := c.Validate(); err != nil {

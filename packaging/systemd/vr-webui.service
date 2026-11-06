@@ -1,9 +1,9 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-# Weboberfläche (M4). Läuft ohne Root, nur mit CAP_NET_BIND_SERVICE (Port 443/80). Alles
-# Privilegierte geht über vr-webui-helper (D-04). Ping läuft nativ, ohne Programme mit Datei-
-# Capabilities, die die Härtung verhindern würde (L-09).
+# Web interface (M4). Runs without root, only with CAP_NET_BIND_SERVICE (ports 443/80). Everything
+# privileged goes through vr-webui-helper (D-04). Ping runs natively, without programs with file
+# capabilities, which the hardening would prevent (L-09).
 [Unit]
-Description=vanilla-router Weboberfläche
+Description=vanilla-router web interface
 After=network.target vr-webui-helper.service
 Wants=vr-webui-helper.service
 ConditionPathExists=/etc/vanilla-router/config.json
@@ -12,7 +12,7 @@ ConditionPathExists=/etc/vanilla-router/config.json
 Type=simple
 User=vr-webui
 Group=vr-webui
-# „+“: als root vor dem Start (TLS-Zertifikat, Einrichtungscode vom Installer)
+# "+": as root before the start (TLS certificate, setup code from the installer)
 ExecStartPre=+/usr/sbin/vr-webui prepare
 ExecStart=/usr/sbin/vr-webui serve
 Restart=on-failure

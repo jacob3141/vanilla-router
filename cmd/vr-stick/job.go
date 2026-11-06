@@ -11,7 +11,7 @@ import (
 	"vanilla-router/internal/windisk"
 )
 
-// Ablauf: Manifest → (Download) → Prüfen → Stick öffnen → Schreiben → Kontrolle (PLAN.md 3.12).
+// Flow: manifest → (download) → verify → open stick → write → check (PLAN.md 3.12).
 type phase int
 
 const (
@@ -24,27 +24,27 @@ const (
 	phVerify
 )
 
-var errOnStick = errors.New("Abbild liegt auf dem Ziel")
+var errOnStick = errors.New("image is on the target")
 
-// device ist ein geöffneter Stick.
+// device is an opened stick.
 type device interface {
 	stickwrite.Device
 	Close() error
 }
 
-// platform kapselt, was nur unter Windows geht, damit der Ablauf auf Linux getestet werden kann.
+// platform wraps what only works on Windows, so the flow can be tested on Linux.
 type platform struct {
 	open        func(windisk.Disk) (device, error)
 	disksOfPath func(string) []int
 }
 
-// job ist ein laufender Vorgang. Die Oberfläche fragt den Stand per Timer ab.
+// job is a running operation. The window polls its state with a timer.
 type job struct {
 	mu      sync.Mutex
 	ph      phase
 	done    int64
 	total   int64
-	wrote   bool // der Stick wurde schon verändert
+	wrote   bool // the stick has already been changed
 	err     error
 	over    bool
 	cancel  context.CancelFunc
@@ -82,8 +82,8 @@ func (j *job) finish(err error) {
 	j.mu.Unlock()
 }
 
-// prepare holt das Manifest (oder prüft die gewählte Datei), damit vor der Warnung feststeht, ob
-// der Stick groß genug ist.
+// prepare fetches the manifest (or checks the chosen file), so that it is known before the warning
+// whether the stick is big enough.
 func prepare(ctx context.Context, j *job, src *source, local *image) {
 	if local != nil {
 		j.mu.Lock()
@@ -102,7 +102,7 @@ func prepare(ctx context.Context, j *job, src *source, local *image) {
 	j.finish(err)
 }
 
-// run schreibt den Stick. stickJSON sind die Vorgaben aus Windows (F-STICK-07).
+// run writes the stick. stickJSON holds the defaults from Windows (F-STICK-07).
 func run(ctx context.Context, j *job, src *source, im *image, d windisk.Disk, p platform, stickJSON []byte) {
 	err := runSteps(ctx, j, src, im, d, p, stickJSON)
 	discardCorrupt(j.state().im, err)

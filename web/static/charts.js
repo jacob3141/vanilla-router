@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// Einfache SVG-Liniendiagramme. Zeitachse in Unix-Sekunden, Breite passt sich dem Element an.
+import { locale } from './i18n.js';
+// Simple SVG line charts. Time axis in Unix seconds, the width adapts to the element.
 
 const NS = 'http://www.w3.org/2000/svg';
 
@@ -25,8 +26,8 @@ export function niceMax(v, min = 1) {
 
 /**
  * series: [{ points: [[t, v], …], cls: 'rx-line', area: 'rx-area' }]
- * opts: { t0, t1, yMax, yFmt(v), tFmt(t), gaps: [[t0,t1],…] (markiert, z. B. Ausfälle), gapSec }
- * Fehlende Werte (null) unterbrechen die Linie.
+ * opts: { t0, t1, yMax, yFmt(v), tFmt(t), gaps: [[t0,t1],…] (marked, e.g. outages), gapSec }
+ * Missing values (null) interrupt the line.
  */
 export function drawLines(svg, series, opts) {
   while (svg.firstChild) svg.removeChild(svg.firstChild);
@@ -49,7 +50,7 @@ export function drawLines(svg, series, opts) {
   }
   const gapSec = opts.gapSec || Infinity;
   for (const s of series) {
-    // Linie in Stücke teilen: bei null oder Zeitlücken größer gapSec
+    // Split the line into pieces: at null or time gaps larger than gapSec
     const segs = [];
     let cur = [];
     let lastT = null;
@@ -76,5 +77,5 @@ export function drawLines(svg, series, opts) {
 }
 
 export function clockFmt(t) {
-  return new Intl.DateTimeFormat('de-DE', { hour: '2-digit', minute: '2-digit' }).format(new Date(t * 1000));
+  return new Intl.DateTimeFormat(locale(), { hour: '2-digit', minute: '2-digit' }).format(new Date(t * 1000));
 }

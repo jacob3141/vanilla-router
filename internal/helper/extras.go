@@ -16,8 +16,8 @@ import (
 )
 
 func (s *Server) registerExtras() {
-	// Import einer exportierten Konfiguration: wird vollständig geprüft und wie jede andere
-	// Änderung eingespielt. Firewall-Teile brauchen eine Bestätigung innerhalb von 60 s.
+	// Import of an exported configuration: fully validated and applied like any other
+	// change. Firewall parts need confirmation within 60 s.
 	s.handle("state.import", func(ctx context.Context, raw json.RawMessage) (any, error) {
 		var p struct {
 			State conf.State `json:"state"`
@@ -27,7 +27,7 @@ func (s *Server) registerExtras() {
 		}
 		next := p.State
 		next.Version = 1
-		// fehlende Listen als leer behandeln, damit der Vergleich unten stimmt
+		// treat missing lists as empty, so the comparison below works
 		next.Reservations = nonNil(next.Reservations)
 		next.Records = nonNil(next.Records)
 		next.PortForwards = nonNil(next.PortForwards)
@@ -49,7 +49,7 @@ func (s *Server) registerExtras() {
 		return res, nil
 	})
 
-	// Port prüfen: Kann der Router eine TCP-Verbindung zu Ziel:Port aufbauen?
+	// Port check: can the router open a TCP connection to target:port?
 	s.handle("tool.port", func(ctx context.Context, raw json.RawMessage) (any, error) {
 		var p struct {
 			Target string `json:"target"`
@@ -63,7 +63,7 @@ func (s *Server) registerExtras() {
 			return nil, err
 		}
 		if p.Port < 1 || p.Port > 65535 {
-			return nil, Userf("Der Port muss zwischen 1 und 65535 liegen.")
+			return nil, Userf("The port must be between 1 and 65535.")
 		}
 		start := time.Now()
 		d := net.Dialer{Timeout: 5 * time.Second}

@@ -16,15 +16,15 @@ import (
 func (s *Server) registerNetwork() {
 	s.route("GET /api/devices", s.handleDevices)
 	s.route("POST /api/reservations", s.handleReservationSet)
-	s.route("POST /api/reservations/delete", s.forward("dhcp.reservation.delete", "Reservierung gelöscht."))
+	s.route("POST /api/reservations/delete", s.forward("dhcp.reservation.delete", "Reservation deleted."))
 	s.route("GET /api/dns", s.handleDNS)
-	s.route("POST /api/dns", s.forward("dns.record.set", "DNS-Eintrag gespeichert."))
-	s.route("POST /api/dns/delete", s.forward("dns.record.delete", "DNS-Eintrag gelöscht."))
-	s.route("POST /api/dns/flush", s.forward("dns.flush", "DNS-Cache geleert."))
+	s.route("POST /api/dns", s.forward("dns.record.set", "DNS record saved."))
+	s.route("POST /api/dns/delete", s.forward("dns.record.delete", "DNS record deleted."))
+	s.route("POST /api/dns/flush", s.forward("dns.flush", "DNS cache cleared."))
 }
 
-// forward reicht den Anfragekörper unverändert an eine Helper-Aktion weiter.
-// Die Prüfung der Parameter übernimmt der Helper.
+// forward passes the request body unchanged to a helper action.
+// The helper validates the parameters.
 func (s *Server) forward(action, okMsg string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var params map[string]any
@@ -41,14 +41,14 @@ func (s *Server) forward(action, okMsg string) http.HandlerFunc {
 }
 
 func (s *Server) handleReservationSet(w http.ResponseWriter, r *http.Request) {
-	s.forward("dhcp.reservation.set", "Reservierung gespeichert. Das Gerät bekommt die Adresse bei der nächsten Erneuerung seiner Lease.")(w, r)
+	s.forward("dhcp.reservation.set", "Reservation saved. The device gets the address the next time it renews its lease.")(w, r)
 }
 
-// Device fasst Lease, Nachbartabelle und Reservierung einer MAC-Adresse zusammen.
+// Device combines the lease, neighbor table and reservation of a MAC address.
 type Device struct {
 	MAC         string            `json:"mac"`
 	IP          string            `json:"ip"`
-	Hostname    string            `json:"hostname"` // vom Gerät gemeldet
+	Hostname    string            `json:"hostname"` // reported by the device
 	Online      bool              `json:"online"`
 	Neighbor    string            `json:"neighbor_state,omitempty"`
 	LeaseState  string            `json:"lease_state,omitempty"`
@@ -84,7 +84,7 @@ func (s *Server) handleDevices(w http.ResponseWriter, r *http.Request) {
 	}
 	now := time.Now()
 	for _, l := range leases {
-		// Abgelaufene, längst freigegebene Leases ohne Bezug blenden wir aus
+		// We hide expired leases released long ago that have no other reference
 		if l.State != "active" && now.Sub(l.Ends) > 7*24*time.Hour {
 			continue
 		}
@@ -115,7 +115,7 @@ func (s *Server) handleDevices(w http.ResponseWriter, r *http.Request) {
 			d.IP = res.IP
 		}
 	}
-	// handgeschriebene DNS-Namen den Geräten zuordnen (z. B. klipper)
+	// assign hand-written DNS names to devices (e.g. a printer)
 	for _, m := range info.Manual {
 		for _, d := range byMAC {
 			if d.DNSName == "" && d.IP == m.IP && strings.HasSuffix(m.Name, "."+conf.Domain) {
@@ -131,7 +131,7 @@ func (s *Server) handleDevices(w http.ResponseWriter, r *http.Request) {
 
 	out := make([]*Device, 0, len(byMAC))
 	for _, d := range byMAC {
-		// Docker-Container (ipvlan) und der Router selbst gehören nicht in die Geräteliste
+		// Docker containers (ipvlan) and the router itself do not belong in the device list
 		if d.MAC == "" {
 			continue
 		}
@@ -187,7 +187,7 @@ func compareIPStr(a, b string) int {
 	return strings.Compare(pa, pb)
 }
 
-// ipKey macht IPv4-Adressen sortierbar ("10.0.10.5" → "010.000.010.005").
+// ipKey makes IPv4 addresses sortable ("10.0.10.5" → "010.000.010.005").
 func ipKey(ip string) string {
 	parts := strings.Split(ip, ".")
 	if len(parts) != 4 {

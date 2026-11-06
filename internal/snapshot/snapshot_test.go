@@ -11,7 +11,7 @@ import (
 	"time"
 )
 
-// fakeRunner spielt btrfs und grub-editenv mit Ordnern und Dateien nach.
+// fakeRunner imitates btrfs and grub-editenv with folders and files.
 type fakeRunner struct {
 	t     *testing.T
 	calls []string
@@ -71,15 +71,15 @@ func TestPreUpdate(t *testing.T) {
 	for _, want := range []string{"--id vr-rollback", "rootflags=subvol=@snapshots/20261104-030000-pre-update",
 		"vr.rollback=20261104-030000-pre-update", "initrd /@snapshots/20261104-030000-pre-update/boot/initrd.img"} {
 		if !strings.Contains(string(cfg), want) {
-			t.Errorf("rollback.cfg ohne %q:\n%s", want, cfg)
+			t.Errorf("rollback.cfg without %q:\n%s", want, cfg)
 		}
 	}
-	// zweiter dpkg-Aufruf im selben apt-Lauf: kein neuer Snapshot
+	// second dpkg call in the same apt run: no new snapshot
 	*now = now.Add(2 * time.Minute)
 	if info, _ := m.PreUpdate("apt"); info != nil {
-		t.Error("doppelter Snapshot")
+		t.Error("duplicate snapshot")
 	}
-	// Aufräumen: nur Keep=2 bleiben
+	// Cleanup: only Keep=2 stay
 	for i := 0; i < 3; i++ {
 		*now = now.Add(time.Hour)
 		if _, err := m.PreUpdate("apt"); err != nil {
@@ -88,7 +88,7 @@ func TestPreUpdate(t *testing.T) {
 	}
 	list, _ := m.List()
 	if len(list) != 2 {
-		t.Errorf("%d Snapshots nach dem Aufräumen: %+v", len(list), list)
+		t.Errorf("%d snapshots after cleanup: %+v", len(list), list)
 	}
 }
 
@@ -104,7 +104,7 @@ func TestMarkGoodNormal(t *testing.T) {
 	}
 }
 
-func TestMarkGoodNachRuecknahme(t *testing.T) {
+func TestMarkGoodAfterRollback(t *testing.T) {
 	m, r, _ := setup(t)
 	top := filepath.Join(m.Root, "run/vr-btrfs-top")
 	os.MkdirAll(filepath.Join(top, "@"), 0o755)
@@ -114,30 +114,30 @@ func TestMarkGoodNachRuecknahme(t *testing.T) {
 	if err != nil || !rb {
 		t.Fatal(rb, err)
 	}
-	if _, err := os.Stat(filepath.Join(top, "@kaputt-20261104-030000")); err != nil {
-		t.Error("altes @ nicht aufgehoben")
+	if _, err := os.Stat(filepath.Join(top, "@broken-20261104-030000")); err != nil {
+		t.Error("old @ not kept")
 	}
 	if _, err := os.Stat(filepath.Join(top, "@")); err != nil {
-		t.Error("neues @ fehlt")
+		t.Error("new @ is missing")
 	}
 	joined := strings.Join(r.calls, "\n")
 	if !strings.Contains(joined, "mount -o subvolid=5 /dev/sda2 ") || !strings.Contains(joined, "umount "+top) {
-		t.Errorf("Einhängen der obersten Ebene:\n%s", joined)
+		t.Errorf("mounting the top level:\n%s", joined)
 	}
 }
 
-func TestMakePermanentFehlerStelltWiederHer(t *testing.T) {
+func TestMakePermanentErrorRestores(t *testing.T) {
 	m, r, _ := setup(t)
 	top := filepath.Join(m.Root, "run/vr-btrfs-top")
 	os.MkdirAll(filepath.Join(top, "@"), 0o755)
 	r.fail = "btrfs subvolume snapshot"
 	if err := m.MakePermanent("20261104-030000-pre-update"); err == nil {
-		t.Fatal("Fehler erwartet")
+		t.Fatal("error expected")
 	}
 	if _, err := os.Stat(filepath.Join(top, "@")); err != nil {
-		t.Error("@ nach Fehler nicht zurückbenannt")
+		t.Error("@ not renamed back after an error")
 	}
 	if err := m.MakePermanent("../x"); err == nil {
-		t.Error("Pfad angenommen")
+		t.Error("path accepted")
 	}
 }

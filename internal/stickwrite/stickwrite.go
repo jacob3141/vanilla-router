@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-// Package stickwrite prüft ein Stick-Abbild gegen sein Manifest, schreibt es roh auf einen Datenträger,
-// trägt dabei vr/stick.json ein und liest das Ergebnis zur Kontrolle zurück (F-STICK-04, F-STICK-05,
-// PLAN.md 3.12). Das Paket ist plattformunabhängig, den Zugriff auf den Stick liefert ein Device.
+// Package stickwrite checks a stick image against its manifest, writes it raw to a disk,
+// adds vr/stick.json and reads the result back for checking (F-STICK-04, F-STICK-05,
+// PLAN.md 3.12). The package is platform-independent, a Device provides access to the stick.
 package stickwrite
 
 import (
@@ -20,8 +20,8 @@ import (
 	"vanilla-router/internal/stick"
 )
 
-// Device ist der Datenträger. Lesen und Schreiben geschehen immer in ganzen Sektoren an
-// Sektorgrenzen, mit Puffern, die auf Align ausgerichtet sind (Windows: FILE_FLAG_NO_BUFFERING).
+// Device is the disk. Reading and writing always happen in whole sectors at
+// sector boundaries, with buffers aligned to Align (Windows: FILE_FLAG_NO_BUFFERING).
 type Device interface {
 	io.WriterAt
 	io.ReaderAt
@@ -29,43 +29,43 @@ type Device interface {
 	SectorSize() int
 }
 
-// Syncer schreibt Zwischenspeicher auf den Datenträger (optional).
+// Syncer flushes caches to the disk (optional).
 type Syncer interface{ Sync() error }
 
-// Phase ist der Arbeitsschritt für die Fortschrittsanzeige.
+// Phase is the work step for the progress display.
 type Phase int
 
 const (
-	PhaseCheck  Phase = iota // Abbild prüfen
-	PhaseWrite               // auf den Stick schreiben
-	PhaseVerify              // zurücklesen und vergleichen
+	PhaseCheck  Phase = iota // verify image
+	PhaseWrite               // write to the stick
+	PhaseVerify              // read back and compare
 )
 
-// Progress meldet den Fortschritt in Bytes.
+// Progress reports the progress in bytes.
 type Progress func(p Phase, done, total int64)
 
-// Fehler, die die Oberfläche in Laien-Text übersetzt (F-STICK-06).
+// Errors that the window translates into plain language (F-STICK-06).
 var (
-	ErrTooSmall = errors.New("der Stick ist zu klein")
-	ErrCorrupt  = errors.New("das Abbild ist beschädigt")
-	ErrNotBlank = errors.New("im Abbild fehlt die Reservierung für stick.json")
-	ErrVerify   = errors.New("die Kontrolle nach dem Schreiben ist fehlgeschlagen")
+	ErrTooSmall = errors.New("the stick is too small")
+	ErrCorrupt  = errors.New("the image is damaged")
+	ErrNotBlank = errors.New("the reservation for stick.json is missing in the image")
+	ErrVerify   = errors.New("the check after writing failed")
 )
 
 const (
-	// Align ist die Ausrichtung der Puffer im Speicher und die größte unterstützte Sektorgröße.
+	// Align is the alignment of the buffers in memory and the largest supported sector size.
 	Align = 4096
 	chunk = 4 << 20
-	// head ist der Anfang des Datenträgers mit der Partitionstabelle. Er wird zuerst gelöscht und
-	// zuletzt geschrieben, damit das Betriebssystem während des Schreibens keine Partitionen findet
-	// und einhängt.
+	// head is the start of the disk with the partition table. It is erased first and
+	// written last, so that the operating system finds and mounts no partitions
+	// during writing.
 	head = 1 << 20
 )
 
-// Open öffnet die heruntergeladene Datei (so wie im Manifest unter file beschrieben).
+// Open opens the downloaded file (as described in the manifest under file).
 type Open func() (io.ReadCloser, error)
 
-// stream liest die Datei, prüft dabei die Prüfsumme der Datei und liefert das entpackte Abbild.
+// stream reads the file, checks the file's checksum on the way and returns the unpacked image.
 type stream struct {
 	f       io.ReadCloser
 	tee     io.Reader
@@ -86,7 +86,7 @@ func openStream(open Open, m *manifest.Manifest) (*stream, error) {
 		return nil, err
 	}
 	s := &stream{f: f, fileSum: sha256.New(), fileN: &countWriter{}, imgSum: sha256.New()}
-	// Nie mehr lesen als angekündigt, eine längere Datei fällt bei der Größenprüfung auf.
+	// Never read more than announced, a longer file comes to light in the size check.
 	s.tee = io.TeeReader(io.LimitReader(f, m.File.Size+1), io.MultiWriter(s.fileSum, s.fileN))
 	tee := s.tee
 	if m.File.Compression == manifest.Gzip {
@@ -104,7 +104,7 @@ func openStream(open Open, m *manifest.Manifest) (*stream, error) {
 	return s, nil
 }
 
-// finish liest den Rest der Datei und vergleicht beide Prüfsummen.
+// finish reads the rest of the file and compares both checksums.
 func (s *stream) finish(m *manifest.Manifest, imgN int64) error {
 	if _, err := io.Copy(io.Discard, s.img); err != nil {
 		return fmt.Errorf("%w: %v", ErrCorrupt, err)
@@ -114,25 +114,25 @@ func (s *stream) finish(m *manifest.Manifest, imgN int64) error {
 			return fmt.Errorf("%w: %v", ErrCorrupt, err)
 		}
 	}
-	// Nach dem Ende des gzip-Stroms darf nichts mehr kommen.
+	// Nothing may come after the end of the gzip stream.
 	if _, err := io.Copy(io.Discard, s.tee); err != nil {
 		return err
 	}
 	switch {
 	case s.fileN.n != m.File.Size:
-		return fmt.Errorf("%w: Datei hat %d statt %d Bytes", ErrCorrupt, s.fileN.n, m.File.Size)
+		return fmt.Errorf("%w: file has %d instead of %d bytes", ErrCorrupt, s.fileN.n, m.File.Size)
 	case manifest.HexSum(s.fileSum.Sum(nil)) != m.File.SHA256:
-		return fmt.Errorf("%w: Prüfsumme der Datei falsch", ErrCorrupt)
+		return fmt.Errorf("%w: file checksum wrong", ErrCorrupt)
 	case imgN != m.Image.Size:
-		return fmt.Errorf("%w: Abbild hat %d statt %d Bytes", ErrCorrupt, imgN, m.Image.Size)
+		return fmt.Errorf("%w: image has %d instead of %d bytes", ErrCorrupt, imgN, m.Image.Size)
 	case manifest.HexSum(s.imgSum.Sum(nil)) != m.Image.SHA256:
-		return fmt.Errorf("%w: Prüfsumme des Abbilds falsch", ErrCorrupt)
+		return fmt.Errorf("%w: image checksum wrong", ErrCorrupt)
 	}
 	return nil
 }
 
-// Check prüft die Datei vollständig gegen das Manifest, bevor etwas geschrieben wird (F-STICK-04),
-// und dass die Stelle für stick.json eine leere Reservierung ist.
+// Check verifies the file completely against the manifest before anything is written (F-STICK-04),
+// and that the place for stick.json is an empty reservation.
 func Check(ctx context.Context, open Open, m *manifest.Manifest, prog Progress) error {
 	s, err := openStream(open, m)
 	if err != nil {
@@ -171,7 +171,7 @@ func Check(ctx context.Context, open Open, m *manifest.Manifest, prog Progress) 
 	return nil
 }
 
-// appendRegion hängt den Teil von chunk an dst, der in [off, off+size) liegt.
+// appendRegion appends the part of chunk in [off, off+size) to dst.
 func appendRegion(dst, chunk []byte, pos, off, size int64) []byte {
 	lo, hi := max(off, pos), min(off+size, pos+int64(len(chunk)))
 	if lo < hi {
@@ -180,7 +180,7 @@ func appendRegion(dst, chunk []byte, pos, off, size int64) []byte {
 	return dst
 }
 
-// overlay ersetzt in chunk den Teil, der in [off, off+len(data)) liegt, durch data.
+// overlay replaces the part of chunk in [off, off+len(data)) with data.
 func overlay(chunk []byte, pos, off int64, data []byte) {
 	lo, hi := max(off, pos), min(off+int64(len(data)), pos+int64(len(chunk)))
 	if lo < hi {
@@ -188,8 +188,8 @@ func overlay(chunk []byte, pos, off int64, data []byte) {
 	}
 }
 
-// aligned liefert einen Puffer, dessen Anfang auf Align ausgerichtet ist. Der Speicher von Go wird
-// nicht verschoben, die Ausrichtung bleibt also erhalten.
+// aligned returns a buffer whose start is aligned to Align. Go's memory is not
+// moved, so the alignment stays.
 func aligned(n int) []byte {
 	b := make([]byte, n+Align)
 	off := int(uintptr(unsafe.Pointer(&b[0])) & (Align - 1))
@@ -201,23 +201,23 @@ func aligned(n int) []byte {
 
 func roundUp(n, to int) int { return (n + to - 1) / to * to }
 
-// Write schreibt das Abbild auf dev und kontrolliert es. stickJSON (genau stick.Size Bytes) wird an der
-// Stelle aus dem Manifest eingetragen. Vorher muss Check erfolgreich gewesen sein, Write prüft die
-// Prüfsummen aber ein zweites Mal, damit eine inzwischen veränderte Datei auffällt.
+// Write writes the image to dev and checks it. stickJSON (exactly stick.Size bytes) is added at the
+// place given in the manifest. Check must have succeeded beforehand, but Write verifies the
+// checksums a second time, so a file changed in the meantime comes to light.
 func Write(ctx context.Context, open Open, m *manifest.Manifest, dev Device, stickJSON []byte, prog Progress) error {
 	if len(stickJSON) != stick.Size {
-		return errors.New("stick.json hat die falsche Größe")
+		return errors.New("stick.json has the wrong size")
 	}
 	sector := dev.SectorSize()
 	if sector < 512 || sector > Align || sector&(sector-1) != 0 {
-		return fmt.Errorf("Sektorgröße %d wird nicht unterstützt", sector)
+		return fmt.Errorf("sector size %d is not supported", sector)
 	}
 	devSize := dev.Size() / int64(sector) * int64(sector)
 	if devSize < (m.Image.Size+int64(sector)-1)/int64(sector)*int64(sector) || devSize < 2*head {
 		return ErrTooSmall
 	}
 
-	// Alte Partitionstabellen (vorne und die GPT-Sicherung hinten) löschen.
+	// Erase old partition tables (at the front and the GPT backup at the back).
 	zero := aligned(head)
 	if _, err := dev.WriteAt(zero, 0); err != nil {
 		return err
@@ -242,14 +242,14 @@ func Write(ctx context.Context, open Open, m *manifest.Manifest, dev Device, sti
 		}
 		n, rerr := io.ReadFull(s.img, buf)
 		if int64(n) > m.Image.Size-pos {
-			return fmt.Errorf("%w: Abbild länger als angekündigt", ErrCorrupt)
+			return fmt.Errorf("%w: image longer than announced", ErrCorrupt)
 		}
 		if n > 0 {
 			data := buf[:n]
 			s.imgSum.Write(data)
 			overlay(data, pos, m.StickJSON.Offset, stickJSON)
 			out.Write(data)
-			// Den Anfang (Partitionstabelle) zurückhalten.
+			// Hold back the start (partition table).
 			skip := 0
 			if pos < head {
 				skip = int(min(int64(n), head-pos))
@@ -293,9 +293,9 @@ func Write(ctx context.Context, open Open, m *manifest.Manifest, dev Device, sti
 	return verify(ctx, dev, m.Image.Size, out.Sum(nil), sector, prog)
 }
 
-// FindReservation sucht im Abbild die leere Reservierung für vr/stick.json: eine Folge von mindestens
-// stick.Size Leerzeichen ab einer Sektorgrenze hinter dem ersten MiB. Es muss genau eine geben, sonst
-// ist die Lage nicht eindeutig (Werkzeug zum Erzeugen des Manifests, T-M4-07).
+// FindReservation looks for the empty reservation for vr/stick.json in the image: a run of at least
+// stick.Size spaces from a sector boundary behind the first MiB. There must be exactly one, otherwise
+// the location is not unique (tool for creating the manifest, T-M4-07).
 func FindReservation(r io.Reader) (int64, error) {
 	const sec = 512
 	buf := make([]byte, chunk)
@@ -336,10 +336,10 @@ func FindReservation(r io.Reader) (int64, error) {
 	case 0:
 		return 0, ErrNotBlank
 	}
-	return 0, fmt.Errorf("Reservierung nicht eindeutig (%d Stellen)", len(found))
+	return 0, fmt.Errorf("reservation not unique (%d places)", len(found))
 }
 
-// verify liest das Abbild vom Datenträger zurück und vergleicht die Prüfsumme.
+// verify reads the image back from the disk and compares the checksum.
 func verify(ctx context.Context, dev io.ReaderAt, size int64, want []byte, sector int, prog Progress) error {
 	h := sha256.New()
 	buf := aligned(chunk)

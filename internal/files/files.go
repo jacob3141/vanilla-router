@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-// Package files ist der Dateidienst der Oberfläche. Er läuft als smbuser (dieselben Rechte wie
-// Samba), hat nur Zugriff auf den Ordner der Freigabe und spricht HTTP über einen Unix-Socket,
-// den nur der Webserver erreichen kann. Alle Pfade laufen über os.Root: Das Betriebssystem
-// verhindert damit Ausbrüche über "..", absolute Pfade oder Symlinks.
+// Package files is the file service of the web interface. It runs as smbuser (the same rights as
+// Samba), has access only to the share's folder and speaks HTTP over a Unix socket
+// that only the web server can reach. All paths go through os.Root: the operating system
+// thereby prevents escapes through "..", absolute paths or symlinks.
 package files
 
 import (
@@ -25,8 +25,8 @@ import (
 	"unicode/utf8"
 )
 
-// Trash ist der Papierkorb im Wurzelordner der Freigabe. Löschen verschiebt dorthin.
-const Trash = ".papierkorb"
+// Trash is the trash folder in the root of the share. Deleting moves things there.
+const Trash = ".trash"
 
 type Server struct {
 	root    *os.Root
@@ -54,12 +54,12 @@ func (s *Server) Handler() http.Handler {
 	return mux
 }
 
-// --- Pfade ---------------------------------------------------------------------------
+// --- Paths ---------------------------------------------------------------------------
 
-// cleanPath macht aus einer Angabe der Oberfläche einen relativen Pfad für os.Root ("." = Wurzel).
+// cleanPath turns a path from the web interface into a relative path for os.Root ("." = root).
 func cleanPath(p string) (string, error) {
 	if !utf8.ValidString(p) || strings.ContainsRune(p, 0) || len(p) > 4096 {
-		return "", errBad("Ungültiger Pfad.")
+		return "", errBad("Invalid path.")
 	}
 	c := strings.TrimPrefix(path.Clean("/"+p), "/")
 	if c == "" {
@@ -68,20 +68,20 @@ func cleanPath(p string) (string, error) {
 	return c, nil
 }
 
-// validName prüft einen einzelnen Datei- oder Ordnernamen.
+// validName checks a single file or folder name.
 func validName(n string) error {
 	switch {
 	case n == "" || n == "." || n == "..":
-		return errBad("Ungültiger Name.")
+		return errBad("Invalid name.")
 	case len(n) > 255 || !utf8.ValidString(n):
-		return errBad("Der Name ist zu lang.")
+		return errBad("The name is too long.")
 	case strings.ContainsAny(n, "/\\\x00"):
-		return errBad("Der Name darf keinen Schrägstrich enthalten.")
+		return errBad("The name must not contain a slash.")
 	case strings.ContainsAny(n, `:*?"<>|`):
-		// Diese Zeichen kann Windows über Samba nicht darstellen
-		return errBad(`Windows erlaubt die Zeichen : * ? " < > | nicht in Dateinamen.`)
+		// Windows cannot display these characters over Samba
+		return errBad(`Windows does not allow the characters : * ? " < > | in file names.`)
 	case strings.TrimSpace(n) != n || strings.HasSuffix(n, "."):
-		return errBad("Der Name darf nicht mit Leerzeichen oder Punkt enden (Windows).")
+		return errBad("The name must not end with a space or period (Windows).")
 	}
 	return nil
 }
@@ -93,22 +93,22 @@ func errBad(msg string) error      { return &userError{msg} }
 
 func (s *Server) fail(w http.ResponseWriter, err error) {
 	var ue *userError
-	status, msg := http.StatusInternalServerError, "Interner Fehler im Dateidienst."
+	status, msg := http.StatusInternalServerError, "Internal error in the file service."
 	switch {
 	case errors.As(err, &ue):
 		status, msg = http.StatusBadRequest, ue.msg
 	case errors.Is(err, fs.ErrNotExist):
-		status, msg = http.StatusNotFound, "Datei oder Ordner gibt es nicht."
+		status, msg = http.StatusNotFound, "That file or folder does not exist."
 	case errors.Is(err, fs.ErrExist):
-		status, msg = http.StatusConflict, "Eine Datei oder ein Ordner mit diesem Namen existiert schon."
+		status, msg = http.StatusConflict, "A file or folder with this name already exists."
 	case errors.Is(err, fs.ErrPermission):
-		status, msg = http.StatusForbidden, "Keine Berechtigung."
+		status, msg = http.StatusForbidden, "No permission."
 	case strings.Contains(err.Error(), "path escapes"):
-		status, msg = http.StatusBadRequest, "Der Pfad zeigt aus der Freigabe heraus."
+		status, msg = http.StatusBadRequest, "The path points out of the share."
 	case errors.Is(err, syscall.ENOSPC):
-		status, msg = http.StatusInsufficientStorage, "Der Speicher ist voll."
+		status, msg = http.StatusInsufficientStorage, "The storage is full."
 	default:
-		s.log.Error("dateidienst", "err", err)
+		s.log.Error("file service", "err", err)
 	}
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(status)
@@ -124,12 +124,12 @@ func readJSON(r *http.Request, v any) error {
 	dec := json.NewDecoder(io.LimitReader(r.Body, 64<<10))
 	dec.DisallowUnknownFields()
 	if err := dec.Decode(v); err != nil {
-		return errBad("Ungültige Anfrage.")
+		return errBad("Invalid request.")
 	}
 	return nil
 }
 
-// --- Auflisten und Herunterladen ------------------------------------------------------
+// --- Listing and downloading ----------------------------------------------------------
 
 type Entry struct {
 	Name     string    `json:"name"`
@@ -157,7 +157,7 @@ func (s *Server) handleList(w http.ResponseWriter, r *http.Request) {
 	}
 	entries := make([]Entry, 0, len(des))
 	for _, de := range des {
-		// Symlinks und Sonderdateien zeigen wir nicht an, sie führen oft aus der Freigabe heraus
+		// We do not show symlinks and special files, they often lead out of the share
 		if de.Type()&(fs.ModeSymlink|fs.ModeDevice|fs.ModeNamedPipe|fs.ModeSocket) != 0 {
 			continue
 		}
@@ -192,7 +192,7 @@ func (s *Server) handleList(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleDownload(w http.ResponseWriter, r *http.Request) {
 	p, err := cleanPath(r.URL.Query().Get("path"))
 	if err != nil || p == "." {
-		s.fail(w, errBad("Ungültiger Pfad."))
+		s.fail(w, errBad("Invalid path."))
 		return
 	}
 	f, err := s.root.Open(p)
@@ -207,12 +207,12 @@ func (s *Server) handleDownload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if info.IsDir() {
-		s.fail(w, errBad("Ordner lassen sich nicht direkt herunterladen."))
+		s.fail(w, errBad("Folders cannot be downloaded directly."))
 		return
 	}
 	name := path.Base(p)
-	// Immer als Download ausliefern, nie im Browser anzeigen: eine HTML-Datei aus der
-	// Freigabe darf nicht im Kontext der Oberfläche laufen
+	// Always deliver as a download, never display in the browser: an HTML file from the
+	// share must not run in the context of the web interface
 	w.Header().Set("Content-Disposition", mime.FormatMediaType("attachment", map[string]string{"filename": name}))
 	w.Header().Set("Content-Type", "application/octet-stream")
 	w.Header().Set("X-Content-Type-Options", "nosniff")
@@ -220,7 +220,7 @@ func (s *Server) handleDownload(w http.ResponseWriter, r *http.Request) {
 	http.ServeContent(w, r, name, info.ModTime(), f)
 }
 
-// --- Ändern ---------------------------------------------------------------------------
+// --- Changing --------------------------------------------------------------------------
 
 func (s *Server) handleUpload(w http.ResponseWriter, r *http.Request) {
 	dir, err := cleanPath(r.URL.Query().Get("path"))
@@ -229,12 +229,12 @@ func (s *Server) handleUpload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if info, err := s.root.Stat(dir); err != nil || !info.IsDir() {
-		s.fail(w, errBad("Der Zielordner existiert nicht."))
+		s.fail(w, errBad("The target folder does not exist."))
 		return
 	}
 	mr, err := r.MultipartReader()
 	if err != nil {
-		s.fail(w, errBad("Ungültiger Upload."))
+		s.fail(w, errBad("Invalid upload."))
 		return
 	}
 	var saved []string
@@ -244,7 +244,7 @@ func (s *Server) handleUpload(w http.ResponseWriter, r *http.Request) {
 			break
 		}
 		if err != nil {
-			s.fail(w, errBad("Upload abgebrochen."))
+			s.fail(w, errBad("Upload cancelled."))
 			return
 		}
 		if part.FormName() != "file" || part.FileName() == "" {
@@ -260,11 +260,11 @@ func (s *Server) handleUpload(w http.ResponseWriter, r *http.Request) {
 		target := path.Join(dir, name)
 		if _, err := s.root.Lstat(target); err == nil {
 			part.Close()
-			s.fail(w, &userError{fmt.Sprintf("„%s“ gibt es schon. Bitte vorher umbenennen oder löschen.", name)})
+			s.fail(w, &userError{fmt.Sprintf("\"%s\" already exists. Please rename or delete it first.", name)})
 			return
 		}
-		// Erst in eine versteckte Datei schreiben und am Ende umbenennen: ein abgebrochener
-		// Upload hinterlässt keine halbe Datei unter dem richtigen Namen
+		// First write to a hidden file and rename at the end: an interrupted
+		// upload leaves no half file under the real name
 		tmp := path.Join(dir, fmt.Sprintf(".upload-%d-%s", s.now().UnixNano(), name))
 		if len(path.Base(tmp)) > 255 {
 			tmp = path.Join(dir, fmt.Sprintf(".upload-%d", s.now().UnixNano()))
@@ -291,10 +291,10 @@ func (s *Server) handleUpload(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		saved = append(saved, name)
-		s.log.Info("hochgeladen", "datei", target)
+		s.log.Info("uploaded", "file", target)
 	}
 	if len(saved) == 0 {
-		s.fail(w, errBad("Keine Datei im Upload."))
+		s.fail(w, errBad("No file in the upload."))
 		return
 	}
 	writeJSON(w, map[string]any{"ok": true, "saved": saved})
@@ -334,7 +334,7 @@ func (s *Server) handleRename(w http.ResponseWriter, r *http.Request) {
 	}
 	p, err := cleanPath(req.Path)
 	if err == nil && (p == "." || p == Trash) {
-		err = errBad("Dieser Ordner lässt sich nicht umbenennen.")
+		err = errBad("This folder cannot be renamed.")
 	}
 	if err == nil {
 		err = validName(req.NewName)
@@ -352,12 +352,12 @@ func (s *Server) handleRename(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, err)
 		return
 	}
-	s.log.Info("umbenannt", "von", p, "nach", target)
+	s.log.Info("renamed", "from", p, "to", target)
 	writeJSON(w, map[string]any{"ok": true})
 }
 
-// handleDelete verschiebt in den Papierkorb: .papierkorb/<zeitpunkt>/<ursprünglicher pfad>.
-// Was schon im Papierkorb liegt, wird endgültig gelöscht.
+// handleDelete moves into the trash: .trash/<time>/<original path>.
+// What is already in the trash is deleted permanently.
 func (s *Server) handleDelete(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Paths []string `json:"paths"`
@@ -367,14 +367,14 @@ func (s *Server) handleDelete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if len(req.Paths) == 0 || len(req.Paths) > 1000 {
-		s.fail(w, errBad("Nichts ausgewählt."))
+		s.fail(w, errBad("Nothing selected."))
 		return
 	}
 	stamp := s.now().Format("2006-01-02_150405")
 	for _, raw := range req.Paths {
 		p, err := cleanPath(raw)
 		if err == nil && (p == "." || p == Trash) {
-			err = errBad("Dieser Ordner lässt sich nicht löschen.")
+			err = errBad("This folder cannot be deleted.")
 		}
 		if err != nil {
 			s.fail(w, err)
@@ -389,7 +389,7 @@ func (s *Server) handleDelete(w http.ResponseWriter, r *http.Request) {
 				s.fail(w, err)
 				return
 			}
-			s.log.Info("endgültig gelöscht", "pfad", p)
+			s.log.Info("permanently deleted", "path", p)
 			continue
 		}
 		dst := path.Join(Trash, stamp, p)
@@ -401,7 +401,7 @@ func (s *Server) handleDelete(w http.ResponseWriter, r *http.Request) {
 			s.fail(w, err)
 			return
 		}
-		s.log.Info("in den papierkorb", "pfad", p)
+		s.log.Info("moved to trash", "path", p)
 	}
 	writeJSON(w, map[string]any{"ok": true})
 }

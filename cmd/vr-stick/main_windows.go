@@ -18,7 +18,7 @@ import (
 	"vanilla-router/internal/windisk"
 )
 
-func init() { runtime.LockOSThread() } // Fenster gehören zum Thread, der sie erzeugt hat.
+func init() { runtime.LockOSThread() } // Windows belong to the thread that created them.
 
 const (
 	idCreate = 1 // IDOK: Enter
@@ -38,10 +38,10 @@ const (
 	stRunning
 )
 
-// Farben im Stil des Logos (internal/logo). Texte und Knöpfe erfüllen den Kontrast 4,5:1.
+// Colors in the logo's style (internal/logo). Texts and buttons meet the 4.5:1 contrast.
 var (
-	colBody      = hex(0xFFFDF8) // warmes Weiß
-	colHeader    = colBody       // schlicht: Kopf nur durch eine Linie in Vanille abgesetzt
+	colBody      = hex(0xFFFDF8) // warm white
+	colHeader    = colBody       // plain: the header is set apart only by a vanilla line
 	colLine      = logo.Vanilla
 	colText      = logo.Dark
 	colSub       = logo.Brown
@@ -56,7 +56,7 @@ var (
 )
 
 const (
-	W, H    = 560, 500 // Fenstergröße bei 96 DPI
+	W, H    = 560, 500 // window size at 96 DPI
 	pad     = 20
 	headerH = 92
 	barY    = 432
@@ -68,7 +68,7 @@ type app struct {
 	btnCreate, btnClose, btnFile, footer uintptr
 	font, bold, title                    uintptr
 	bodyBrush                            uintptr
-	icon                                 uintptr // Logo in Kopfgröße (0: ohne Ressource, z. B. in Tests)
+	icon                                 uintptr // logo at header size (0: no resource, e.g. in tests)
 	progress                             int     // 0…1000
 	dpi                                  int
 	disks                                []windisk.Disk
@@ -79,8 +79,8 @@ type app struct {
 	local                                *image
 	stickJSON                            []byte
 	quitWhenDone                         bool
-	prefix                               string // Hinweis vor dem Fortschritt (offline)
-	shown                                string // zuletzt angezeigter Fortschrittstext
+	prefix                               string // note before the progress (offline)
+	shown                                string // last displayed progress text
 }
 
 var theApp *app
@@ -116,8 +116,8 @@ func main() {
 		if int32(r) <= 0 {
 			break
 		}
-		// Enter auf einem anderen Knopf als „Stick erstellen“ löst diesen Knopf aus (selbst gezeichnete
-		// Knöpfe sind für IsDialogMessage keine Standardknöpfe, Enter hieße sonst immer IDOK).
+		// Enter on a button other than "Create stick" triggers that button (custom-drawn buttons are not
+		// standard buttons for IsDialogMessage, Enter would otherwise always mean IDOK).
 		if m.Message == wmKeyDown && m.WParam == vkReturn {
 			if f, _, _ := pGetFocus.Call(); f == a.btnClose || f == a.btnFile {
 				send(f, bmClick, 0, 0)
@@ -144,7 +144,7 @@ func (a *app) create() error {
 		a.dpi = 96
 	}
 
-	// Logo aus der Ressource (Icon-Gruppe 1, internal/winres/mkres), sonst das Standard-Symbol.
+	// Logo from the resource (icon group 1, internal/winres/mkres), otherwise the standard icon.
 	loadIcon := func(n int32) uintptr {
 		h, _, _ := pLoadImageW.Call(inst, 1, imageIcon, uintptr(n), uintptr(n), 0)
 		return h
@@ -178,7 +178,7 @@ func (a *app) create() error {
 	}
 	a.hwnd = hwnd
 
-	// Schriften wie im System (Meldungsschrift), Überschrift größer und fett.
+	// Fonts as in the system (message font), heading bigger and bold.
 	var ncm nonClientMetrics
 	ncm.Size = uint32(unsafe.Sizeof(ncm))
 	pSystemParametersInfoW.Call(spiGetNonClient, uintptr(ncm.Size), uintptr(unsafe.Pointer(&ncm)), 0)
@@ -201,7 +201,7 @@ func (a *app) create() error {
 		send(c, wmSetFont, f, 1)
 		return c
 	}
-	// Kopf (Logo, Name, Überschrift) und Fortschrittsbalken zeichnet paint().
+	// paint() draws the header (logo, name, heading) and the progress bar.
 	a.intro = ctl("STATIC", tr("intro"), ssLeft|ssNoPrefix, 0, 0, pad, headerH+16, W-2*pad, 40, a.font)
 	a.label = ctl("STATIC", tr("sticks"), ssLeft|ssNoPrefix, 0, 0, pad, headerH+62, W-2*pad, 38, a.bold)
 	a.list = ctl("LISTBOX", "", wsTabStop|wsVScroll|lbsNotify|lbsNoIntegral, wsExClientEdge, idList, pad, headerH+102, W-2*pad, 88, a.font)
@@ -241,7 +241,7 @@ func wndProc(hwnd, m, w, l uintptr) uintptr {
 		return 0
 	case wmDeviceChange:
 		if w == dbtArrival || w == dbtRemoveComplete || w == dbtDevNodesChange {
-			// Volumes erscheinen etwas nach dem Datenträger, kurz warten.
+			// Volumes appear a little after the disk, wait briefly.
 			pSetTimer.Call(hwnd, timerDevices, 800, 0)
 		}
 		return 1
@@ -253,7 +253,7 @@ func wndProc(hwnd, m, w, l uintptr) uintptr {
 		a.paint()
 		return 0
 	case wmDrawItem:
-		a.drawButton(*(**drawItemStruct)(unsafe.Pointer(&l))) // lParam zeigt auf DRAWITEMSTRUCT
+		a.drawButton(*(**drawItemStruct)(unsafe.Pointer(&l))) // lParam points to DRAWITEMSTRUCT
 		return 1
 	case wmClose:
 		if a.st != stIdle {
@@ -277,7 +277,7 @@ func (a *app) barRect() rect {
 	return rect{a.s(pad), a.s(barY), a.s(W - pad), a.s(barY + 8)}
 }
 
-// setProgress setzt den Fortschritt (0…1000) und zeichnet nur den Balken neu.
+// setProgress sets the progress (0…1000) and redraws only the bar.
 func (a *app) setProgress(v int) {
 	if v == a.progress {
 		return
@@ -287,7 +287,7 @@ func (a *app) setProgress(v int) {
 	pInvalidateRect.Call(a.hwnd, uintptr(unsafe.Pointer(&r)), 0)
 }
 
-// paint zeichnet den Kopf mit Logo und den Fortschrittsbalken.
+// paint draws the header with the logo and the progress bar.
 func (a *app) paint() {
 	var ps paintStruct
 	dc, _, _ := pBeginPaint.Call(a.hwnd, uintptr(unsafe.Pointer(&ps)))
@@ -320,8 +320,8 @@ func (a *app) paint() {
 	}
 }
 
-// drawButton zeichnet die Knöpfe: „Stick erstellen“ gefüllt in Vanilleschoten-Braun, die anderen hell
-// mit Rand.
+// drawButton draws the buttons: "Create stick" filled in vanilla-pod brown, the others light
+// with a border.
 func (a *app) drawButton(d *drawItemStruct) {
 	dc, r := d.Hdc, d.Rect
 	fillRect(dc, r, a.bodyBrush)
@@ -450,7 +450,7 @@ func (a *app) chooseFile() {
 	setText(a.status, tr("ready_local", filepath.Base(path), im.m.Version))
 }
 
-// start: erst Manifest holen, dann Größe prüfen und warnen, dann schreiben.
+// start: first fetch the manifest, then check the size and warn, then write.
 func (a *app) start() {
 	d, ok := a.selected()
 	if !ok || a.stickJSON == nil {

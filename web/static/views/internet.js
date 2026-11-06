@@ -1,22 +1,23 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// Internet-Anschluss, Heimnetz und Name des Routers (F-UI-03, F-UI-08, F-UI-09).
-// Mit ?setup=1 ist das der Einrichtungsschritt „Internetzugang“ nach der ersten Anmeldung.
+import { t } from '../i18n.js';
+// Internet port, home network and router name (F-UI-03, F-UI-08, F-UI-09).
+// With ?setup=1 this is the setup step "internet access" after the first login.
 import { h, clear, icon, toast, badge, confirmDialog } from '../ui.js';
 import { get, post } from '../api.js';
 
 const TYPES = [
-  { value: 'dhcp', label: 'Automatisch', hint: 'Ein Router oder Modem davor vergibt die Adresse (Kabel, viele Glasfaser-Anschlüsse).' },
-  { value: 'pppoe', label: 'Mit Zugangsdaten', hint: 'Einwahl mit Benutzername und Passwort aus dem Brief des Anbieters (DSL, Telekom-Glasfaser).' },
-  { value: 'static', label: 'Feste Adresse', hint: 'Der Anbieter hat eine feste IP-Adresse vorgegeben (selten, meist Geschäftskunden).' },
+  { value: 'dhcp', label: 'Automatic', hint: 'A router or modem in front hands out the address (cable, many fiber connections).' },
+  { value: 'pppoe', label: 'With credentials', hint: 'Dial-up with the user name and password from your provider\'s letter (DSL, Telekom fiber).' },
+  { value: 'static', label: 'Fixed address', hint: 'The provider has specified a fixed IP address (rare, usually business customers).' },
 ];
 
-const LEASES = [['1h', '1 Stunde'], ['12h', '12 Stunden'], ['24h', '1 Tag'], ['168h', '1 Woche']];
+const LEASES = [['1h', '1 hour'], ['12h', '12 hours'], ['24h', '1 day'], ['168h', '1 week']];
 
 export const SETUP_LATER_KEY = 'vr-internet-setup-later';
 
 export default {
-  title: 'Internet & Heimnetz',
-  subtitle: 'Anschluss, Adressen und Name des Routers',
+  title: 'Internet & home network',
+  subtitle: 'Connection, addresses and router name',
   render(root) {
     const setupMode = /[?&]setup=1/.test(location.hash);
     let data = null;
@@ -29,22 +30,22 @@ export default {
     async function load() {
       try { data = await get('/api/settings'); } catch (e) { clear(top).append(h('div', { class: 'banner crit' }, icon('alert'), e.message)); return; }
       clear(top);
-      if (data.dry_run) top.append(h('div', { class: 'banner warn' }, icon('info'), 'Testinstanz: Änderungen werden geprüft, aber nicht eingespielt.'));
+      if (data.dry_run) top.append(h('div', { class: 'banner warn' }, icon('info'), 'Test instance: changes are checked, but not applied.'));
       if (data.needs_setup) top.append(setupIntro());
       drawPending();
       clear(body).append(wanCard(), systemCard(), lanCard(), dhcpCard());
     }
 
-    // --- Einrichtungsschritt -----------------------------------------------------------
+    // --- Setup step -----------------------------------------------------------
     function setupIntro() {
       const d = data.detected || {};
       const text = d.method === 'pppoe'
-        ? `Der Router hat erkannt, dass Ihr Anschluss eine Einwahl mit Zugangsdaten braucht${d.vlan ? ` (über VLAN ${d.vlan}, typisch für die Telekom)` : ''}. Die Zugangsdaten stehen im Brief Ihres Anbieters.`
-        : 'Bei der Installation hat das Modem nicht geantwortet. Wählen Sie bitte, wie Ihr Anschluss funktioniert. Wenn Sie unsicher sind: Bei Kabel-Anschlüssen und wenn ein anderer Router davor steht, ist es „Automatisch“.';
+        ? `The router has detected that your connection needs a dial-up with credentials${d.vlan ? ` (over VLAN ${d.vlan}, typical for Telekom)` : ''}. The credentials are in your provider's letter.`
+        : 'The modem did not answer during installation. Please choose how your connection works. If you are unsure: with cable connections and if another router is in front, it is "Automatic".';
       return h('section', { class: 'card hero' },
-        h('div', { class: 'card-head' }, h('span', { class: 'icon-badge' }, icon('globe')), h('h2', null, setupMode ? 'Fast geschafft: Internetzugang einrichten' : 'Internetzugang ist noch nicht eingerichtet')),
+        h('div', { class: 'card-head' }, h('span', { class: 'icon-badge' }, icon('globe')), h('h2', null, setupMode ? 'Almost there: set up internet access' : 'Internet access is not set up yet')),
         h('p', null, text),
-        setupMode && h('div', { class: 'row end' }, h('button', { class: 'btn', onclick: later }, 'Später')));
+        setupMode && h('div', { class: 'row end' }, h('button', { class: 'btn', onclick: later }, 'Later')));
     }
 
     function later() {
@@ -52,21 +53,21 @@ export default {
       location.hash = '#/dashboard';
     }
 
-    // --- Bestätigung -------------------------------------------------------------------
+    // --- Confirmation -------------------------------------------------------------------
     function drawPending() {
       clearInterval(countdown);
       clear(pendingBox);
       const p = data.pending;
       if (!p) return;
       const left = h('strong', { class: 'num' });
-      const net = h('span', { class: 'muted' }, ' Internet wird geprüft …');
+      const net = h('span', { class: 'muted' }, ' Checking the internet …');
       pendingBox.append(h('div', { class: 'banner warn pending' }, icon('alert'),
-        h('div', { class: 'spacer' }, 'Die neue Einstellung ist aktiv. Ohne Bestätigung wird sie in ', left, ' automatisch zurückgenommen.', net),
-        h('button', { class: 'btn', onclick: revert }, 'Zurücknehmen'),
-        h('button', { class: 'btn primary', onclick: confirmChange }, icon('check'), 'Bestätigen')));
+        h('div', { class: 'spacer' }, 'The new setting is active. Without confirmation it is rolled back automatically in ', left, '.', net),
+        h('button', { class: 'btn', onclick: revert }, 'Roll back'),
+        h('button', { class: 'btn primary', onclick: confirmChange }, icon('check'), 'Confirm')));
       const tick = () => {
         const s = Math.max(0, Math.round((new Date(p.deadline) - Date.now()) / 1000));
-        left.textContent = s >= 60 ? `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')} min` : `${s} s`;
+        left.textContent = t(s >= 60 ? `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')} min` : `${s} s`);
         if (s <= 0) { clearInterval(countdown); setTimeout(load, 2000); }
       };
       tick();
@@ -77,11 +78,11 @@ export default {
     async function checkInternet(el) {
       for (let i = 0; i < 6 && el.isConnected; i++) {
         try {
-          if ((await get('/api/settings/check')).internet) { clear(el).append(' ', badge('Internet erreichbar', 'ok')); return; }
-        } catch { /* weiter versuchen */ }
+          if ((await get('/api/settings/check')).internet) { clear(el).append(' ', badge('Internet reachable', 'ok')); return; }
+        } catch { /* keep trying */ }
         await new Promise((r) => setTimeout(r, 5000));
       }
-      if (el.isConnected) clear(el).append(' ', badge('Internet nicht erreichbar', 'crit'), ' Prüfen Sie die Angaben oder nehmen Sie die Änderung zurück.');
+      if (el.isConnected) clear(el).append(' ', badge('Internet not reachable', 'crit'), ' Check the details or roll back the change.');
     }
 
     async function confirmChange() {
@@ -95,31 +96,31 @@ export default {
       load();
     }
 
-    // --- Internet-Anschluss ------------------------------------------------------------
+    // --- Internet port ------------------------------------------------------------
     function wanCard() {
       const w = data.wan;
       const d = data.detected || {};
       const err = h('div', { class: 'form-error hidden' });
-      // Im Einrichtungsschritt mit dem Erkannten vorbelegen
+      // In the setup step, prefill with what was detected
       let type = data.needs_setup && d.method === 'pppoe' ? 'pppoe' : w.type;
       const hasTelekom = w.type === 'pppoe' && (w.pppoe_user || '').endsWith('@t-online.de');
       const telekomGuess = hasTelekom || (data.needs_setup && d.vlan === 7);
       const provider = h('select', { class: 'input' },
         h('option', { value: 'telekom', selected: telekomGuess }, 'Telekom'),
-        h('option', { value: 'other', selected: !telekomGuess }, 'anderer Anbieter'));
+        h('option', { value: 'other', selected: !telekomGuess }, 'another provider'));
       const inp = (attrs) => h('input', { class: 'input', autocomplete: 'off', spellcheck: 'false', ...attrs });
-      const ak = inp({ inputmode: 'numeric', placeholder: '12 Ziffern' });
-      const zn = inp({ inputmode: 'numeric', placeholder: 'meist 12 Ziffern' });
+      const ak = inp({ inputmode: 'numeric', placeholder: '12 digits' });
+      const zn = inp({ inputmode: 'numeric', placeholder: 'usually 12 digits' });
       const mb = inp({ inputmode: 'numeric', value: '0001' });
-      const user = inp({ value: w.pppoe_user, placeholder: 'z. B. kunde@anbieter.de' });
+      const user = inp({ value: w.pppoe_user, placeholder: 'e.g. customer@provider.example' });
       const pass = h('input', { class: 'input', type: 'password', autocomplete: 'new-password',
-        placeholder: w.has_password ? 'unverändert lassen' : 'Passwort aus dem Brief' });
-      const vlan = inp({ inputmode: 'numeric', value: w.pppoe_vlan ? String(w.pppoe_vlan) : (data.needs_setup && d.vlan ? String(d.vlan) : ''), placeholder: 'leer = ohne' });
+        placeholder: w.has_password ? 'leave unchanged' : 'password from the letter' });
+      const vlan = inp({ inputmode: 'numeric', value: w.pppoe_vlan ? String(w.pppoe_vlan) : (data.needs_setup && d.vlan ? String(d.vlan) : ''), placeholder: 'empty = none' });
       const addr = inp({ value: w.static_address, placeholder: 'z. B. 203.0.113.10/29' });
       const gw = inp({ value: w.static_gateway, placeholder: 'z. B. 203.0.113.9' });
       const dns = inp({ value: (w.static_dns || []).join(', '), placeholder: 'z. B. 9.9.9.9, 149.112.112.112' });
       const ipv6 = h('input', { type: 'checkbox', checked: w.ipv6 });
-      const mtu = inp({ inputmode: 'numeric', value: w.mtu ? String(w.mtu) : '', placeholder: 'leer = automatisch' });
+      const mtu = inp({ inputmode: 'numeric', value: w.mtu ? String(w.mtu) : '', placeholder: 'empty = automatic' });
 
       const typeBox = h('div', { class: 'choice-list' });
       const fields = h('div');
@@ -129,29 +130,29 @@ export default {
           h('div', null, h('div', { class: 'cell-main' }, t.label), h('div', { class: 'muted small' }, t.hint)))));
         clear(fields);
         if (type === 'pppoe') {
-          fields.append(field('Anbieter', provider));
+          fields.append(field('Provider', provider));
           if (provider.value === 'telekom') {
             fields.append(
-              h('p', { class: 'muted small' }, 'Die Angaben stehen im Brief „Ihre persönlichen Zugangsdaten“. Der Benutzername wird daraus zusammengesetzt.'),
-              hasTelekom && h('p', { class: 'small' }, 'Eingerichtet: ', h('span', { class: 'mono' }, w.pppoe_user), '. Felder leer lassen, um ihn zu behalten.'),
-              field('Anschlusskennung', ak), field('Zugangsnummer (T-Online-Nummer)', zn), field('Mitbenutzernummer', mb, 'Meist 0001.'),
-              field('Persönliches Kennwort', pass));
+              h('p', { class: 'muted small' }, 'The details are in the letter "Your personal access data". The user name is built from them.'),
+              hasTelekom && h('p', { class: 'small' }, 'Set up: ', h('span', { class: 'mono' }, w.pppoe_user), '. Leave the fields empty to keep it.'),
+              field('Line ID (Anschlusskennung)', ak), field('Access number (T-Online number)', zn), field('Co-user number (Mitbenutzernummer)', mb, 'Usually 0001.'),
+              field('Personal password', pass));
           } else {
-            fields.append(field('Benutzername', user), field('Passwort', pass),
-              field('VLAN (optional)', vlan, 'Nur wenn der Anbieter eine VLAN-ID nennt. Die Telekom nutzt 7.'));
+            fields.append(field('User name', user), field('Password', pass),
+              field('VLAN (optional)', vlan, 'Only if the provider names a VLAN ID. Telekom uses 7.'));
           }
         } else if (type === 'static') {
-          fields.append(field('IP-Adresse mit Präfix', addr), field('Gateway', gw), field('DNS-Server (optional)', dns, 'Kommagetrennt. Leer = öffentliche DNS-Server aus den DNS-Einstellungen.'));
+          fields.append(field('IP address with prefix', addr), field('Gateway', gw), field('DNS-Server (optional)', dns, 'Comma-separated. Empty = public DNS servers from the DNS settings.'));
         }
       }
       provider.addEventListener('change', draw);
       draw();
 
-      const save = h('button', { class: 'btn primary', type: 'submit' }, icon('check'), 'Übernehmen');
+      const save = h('button', { class: 'btn primary', type: 'submit' }, icon('check'), 'Apply');
       const form = h('form', null, err, typeBox, fields,
-        h('details', { class: 'mt' }, h('summary', null, 'Erweitert'),
-          h('label', { class: 'row' }, ipv6, 'IPv6 vom Anbieter anfordern (empfohlen)'),
-          field('MTU', mtu, 'Nur ändern, wenn der Anbieter es verlangt.')),
+        h('details', { class: 'mt' }, h('summary', null, 'Advanced'),
+          h('label', { class: 'row' }, ipv6, 'Request IPv6 from the provider (recommended)'),
+          field('MTU', mtu, 'Only change if the provider requires it.')),
         h('div', { class: 'row end mt' }, save));
       form.addEventListener('submit', async (e) => {
         e.preventDefault();
@@ -160,10 +161,10 @@ export default {
         if (type === 'pppoe') {
           req.pppoe_password = pass.value;
           if (provider.value === 'telekom' && hasTelekom && !ak.value.trim() && !zn.value.trim()) {
-            req.pppoe_user = w.pppoe_user; // bisherigen Benutzernamen behalten
+            req.pppoe_user = w.pppoe_user; // keep the previous user name
             req.pppoe_vlan = 7;
           } else if (provider.value === 'telekom') {
-            req.telekom = { anschlusskennung: ak.value.replace(/\s/g, ''), zugangsnummer: zn.value.replace(/\s/g, ''), mitbenutzer: mb.value.trim() };
+            req.telekom = { line_id: ak.value.replace(/\s/g, ''), access_number: zn.value.replace(/\s/g, ''), co_user: mb.value.trim() };
           } else {
             req.pppoe_user = user.value.trim();
             req.pppoe_vlan = vlan.value.trim() ? +vlan.value : 0;
@@ -175,16 +176,16 @@ export default {
         try {
           const res = await post('/api/settings/wan', req);
           pass.value = '';
-          toast(res.data?.pending ? res.message : 'Gespeichert, es hat sich nichts geändert.', res.data?.pending ? 'warn' : 'ok');
+          toast(res.data?.pending ? res.message : 'Saved, nothing has changed.', res.data?.pending ? 'warn' : 'ok');
           load();
-        } catch (ex) { err.textContent = ex.message; err.classList.remove('hidden'); } finally { save.disabled = false; }
+        } catch (ex) { err.textContent = t(ex.message); err.classList.remove('hidden'); } finally { save.disabled = false; }
       });
       return h('section', { class: 'card span-2' },
-        h('div', { class: 'card-head' }, h('span', { class: 'icon-badge' }, icon('globe')), h('h2', null, 'Internet-Anschluss')),
+        h('div', { class: 'card-head' }, h('span', { class: 'icon-badge' }, icon('globe')), h('h2', null, 'Internet port')),
         form);
     }
 
-    // --- Name und Zeitzone -------------------------------------------------------------
+    // --- Name and time zone -------------------------------------------------------------
     function systemCard() {
       const err = h('div', { class: 'form-error hidden' });
       const host = h('input', { class: 'input', value: data.hostname, autocomplete: 'off', spellcheck: 'false' });
@@ -193,57 +194,57 @@ export default {
         clear(tz).append(...z.zones.map((n) => h('option', { value: n, selected: n === data.timezone }, n.replaceAll('_', ' '))));
       }).catch(() => {});
       const form = h('form', null, err,
-        field('Name des Routers', host, `Erreichbar als ${data.hostname}.${data.domain}. Kleinbuchstaben, Ziffern und Bindestrich.`),
-        field('Zeitzone', tz, 'Gilt für Zeitsperren, Protokolle und den Zeitpunkt für Neustarts nach Updates.'),
-        h('div', { class: 'row end' }, h('button', { class: 'btn primary', type: 'submit' }, 'Speichern')));
+        field('Router name', host, `Reachable as ${data.hostname}.${data.domain}. Lowercase letters, digits and hyphens.`),
+        field('Time zone', tz, 'Applies to time-based blocks, logs and the time for restarts after updates.'),
+        h('div', { class: 'row end' }, h('button', { class: 'btn primary', type: 'submit' }, 'Save')));
       form.addEventListener('submit', async (e) => {
         e.preventDefault();
         err.classList.add('hidden');
         const name = host.value.trim().toLowerCase();
-        if (name !== data.hostname && !(await confirmDialog({ title: 'Namen ändern?',
-          text: `Die Oberfläche ist danach unter https://${name}.${data.domain} erreichbar. Sie startet dafür kurz neu und bekommt ein neues Zertifikat, der Browser warnt deshalb einmal neu.`, confirm: 'Ändern' }))) return;
+        if (name !== data.hostname && !(await confirmDialog({ title: 'Change the name?',
+          text: `The web interface is then reachable at https://${name}.${data.domain}. It restarts briefly for this and gets a new certificate, so the browser warns once more.`, confirm: 'Change' }))) return;
         try {
           const res = await post('/api/settings/system', { hostname: name, timezone: tz.value });
           toast(res.message);
           if (res.data?.restart) moveTo(res.data.new_url);
           else load();
-        } catch (ex) { err.textContent = ex.message; err.classList.remove('hidden'); }
+        } catch (ex) { err.textContent = t(ex.message); err.classList.remove('hidden'); }
       });
       return h('section', { class: 'card' },
         h('div', { class: 'card-head' }, h('span', { class: 'icon-badge' }, icon('router')), h('h2', null, 'Router')),
         form);
     }
 
-    // --- Heimnetz ----------------------------------------------------------------------
+    // --- Home network ----------------------------------------------------------------------
     function lanCard() {
       const l = data.lan;
       const err = h('div', { class: 'form-error hidden' });
       const addr = h('input', { class: 'input mono', value: l.address, autocomplete: 'off', spellcheck: 'false' });
       const prefix = h('select', { class: 'input' }, [16, 20, 22, 23, 24, 25, 26, 27, 28].map((b) =>
-        h('option', { value: String(b), selected: b === l.prefix }, `/${b} (${(2 ** (32 - b) - 2).toLocaleString('de-DE')} Geräte)`)));
+        h('option', { value: String(b), selected: b === l.prefix }, `/${b} (${(2 ** (32 - b) - 2).toLocaleString()} devices)`)));
       const form = h('form', null, err,
-        field('Adresse des Routers', addr, 'Private Bereiche: 192.168.x.x, 10.x.x.x oder 172.16–31.x.x.'),
-        field('Netzgröße', prefix),
-        h('div', { class: 'row end' }, h('button', { class: 'btn primary', type: 'submit' }, 'Ändern …')));
+        field('Router address', addr, 'Private ranges: 192.168.x.x, 10.x.x.x or 172.16–31.x.x.'),
+        field('Network size', prefix),
+        h('div', { class: 'row end' }, h('button', { class: 'btn primary', type: 'submit' }, 'Change …')));
       form.addEventListener('submit', async (e) => {
         e.preventDefault();
         err.classList.add('hidden');
         const a = addr.value.trim();
         if (a === l.address && +prefix.value === l.prefix) return;
-        if (!(await confirmDialog({ title: 'Heimnetz umstellen?', danger: true, confirm: 'Umstellen',
-          text: `Der Router ist danach unter https://${a} erreichbar. Feste Adressen, DNS-Namen und Weiterleitungen werden mit umgezogen.`,
+        if (!(await confirmDialog({ title: 'Change the home network?', danger: true, confirm: 'Switch',
+          text: `The router is then reachable at https://${a}. Fixed addresses, DNS names and port forwards move along.`,
           details: h('ol', { class: 'small list' },
-            h('li', null, 'Die Verbindung zu dieser Seite bricht ab.'),
-            h('li', null, 'Verbinden Sie dieses Gerät neu mit dem Heimnetz (WLAN aus und wieder an oder Kabel kurz abziehen), damit es eine neue Adresse bekommt.'),
-            h('li', null, `Öffnen Sie https://${a}, melden Sie sich an und bestätigen Sie die Änderung innerhalb von 5 Minuten. Sonst stellt der Router das alte Netz wieder her.`)) }))) return;
+            h('li', null, 'The connection to this page will drop.'),
+            h('li', null, 'Reconnect this device to the home network (turn Wi-Fi off and on or briefly unplug the cable), so that it gets a new address.'),
+            h('li', null, `Open https://${a}, sign in and confirm the change within 5 minutes. Otherwise the router restores the old network.`)) }))) return;
         try {
           const res = await post('/api/settings/lan', { address: a, prefix: +prefix.value });
           if (res.data?.restart) moveTo(res.data.new_url, true);
           else load();
-        } catch (ex) { err.textContent = ex.message; err.classList.remove('hidden'); }
+        } catch (ex) { err.textContent = t(ex.message); err.classList.remove('hidden'); }
       });
       return h('section', { class: 'card' },
-        h('div', { class: 'card-head' }, h('span', { class: 'icon-badge' }, icon('devices')), h('h2', null, 'Heimnetz')),
+        h('div', { class: 'card-head' }, h('span', { class: 'icon-badge' }, icon('devices')), h('h2', null, 'Home network')),
         form);
     }
 
@@ -255,33 +256,33 @@ export default {
       const lease = h('select', { class: 'input' }, LEASES.map(([v, t]) => h('option', { value: v, selected: v === l.lease }, t)),
         !LEASES.some(([v]) => v === l.lease) && h('option', { value: l.lease, selected: true }, l.lease));
       const form = h('form', null, err,
-        h('div', { class: 'grid cols-2 tight' }, field('Erste Adresse', start), field('Letzte Adresse', end)),
-        field('Gültigkeit einer Adresse', lease, 'Feste Adressen (Seite Geräte) gelten unabhängig vom Bereich.'),
-        h('div', { class: 'row end' }, h('button', { class: 'btn primary', type: 'submit' }, 'Speichern')));
+        h('div', { class: 'grid cols-2 tight' }, field('First address', start), field('Last address', end)),
+        field('Validity of an address', lease, 'Fixed addresses (Devices page) apply regardless of the range.'),
+        h('div', { class: 'row end' }, h('button', { class: 'btn primary', type: 'submit' }, 'Save')));
       form.addEventListener('submit', async (e) => {
         e.preventDefault();
         err.classList.add('hidden');
         try {
           toast((await post('/api/settings/dhcp', { pool_start: start.value.trim(), pool_end: end.value.trim(), lease: lease.value })).message);
           load();
-        } catch (ex) { err.textContent = ex.message; err.classList.remove('hidden'); }
+        } catch (ex) { err.textContent = t(ex.message); err.classList.remove('hidden'); }
       });
       return h('section', { class: 'card span-2' },
-        h('div', { class: 'card-head' }, h('span', { class: 'icon-badge' }, icon('pin')), h('h2', null, 'Automatische Adressen (DHCP)')),
+        h('div', { class: 'card-head' }, h('span', { class: 'icon-badge' }, icon('pin')), h('h2', null, 'Automatic addresses (DHCP)')),
         form);
     }
 
-    // Nach einer Änderung von Name oder Adresse: Hinweis und Link auf die neue Adresse.
+    // After a change of name or address: a note and a link to the new address.
     function moveTo(url, lan) {
       clearInterval(countdown);
       clear(top); clear(pendingBox);
       clear(body).append(h('section', { class: 'card span-2 hero' },
-        h('div', { class: 'card-head' }, h('span', { class: 'icon-badge' }, icon('arrowRight')), h('h2', null, 'Die Oberfläche zieht um')),
+        h('div', { class: 'card-head' }, h('span', { class: 'icon-badge' }, icon('arrowRight')), h('h2', null, 'The web interface is moving')),
         h('p', null, lan
-          ? 'Verbinden Sie dieses Gerät jetzt neu mit dem Heimnetz und öffnen Sie dann die neue Adresse. Bestätigen Sie dort die Änderung innerhalb von 5 Minuten.'
-          : 'Die Oberfläche startet gerade neu. In ein paar Sekunden ist sie unter der neuen Adresse erreichbar.'),
+          ? 'Reconnect this device to the home network now and then open the new address. Confirm the change there within 5 minutes.'
+          : 'The web interface is restarting. In a few seconds it will be reachable at the new address.'),
         h('p', null, h('a', { class: 'btn primary', href: url }, url)),
-        data.dry_run && h('p', { class: 'muted small' }, 'Testinstanz: Hier zieht nichts um, die alte Adresse bleibt.')));
+        data.dry_run && h('p', { class: 'muted small' }, 'Test instance: nothing moves here, the old address stays.')));
     }
 
     load();

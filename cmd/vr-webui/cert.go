@@ -19,9 +19,9 @@ import (
 	"time"
 )
 
-// ensureCert legt ein selbstsigniertes ECDSA-Zertifikat für name und ip an (Q-09: selbstsigniert mit
-// Anleitung). Ein vorhandenes bleibt, solange es noch mindestens 30 Tage gilt und Name und Adresse
-// passen. Der Schlüssel gehört root und ist für die Gruppe gid lesbar (0640).
+// ensureCert creates a self-signed ECDSA certificate for name and ip (Q-09: self-signed with
+// instructions). An existing one stays as long as it is valid for at least 30 more days and the name
+// and address match. The key belongs to root and is readable by group gid (0640).
 func ensureCert(dir, name string, ip netip.Addr, gid int) (bool, error) {
 	certPath, keyPath := filepath.Join(dir, "cert.pem"), filepath.Join(dir, "key.pem")
 	if b, err := os.ReadFile(certPath); err == nil {

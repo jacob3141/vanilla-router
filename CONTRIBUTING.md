@@ -1,93 +1,95 @@
-# Mitmachen
+# Contributing
 
-Danke, dass du etwas beitragen willst. Dieses Dokument sagt, wie ein Beitrag aussieht, der ohne viel Hin
-und Her übernommen werden kann.
+Thanks for wanting to contribute. This document says what a contribution looks like that can be taken over
+without much back and forth.
 
-> **Stand:** frühe Vorabversion. Fehlerberichte und Fragen gern als Issue. Größere Änderungen bitte vorher
-> in einem Issue absprechen, damit niemand umsonst arbeitet. Die Regeln unten gelten für alle, auch für
-> KI-Agenten.
+> **Status:** early pre-release. Bug reports and questions are welcome as issues, in English or German. Please
+> discuss larger changes in an issue first, so nobody works for nothing. The rules below apply to everyone,
+> also to AI agents.
 
-## Bevor du anfängst
+## Before you start
 
-1. [README.md](README.md) für das Ziel, [docs/architektur.md](docs/architektur.md) für den Aufbau,
-   [docs/entwicklung.md](docs/entwicklung.md) für die Einrichtung. `test/check-all.sh` muss bei dir grün
-   sein, bevor du etwas änderst.
-2. [PLAN.md](PLAN.md) ist führend. Prüfe, ob es zu deinem Vorhaben schon eine Anforderung (`F-…`), eine
-   Entscheidung (`D-…`) oder eine offene Frage (`Q-…`) gibt.
-3. Größere Änderungen erst besprechen (Issue), vor allem alles, was eine Entscheidung berührt.
-   Entscheidungen werden nur mit Begründung geändert. Offene Fragen entscheidet der Projektinhaber.
+1. [README.md](README.md) for the goal, [docs/architecture.md](docs/architecture.md) for the structure,
+   [docs/development.md](docs/development.md) for the setup. `test/check-all.sh` must pass on your machine
+   before you change anything.
+2. [PLAN.md](PLAN.md) is authoritative. Check whether there is already a requirement (`F-…`), a decision
+   (`D-…`) or an open question (`Q-…`) for what you plan.
+3. Discuss larger changes first (issue), especially anything that touches a decision. Decisions only change
+   with a reason. The project owner decides open questions.
 
-## Leitlinie
+## Guideline
 
-**Komfort vor Optimierung, aber nie auf Kosten der Sicherheit** (P-10). Im Zweifel gewinnt das, was für
-einen Laien verständlich und für einen Angreifer schwer ist, nicht das, was am wenigsten Speicher braucht.
+**Comfort over optimization, but never at the expense of security** (P-10). When in doubt, what wins is what
+is understandable for a non-expert and hard for an attacker, not what uses the least memory.
 
-## Regeln für Code
+## Rules for code
 
-| Regel | Warum | Kennung |
+| Rule | Why | ID |
 |---|---|---|
-| **Go nur mit der Standardbibliothek**, keine externen Module | keine Lieferkette, ein statisches Binary, lange wartbar | D-01, NF-03 |
-| **Frontend ohne Frameworks, Build-Schritt und CDN** | dieselben Gründe, die Oberfläche läuft auch offline | D-01 |
-| **SPDX-Zeile** `SPDX-License-Identifier: AGPL-3.0-or-later` am Anfang jeder Quelldatei | Lizenz eindeutig je Datei | NF-08 |
-| **Pakete nur aus Ubuntu *main*** (`dnsmasq-base` statt `dnsmasq`) | nur *main* bekommt garantierte Sicherheitsupdates | D-10, NF-09 |
-| **Eine Wahrheitsquelle** `config.json`. Dienstdateien werden immer vollständig erzeugt, nie per Textsuche bearbeitet | reproduzierbar, testbar | D-02 |
-| **Prüfen vor Einspielen**: erzeugen → mit dem Werkzeug des Dienstes prüfen → atomar ersetzen → neu laden → Gesundheitsprüfung → bei Fehler zurück | ein Fehler darf den Router nicht lahmlegen | P-05 |
-| **nftables:** eigene Tabellen je Aufgabe, ersetzen mit `table x; delete table x; table x { … }`, **nie `flush ruleset`** | Docker und andere bringen eigene Tabellen mit | D-03 |
-| **Privilegientrennung:** Der Webserver läuft nie als root. Privilegiertes nur über eine feste Helper-Aktion, die ihre Parameter selbst prüft | eine Lücke im Webserver ist nicht sofort root | D-04 |
-| **Keine Programme mit Datei-Capabilities** (z. B. `ping`) aus gehärteten Diensten starten, lieber nativ | sie scheitern an der Härtung | L-09 |
-| **Frontend:** DOM nur über `h()`, nie `innerHTML` mit Daten. Keine `style`-Attribute, nur `el.style` | XSS, strenge CSP | |
-| **Daten aus dem Netz** (Hostnamen, Logzeilen, Dateinamen) sind nicht vertrauenswürdig | | |
-| Werkzeugausgaben (apt, ip …) nur mit `LC_ALL=C` auswerten. Fehlen Daten, schlägt die Prüfung fehl | Übersetzungen ändern die Ausgabe | L-17 |
+| **Go with the standard library only**, no external modules | no supply chain, one static binary, maintainable for a long time | D-01, NF-03 |
+| **Frontend without frameworks, build step or CDN** | the same reasons, and the web interface also works offline | D-01 |
+| **SPDX line** `SPDX-License-Identifier: AGPL-3.0-or-later` at the start of every source file | clear license per file | NF-08 |
+| **Packages only from Ubuntu *main*** (`dnsmasq-base` instead of `dnsmasq`) | only *main* gets guaranteed security updates | D-10, NF-09 |
+| **One source of truth** `config.json`. Service files are always generated completely, never edited by text search | reproducible, testable | D-02 |
+| **Check before applying**: generate → check with the service's tool → replace atomically → reload → health check → on failure restore | an error must not take the router down | P-05 |
+| **nftables:** own tables per purpose, replace with `table x; delete table x; table x { … }`, **never `flush ruleset`** | Docker and others bring their own tables | D-03 |
+| **Privilege separation:** the web server never runs as root. Anything privileged only through a fixed helper action that checks its parameters itself | a hole in the web server is not immediately root | D-04 |
+| **Do not start programs with file capabilities** (e.g. `ping`) from hardened services, prefer native code | they fail because of the hardening | L-09 |
+| **Frontend:** DOM only through `h()`, never `innerHTML` with data. No `style` attributes, only `el.style` | XSS, strict CSP | |
+| **Data from the network** (host names, log lines, file names) is not trustworthy | | |
+| Evaluate tool output (apt, ip …) only with `LC_ALL=C`. If data is missing, the check fails | translations change the output | L-17 |
 
 ## Tests
 
-- **Jede Prüfregel und jeder Erzeuger** bekommt Unit-Tests, Erzeuger zusätzlich Golden Files (NF-04).
-- **Zeit- und Kalenderlogik immer mit Tests** (L-16), die Zeit wird übergeben, nicht gelesen.
-- Was das System anfasst, läuft hinter einem Interface und wird im Test ersetzt (siehe
-  [entwicklung.md, 5.1](docs/entwicklung.md#51-unit-tests)). `go test ./...` braucht weder Root noch Netz.
-- Die Testumgebung hat dieselbe systemd-Härtung wie der Betrieb (NF-05).
+- **Every validation rule and every generator** gets unit tests, generators also golden files (NF-04).
+- **Time and calendar logic always with tests** (L-16), time is passed in, not read.
+- Whatever touches the system sits behind an interface and is replaced in tests (see
+  [development.md, 5.1](docs/development.md#51-unit-tests)). `go test ./...` needs neither root nor network.
+- The test environment has the same systemd hardening as production (NF-05).
 
-## Texte
+## Texts
 
-- Oberfläche, Doku und Kommentare sind derzeit **deutsch** (Q-07 offen). Ausnahmen: `README.md` und
-  `SECURITY.md` sind **englisch**, ebenso alles auf GitHub (Commit-Nachrichten, Issues, Pull Requests,
-  Releases).
-- Texte für Laien **ohne Fachbegriffe**: „Internet-Anschluss“ statt „WAN“, „Heimnetz“ statt „LAN“.
-- Beispiele nur mit Dokumentations-Adressen: IPv4 `192.0.2.0/24`, `198.51.100.0/24`, `203.0.113.0/24`
-  (RFC 5737), IPv6 `2001:db8::/32` (RFC 3849), Domain `home.arpa` oder `example.org`, MACs mit `02:`.
+- Code, comments, documentation and everything on GitHub (commit messages, issues, pull requests, releases) are
+  in **English**.
+- The product is English by default, with German as a selectable language. **Add a new user-visible text** in
+  English in the code and its German to [internal/i18n/de.json](internal/i18n/de.json)
+  ([architecture.md, section 14](docs/architecture.md#14-languages)).
+- Texts for non-experts **without jargon**: "internet port" instead of "WAN", "home network" instead of "LAN".
+- Examples only with documentation addresses: IPv4 `192.0.2.0/24`, `198.51.100.0/24`, `203.0.113.0/24`
+  (RFC 5737), IPv6 `2001:db8::/32` (RFC 3849), domain `home.arpa` or `example.org`, MACs starting with `02:`.
 
-## Datenschutz im Repo
+## Privacy in the repo
 
-Das Projekt ist öffentlich. **Nie** ins Repo: echte MAC-, IP- oder IPv6-Adressen, Hostnamen,
-Zugangsdaten, Schlüssel, Backups, Audit-Ergebnisse oder Logs aus einem echten Netz. Testpasswörter und
-Testschlüssel gehören nach `dev/` (per `.gitignore` ausgeschlossen).
+The project is public. **Never** in the repo: real MAC, IP or IPv6 addresses, host names, credentials, keys,
+backups, audit results or logs from a real network. Test passwords and test keys belong in `dev/` (excluded by
+`.gitignore`).
 
 ## Commits
 
-Vor jedem Commit:
+Before every commit:
 
 ```bash
 test/check-all.sh
 ```
 
-- **Eine Sache je Commit.** Code, Tests und die zugehörige Änderung an PLAN.md gehören zusammen.
-- **Kennungen nennen**, wo es passt: im Betreff oder Text (`F-INST-03`, `D-05`), ebenso in Kommentaren und Tests.
-- Ändert ein Commit den Stand einer Aufgabe, aktualisiert er im selben Commit den Status in PLAN.md,
-  dazu `version`, `updated` und den Änderungsverlauf unten in PLAN.md.
-- Betreff kurz und auf **Englisch**, z. B. `M4: setup assistant with arrow keys and Enter only`, darunter
-  bei Bedarf eine Liste der Änderungen.
+- **One thing per commit.** Code, tests and the corresponding change to PLAN.md belong together.
+- **Name IDs** where it fits: in the subject or text (`F-INST-03`, `D-05`), likewise in comments and tests.
+- If a commit changes the status of a task, it updates the status in PLAN.md in the same commit, plus `version`,
+  `updated` and the change history at the bottom of PLAN.md.
+- A short subject in **English**, e.g. `M4: setup assistant with arrow keys and Enter only`, with a list of
+  changes below it if needed.
 
-## PLAN.md pflegen
+## Maintaining PLAN.md
 
-- Kennungen (`P-`, `L-`, `F-…-`, `NF-`, `D-`, `Q-`, `R-`, `M`, `T-M…-`, `S-`) sind stabil. Nie
-  umnummerieren, nie neu vergeben. Was entfällt, bekommt den Status `verworfen` und bleibt stehen.
-- Neue Recherche-Ergebnisse mit Quelle unter `S-NN`. Forenquellen als solche kennzeichnen.
-- Offene Fragen: eine Tendenz vorschlagen, aber nicht eigenmächtig umsetzen.
+- IDs (`P-`, `L-`, `F-…-`, `NF-`, `D-`, `Q-`, `R-`, `M`, `T-M…-`, `S-`) are stable. Never renumber, never
+  reassign. What is dropped gets the status `rejected` and stays.
+- New research results with a source under `S-NN`. Mark forum sources as such.
+- Open questions: suggest a tendency, but do not implement it on your own.
 
-## Lizenz deiner Beiträge
+## License of your contributions
 
-Beiträge stehen unter derselben Lizenz wie das Projekt, [AGPL-3.0-or-later](LICENSE).
+Contributions are under the same license as the project, [AGPL-3.0-or-later](LICENSE).
 
-## Sicherheitslücken
+## Security issues
 
-Nicht als öffentliches Issue melden, siehe [SECURITY.md](SECURITY.md).
+Do not report them as a public issue, see [SECURITY.md](SECURITY.md).

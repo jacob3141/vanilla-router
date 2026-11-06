@@ -11,8 +11,8 @@ import (
 	"time"
 )
 
-// registerFiles leitet /api/files/* an den Dateidienst weiter (läuft als smbuser, Unix-Socket).
-// Anmeldung und CSRF-Prüfung passieren hier im Webserver, bevor etwas weitergereicht wird.
+// registerFiles forwards /api/files/* to the file service (runs as smbuser, Unix socket).
+// Login and CSRF checks happen here in the web server, before anything is passed on.
 func (s *Server) registerFiles() {
 	if s.cfg.Files == "" {
 		return
@@ -24,7 +24,7 @@ func (s *Server) registerFiles() {
 			pr.Out.URL.Host = "files"
 			pr.Out.URL.Path = strings.TrimPrefix(pr.In.URL.Path, "/api/files")
 			pr.Out.Host = "files"
-			pr.Out.Header.Del("Cookie") // Der Dateidienst braucht keine Sitzungsdaten
+			pr.Out.Header.Del("Cookie") // The file service does not need session data
 		},
 		Transport: &http.Transport{
 			DialContext: func(ctx context.Context, _, _ string) (net.Conn, error) {
@@ -34,14 +34,14 @@ func (s *Server) registerFiles() {
 			MaxIdleConns:    4,
 			IdleConnTimeout: 30 * time.Second,
 		},
-		FlushInterval: -1, // Downloads sofort durchreichen
+		FlushInterval: -1, // pass downloads through immediately
 		ErrorHandler: func(w http.ResponseWriter, r *http.Request, err error) {
-			s.cfg.Log.Error("dateidienst", "err", err)
-			writeError(w, http.StatusBadGateway, "Der Dateidienst ist nicht eingerichtet oder antwortet nicht (Erweiterung Dateiablage).")
+			s.cfg.Log.Error("file service", "err", err)
+			writeError(w, http.StatusBadGateway, "The file service is not set up or not responding (file share extension).")
 		},
 	}
 	handler := func(w http.ResponseWriter, r *http.Request) {
-		// Große Up- und Downloads dürfen länger dauern als die üblichen Server-Timeouts
+		// Big uploads and downloads may take longer than the usual server timeouts
 		rc := http.NewResponseController(w)
 		rc.SetReadDeadline(time.Time{})
 		rc.SetWriteDeadline(time.Time{})

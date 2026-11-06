@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-// Package config ist das Schema von /etc/vanilla-router/config.json, der einzigen Wahrheitsquelle
-// (D-02, PLAN.md 3.3). Laden ist streng (unbekannte Felder sind ein Fehler), Validate prüft alle
-// Werte so, dass die Generatoren in internal/gen keine eigene Prüfung mehr brauchen.
+// Package config is the schema of /etc/vanilla-router/config.json, the single source of truth
+// (D-02, PLAN.md 3.3). Loading is strict (unknown fields are an error), Validate checks all
+// values so that the generators in internal/gen need no checks of their own.
 package config
 
 import (
@@ -14,17 +14,17 @@ import (
 	"path/filepath"
 )
 
-// SchemaVersion ist die aktuelle Version des Schemas. Ältere Versionen werden beim Laden migriert.
+// SchemaVersion is the current version of the schema. Older versions are migrated on load.
 const SchemaVersion = 1
 
-// Path ist der Ort der Konfiguration auf dem Zielsystem.
+// Path is the location of the configuration on the target system.
 const Path = "/etc/vanilla-router/config.json"
 
-// FileMode: lesbar für alle, damit die Weboberfläche ohne Root sie lesen kann. Geheimnisse stehen nie
-// in config.json, sondern unter secrets/ (0600).
+// FileMode: readable by all, so the web interface can read it without root. Secrets are never
+// in config.json, but under secrets/ (0600).
 const FileMode = 0o644
 
-// Config ist der gewünschte Zustand des Routers.
+// Config is the desired state of the router.
 type Config struct {
 	Schema   int      `json:"schema"`
 	System   System   `json:"system"`
@@ -37,7 +37,7 @@ type Config struct {
 	Updates  Updates  `json:"updates"`
 }
 
-// System sind allgemeine Einstellungen.
+// System holds general settings.
 type System struct {
 	Hostname string `json:"hostname"`
 	Timezone string `json:"timezone"`
@@ -45,85 +45,85 @@ type System struct {
 	Keymap   string `json:"keymap,omitempty"`
 }
 
-// WAN-Arten.
+// WAN types.
 const (
 	WANDHCP   = "dhcp"
 	WANPPPoE  = "pppoe"
 	WANStatic = "static"
 )
 
-// WAN ist der Internet-Anschluss.
+// WAN is the internet port.
 type WAN struct {
-	// MatchMAC ordnet den physischen Port zu. Er heißt danach immer wan0 (per .link-Datei),
-	// unabhängig davon, wie der Kernel ihn nennt.
+	// MatchMAC assigns the physical port. It is then always called wan0 (through a .link file),
+	// regardless of what the kernel calls it.
 	MatchMAC string     `json:"match_mac"`
 	Type     string     `json:"type"`
 	PPPoE    *PPPoE     `json:"pppoe,omitempty"`
 	Static   *StaticWAN `json:"static,omitempty"`
 	IPv6     WANIPv6    `json:"ipv6"`
-	MTU      int        `json:"mtu,omitempty"` // 0 = Vorgabe (1500, bei PPPoE 1492)
-	// Detected ist das Ergebnis der Erkennung im Assistenten, solange der Anschluss noch nicht in der
-	// Oberfläche eingerichtet wurde (F-INST-15, F-UI-08). Der Assistent fragt keine Zugangsdaten
-	// (P-11): Bei PPPoE läuft der Router bis dahin mit Type dhcp, das schadet nicht.
+	MTU      int        `json:"mtu,omitempty"` // 0 = default (1500, with PPPoE 1492)
+	// Detected is the result of detection in the assistant, as long as the connection has not been set
+	// up in the web interface (F-INST-15, F-UI-08). The assistant does not ask for credentials
+	// (P-11): with PPPoE the router runs with Type dhcp until then, which does no harm.
 	Detected *Detected `json:"detected,omitempty"`
 }
 
-// Erkannte Anschlussarten. DetectedNone: Das Modem hat nicht geantwortet.
+// Detected connection types. DetectedNone: the modem did not answer.
 const DetectedNone = "none"
 
-// Detected beschreibt, was der Assistent am Internet-Anschluss gefunden hat.
+// Detected describes what the assistant found on the internet port.
 type Detected struct {
-	Method string `json:"method"`         // dhcp, pppoe oder none
-	VLAN   int    `json:"vlan,omitempty"` // bei PPPoE: VLAN der Antwort (Telekom: 7)
+	Method string `json:"method"`         // dhcp, pppoe or none
+	VLAN   int    `json:"vlan,omitempty"` // with PPPoE: VLAN of the answer (Telekom: 7)
 }
 
-// NeedsSetup sagt, ob die Oberfläche nach dem Internetzugang fragen muss.
+// NeedsSetup says whether the web interface has to ask about internet access.
 func (w WAN) NeedsSetup() bool {
 	return w.Detected != nil && w.Detected.Method != WANDHCP
 }
 
-// PPPoE-Zugang. Das Passwort steht nicht hier, sondern unter secrets/<PasswordRef> (0600).
+// PPPoE access. The password is not here, but under secrets/<PasswordRef> (0600).
 type PPPoE struct {
 	User        string `json:"user"`
 	PasswordRef string `json:"password_ref"`
-	VLAN        int    `json:"vlan,omitempty"` // 0 = ohne VLAN, Telekom: 7
+	VLAN        int    `json:"vlan,omitempty"` // 0 = no VLAN, Telekom: 7
 }
 
-// StaticWAN ist eine feste Adresse am Internet-Anschluss.
+// StaticWAN is a fixed address on the internet port.
 type StaticWAN struct {
 	Address string   `json:"address"` // CIDR, z. B. 203.0.113.10/29
 	Gateway string   `json:"gateway"`
 	DNS     []string `json:"dns,omitempty"`
 }
 
-// WANIPv6 steuert IPv6 am Internet-Anschluss.
+// WANIPv6 controls IPv6 on the internet port.
 type WANIPv6 struct {
-	Mode          string `json:"mode"`           // auto (DHCPv6 + Prefix Delegation) oder off
-	RequestPrefix int    `json:"request_prefix"` // gewünschte Präfixlänge, 48–64, typisch 56
+	Mode          string `json:"mode"`           // auto (DHCPv6 + prefix delegation) or off
+	RequestPrefix int    `json:"request_prefix"` // desired prefix length, 48–64, typically 56
 }
 
-// LAN ist das Heimnetz: eine Bridge lan0 über alle übrigen Ports.
+// LAN is the home network: a bridge lan0 over all remaining ports.
 type LAN struct {
-	Members []string `json:"members"` // MAC-Adressen der Ports
-	IPv4    string   `json:"ipv4"`    // Adresse des Routers mit Präfix, z. B. 192.168.42.1/24
+	Members []string `json:"members"` // MAC addresses of the ports
+	IPv4    string   `json:"ipv4"`    // router address with prefix, e.g. 192.168.42.1/24
 	IPv6    LANIPv6  `json:"ipv6"`
 }
 
-// LANIPv6 steuert IPv6 im Heimnetz.
+// LANIPv6 controls IPv6 in the home network.
 type LANIPv6 struct {
-	ULA           string `json:"ula"`             // /48 nach RFC 4193, bei der Installation zufällig erzeugt
-	FromWANPrefix bool   `json:"from_wan_prefix"` // ein /64 aus dem delegierten Präfix verteilen
+	ULA           string `json:"ula"`             // /48 per RFC 4193, generated randomly at installation
+	FromWANPrefix bool   `json:"from_wan_prefix"` // hand out a /64 from the delegated prefix
 }
 
-// DHCP für IPv4 im Heimnetz.
+// DHCP for IPv4 in the home network.
 type DHCP struct {
 	PoolStart    string        `json:"pool_start"`
 	PoolEnd      string        `json:"pool_end"`
-	Lease        string        `json:"lease"` // Go-Dauer, z. B. 12h
+	Lease        string        `json:"lease"` // Go duration, e.g. 12h
 	Reservations []Reservation `json:"reservations"`
 }
 
-// Reservation ist eine feste Adresse für ein Gerät. Der Name wird auch im DNS eingetragen.
+// Reservation is a fixed address for a device. The name also goes into DNS.
 type Reservation struct {
 	Name    string `json:"name"`
 	MAC     string `json:"mac"`
@@ -131,40 +131,40 @@ type Reservation struct {
 	Comment string `json:"comment,omitempty"`
 }
 
-// DNS im Heimnetz.
+// DNS in the home network.
 type DNS struct {
 	Domain    string   `json:"domain"`    // home.arpa (RFC 8375)
-	Upstreams []string `json:"upstreams"` // leer = DNS-Server des Anbieters
+	Upstreams []string `json:"upstreams"` // empty = the provider's DNS servers
 	Records   []Record `json:"records"`
 }
 
-// Record ist ein zusätzlicher lokaler Name.
+// Record is an additional local name.
 type Record struct {
 	Name string `json:"name"`
-	IP   string `json:"ip"` // IPv4 oder IPv6
+	IP   string `json:"ip"` // IPv4 or IPv6
 }
 
-// Firewall-Einstellungen.
+// Firewall settings.
 type Firewall struct {
 	PortForwards []PortForward `json:"port_forwards"`
 	Pinholes     []Pinhole     `json:"ipv6_pinholes"`
 	Blocks       []Block       `json:"blocks"`
 }
 
-// PortForward leitet einen Port von außen an ein Gerät im Heimnetz weiter (IPv4).
+// PortForward forwards a port from outside to a device in the home network (IPv4).
 type PortForward struct {
-	ID       string `json:"id,omitempty"` // feste Kennung für die Oberfläche
+	ID       string `json:"id,omitempty"` // fixed ID for the web interface
 	Proto    string `json:"proto"`        // tcp, udp, both
 	ExtPort  int    `json:"ext_port"`
-	ExtEnd   int    `json:"ext_end,omitempty"` // Bereich ext_port–ext_end, 0 = einzelner Port
+	ExtEnd   int    `json:"ext_end,omitempty"` // range ext_port–ext_end, 0 = single port
 	IntIP    string `json:"int_ip"`
-	IntPort  int    `json:"int_port"` // Ziel-Port (bei Bereichen: Beginn)
+	IntPort  int    `json:"int_port"` // target port (for ranges: start)
 	Comment  string `json:"comment,omitempty"`
 	Disabled bool   `json:"disabled,omitempty"`
 }
 
-// Pinhole gibt einen Port eines Geräts für IPv6 von außen frei. Weil sich das Präfix des Anbieters
-// ändern kann, wird das Gerät über den hinteren Teil der Adresse (Interface-ID) erkannt.
+// Pinhole opens a port of a device for IPv6 from outside. Because the provider's prefix can
+// change, the device is identified by the rear part of the address (interface ID).
 type Pinhole struct {
 	InterfaceID string `json:"interface_id"` // z. B. ::1a2b:3c4d:5e6f:7890
 	Proto       string `json:"proto"`
@@ -174,37 +174,37 @@ type Pinhole struct {
 	Disabled    bool   `json:"disabled,omitempty"`
 }
 
-// Block sperrt einem Gerät den Weg ins Internet, immer oder zu Zeiten (Kindersicherung).
-// Wochentage meinen den Beginn der Sperre, der Teil nach Mitternacht gehört zum Folgetag (L-16).
+// Block blocks a device's way to the internet, always or at certain times (parental controls).
+// Weekdays mean the start of the block, the part after midnight belongs to the next day (L-16).
 type Block struct {
 	MAC      string `json:"mac"`
 	Name     string `json:"name,omitempty"`
 	Mode     string `json:"mode"`           // always, schedule
-	From     string `json:"from,omitempty"` // HH:MM Ortszeit
+	From     string `json:"from,omitempty"` // HH:MM local time
 	To       string `json:"to,omitempty"`
-	Days     []int  `json:"days,omitempty"` // 0 = Sonntag … 6 = Samstag, leer = jeden Tag
+	Days     []int  `json:"days,omitempty"` // 0 = Sunday … 6 = Saturday, empty = every day
 	Disabled bool   `json:"disabled,omitempty"`
 }
 
-// Services sind Dienste auf dem Router.
+// Services are services on the router.
 type Services struct {
 	SSH SSH `json:"ssh"`
 }
 
-// SSH ist ab Werk aus (F-SEC-04). An heißt: nur Schlüssel, nur aus dem Heimnetz.
+// SSH is off by default (F-SEC-04). On means: keys only, only from the home network.
 type SSH struct {
 	Enabled        bool     `json:"enabled"`
 	AuthorizedKeys []string `json:"authorized_keys,omitempty"`
 }
 
-// Updates steuert unattended-upgrades und Snapshots.
+// Updates controls unattended-upgrades and snapshots.
 type Updates struct {
 	SecurityAuto bool   `json:"security_auto"`
-	RebootWindow string `json:"reboot_window"` // HH:MM, Neustart nach Updates nur dann
+	RebootWindow string `json:"reboot_window"` // HH:MM, restart after updates only then
 	Snapshots    bool   `json:"snapshots"`
 }
 
-// Parse liest eine Konfiguration streng: unbekannte Felder und nachfolgende Daten sind Fehler.
+// Parse reads a configuration strictly: unknown fields and trailing data are errors.
 func Parse(data []byte) (*Config, error) {
 	dec := json.NewDecoder(bytes.NewReader(data))
 	dec.DisallowUnknownFields()
@@ -213,18 +213,18 @@ func Parse(data []byte) (*Config, error) {
 		return nil, fmt.Errorf("config.json: %w", err)
 	}
 	if err := dec.Decode(&struct{}{}); err != io.EOF {
-		return nil, fmt.Errorf("config.json: Daten nach dem Ende des Objekts")
+		return nil, fmt.Errorf("config.json: data after the end of the object")
 	}
 	if c.Schema == 0 {
-		return nil, fmt.Errorf("config.json: Feld schema fehlt")
+		return nil, fmt.Errorf("config.json: field schema is missing")
 	}
 	if c.Schema > SchemaVersion {
-		return nil, fmt.Errorf("config.json: Schema %d ist neuer als diese Version (%d), bitte vanilla-router aktualisieren", c.Schema, SchemaVersion)
+		return nil, fmt.Errorf("config.json: schema %d is newer than this version (%d), please update vanilla-router", c.Schema, SchemaVersion)
 	}
 	return &c, nil
 }
 
-// Load liest und prüft die Datei.
+// Load reads and validates the file.
 func Load(path string) (*Config, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -240,7 +240,7 @@ func Load(path string) (*Config, error) {
 	return c, nil
 }
 
-// Marshal liefert die kanonische Darstellung (eingerückt, mit Zeilenende).
+// Marshal returns the canonical form (indented, with a trailing newline).
 func (c *Config) Marshal() ([]byte, error) {
 	b, err := json.MarshalIndent(c, "", "  ")
 	if err != nil {
@@ -249,7 +249,7 @@ func (c *Config) Marshal() ([]byte, error) {
 	return append(b, '\n'), nil
 }
 
-// Save prüft und schreibt atomar (temporäre Datei im selben Ordner, dann rename).
+// Save validates and writes atomically (temporary file in the same folder, then rename).
 func (c *Config) Save(path string) error {
 	if err := c.Validate(); err != nil {
 		return err
@@ -261,7 +261,7 @@ func (c *Config) Save(path string) error {
 	return WriteFileAtomic(path, b, FileMode)
 }
 
-// WriteFileAtomic schreibt eine Datei so, dass Leser immer die alte oder die neue Fassung sehen.
+// WriteFileAtomic writes a file so that readers always see the old or the new version.
 func WriteFileAtomic(path string, data []byte, mode os.FileMode) error {
 	dir := filepath.Dir(path)
 	if err := os.MkdirAll(dir, 0o755); err != nil {

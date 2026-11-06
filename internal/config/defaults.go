@@ -10,12 +10,12 @@ import (
 	"strings"
 )
 
-// lanCandidates sind die Heimnetze, die der Installer der Reihe nach anbietet. Bewusst nicht
-// 192.168.0.x, .1.x, .2.x und .178.x: Die nutzen Provider-Router (Vodafone, Telekom, FRITZ!Box)
-// selbst, und hinter einem solchen Router (doppeltes NAT) gäbe es sonst eine Überschneidung (F-NET-03).
+// lanCandidates are the home networks the installer offers in turn. Deliberately not
+// 192.168.0.x, .1.x, .2.x and .178.x: provider routers use those themselves (Vodafone, Telekom, FRITZ!Box),
+// and behind such a router (double NAT) there would otherwise be an overlap (F-NET-03).
 var lanCandidates = []string{"192.168.42.1/24", "192.168.73.1/24", "10.42.0.1/24", "172.20.42.1/24"}
 
-// ChooseLAN liefert das erste Heimnetz, das sich nicht mit avoid (z. B. dem WAN-Netz) überschneidet.
+// ChooseLAN returns the first home network that does not overlap with avoid (e.g. the WAN network).
 func ChooseLAN(avoid ...netip.Prefix) netip.Prefix {
 next:
 	for _, s := range lanCandidates {
@@ -27,10 +27,10 @@ next:
 		}
 		return p
 	}
-	return netip.MustParsePrefix("10.217.33.1/24") // alle Kandidaten belegt: ungewöhnliches Netz
+	return netip.MustParsePrefix("10.217.33.1/24") // all candidates taken: an unusual network
 }
 
-// NewULA erzeugt ein zufälliges ULA-Präfix /48 nach RFC 4193 (fd + 40 Bit Global ID, F-NET-12).
+// NewULA generates a random ULA prefix /48 per RFC 4193 (fd + 40-bit global ID, F-NET-12).
 func NewULA(rnd io.Reader) (netip.Prefix, error) {
 	if rnd == nil {
 		rnd = rand.Reader
@@ -43,15 +43,15 @@ func NewULA(rnd io.Reader) (netip.Prefix, error) {
 	return netip.PrefixFrom(netip.AddrFrom16(b), 48), nil
 }
 
-// DefaultInput ist das, was der Installer über die Hardware weiß.
+// DefaultInput is what the installer knows about the hardware.
 type DefaultInput struct {
 	WANMAC  string
 	LANMACs []string
-	WANNet  netip.Prefix // vom Modem angebotenes Netz (DHCP), leer wenn unbekannt
-	Rand    io.Reader    // für das ULA-Präfix, nil = crypto/rand
+	WANNet  netip.Prefix // network offered by the modem (DHCP), empty if unknown
+	Rand    io.Reader    // for the ULA prefix, nil = crypto/rand
 }
 
-// Default erzeugt eine vollständige, gültige Konfiguration mit den Vorgaben aus PLAN.md 3.4.
+// Default generates a complete, valid configuration with the defaults from PLAN.md 3.4.
 func Default(in DefaultInput) (*Config, error) {
 	lan := ChooseLAN(in.WANNet)
 	net4 := lan.Masked().Addr().As4()
@@ -62,7 +62,7 @@ func Default(in DefaultInput) (*Config, error) {
 	}
 	c := &Config{
 		Schema: SchemaVersion,
-		System: System{Hostname: "router", Timezone: "Europe/Berlin", Locale: "de_DE.UTF-8", Keymap: "de"},
+		System: System{Hostname: "router", Timezone: "UTC", Locale: "en_US.UTF-8", Keymap: "us"},
 		WAN: WAN{
 			MatchMAC: strings.ToLower(in.WANMAC),
 			Type:     WANDHCP,
@@ -83,15 +83,15 @@ func Default(in DefaultInput) (*Config, error) {
 		c.LAN.Members = append(c.LAN.Members, strings.ToLower(m))
 	}
 	if err := c.Validate(); err != nil {
-		return nil, fmt.Errorf("Vorgaben ungültig: %w", err)
+		return nil, fmt.Errorf("defaults invalid: %w", err)
 	}
 	return c, nil
 }
 
-// TelekomUser setzt den PPPoE-Benutzernamen der Telekom aus den Angaben im Zugangsbrief zusammen:
-// Anschlusskennung + Zugangsnummer (T-Online-Nummer) + Mitbenutzernummer + "@t-online.de".
-// Ist die Anschlusskennung kürzer als 12 Stellen, steht vor der Mitbenutzernummer ein „#“ [S-05].
-func TelekomUser(anschlusskennung, zugangsnummer, mitbenutzer string) (string, error) {
+// TelekomUser builds Telekom's PPPoE user name from the details in the access letter:
+// line ID + access number (T-Online number) + co-user number + "@t-online.de".
+// if the line ID is shorter than 12 digits, a "#" goes before the co-user number [S-05].
+func TelekomUser(line_id, access_number, co_user string) (string, error) {
 	digits := func(s string) bool {
 		for _, r := range s {
 			if r < '0' || r > '9' {
@@ -100,12 +100,12 @@ func TelekomUser(anschlusskennung, zugangsnummer, mitbenutzer string) (string, e
 		}
 		return s != ""
 	}
-	ak, zn, mb := strings.TrimSpace(anschlusskennung), strings.TrimSpace(zugangsnummer), strings.TrimSpace(mitbenutzer)
+	ak, zn, mb := strings.TrimSpace(line_id), strings.TrimSpace(access_number), strings.TrimSpace(co_user)
 	if mb == "" {
 		mb = "0001"
 	}
 	if !digits(ak) || !digits(zn) || !digits(mb) || len(ak) > 12 || len(zn) > 12 || len(mb) != 4 {
-		return "", fmt.Errorf("Bitte nur die Ziffern aus dem Zugangsbrief eingeben (Anschlusskennung und Zugangsnummer je bis 12 Stellen, Mitbenutzernummer 4 Stellen)")
+		return "", fmt.Errorf("Please enter only the digits from the access letter (line ID and access number up to 12 digits each, co-user number 4 digits)")
 	}
 	sep := ""
 	if len(ak) < 12 {

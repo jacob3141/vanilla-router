@@ -10,18 +10,18 @@ import (
 	"unsafe"
 )
 
-// LinkEvent ist eine Zustandsmeldung des Kernels zu einem Interface (RTM_NEWLINK/RTM_DELLINK).
+// LinkEvent is a state message from the kernel about an interface (RTM_NEWLINK/RTM_DELLINK).
 type LinkEvent struct {
 	Index     int
 	Name      string
-	Up        bool // IFF_UP (administrativ an)
-	LowerUp   bool // IFF_LOWER_UP: Kabel steckt, Gegenstelle aktiv
-	Carrier   Tri  // IFLA_CARRIER, falls mitgeschickt
+	Up        bool // IFF_UP (administratively on)
+	LowerUp   bool // IFF_LOWER_UP: cable plugged in, other end active
+	Carrier   Tri  // IFLA_CARRIER, if sent along
 	OperState string
-	Removed   bool // RTM_DELLINK, z. B. USB-Adapter abgezogen
+	Removed   bool // RTM_DELLINK, e.g. USB adapter unplugged
 }
 
-// HasLink fasst die Signale zusammen. IFLA_CARRIER hat Vorrang, sonst IFF_LOWER_UP.
+// HasLink combines the signals. IFLA_CARRIER takes precedence, otherwise IFF_LOWER_UP.
 func (e LinkEvent) HasLink() bool {
 	if e.Removed {
 		return false
@@ -46,8 +46,8 @@ const (
 var operStates = map[uint8]string{0: "unknown", 1: "notpresent", 2: "down", 3: "lowerlayerdown",
 	4: "testing", 5: "dormant", 6: "up"}
 
-// ParseLinkMessages wertet einen von Netlink gelesenen Puffer aus. Nachrichten anderer Typen
-// werden übersprungen. Ausgelagert, damit es ohne Kernel testbar ist.
+// ParseLinkMessages evaluates a buffer read from netlink. Messages of other types
+// are skipped. Separated out, so it can be tested without a kernel.
 func ParseLinkMessages(buf []byte) ([]LinkEvent, error) {
 	msgs, err := syscall.ParseNetlinkMessage(buf)
 	if err != nil {
@@ -59,7 +59,7 @@ func ParseLinkMessages(buf []byte) ([]LinkEvent, error) {
 			continue
 		}
 		if len(m.Data) < syscall.SizeofIfInfomsg {
-			return nil, errors.New("netlink: ifinfomsg zu kurz")
+			return nil, errors.New("netlink: ifinfomsg too short")
 		}
 		info := (*syscall.IfInfomsg)(unsafe.Pointer(&m.Data[0]))
 		ev := LinkEvent{
@@ -103,13 +103,13 @@ func cString(b []byte) string {
 	return string(b)
 }
 
-// LinkWatcher liest Link-Ereignisse aus der Netlink-Gruppe RTMGRP_LINK. Braucht keine Root-Rechte.
+// LinkWatcher reads link events from the netlink group RTMGRP_LINK. Needs no root.
 type LinkWatcher struct {
 	fd int
 }
 
-// NewLinkWatcher öffnet den Netlink-Socket. Zuerst öffnen, dann den Anfangszustand lesen
-// (ListPorts), damit kein Ereignis dazwischen verloren geht.
+// NewLinkWatcher opens the netlink socket. Open first, then read the initial state
+// (ListPorts), so no event in between gets lost.
 func NewLinkWatcher() (*LinkWatcher, error) {
 	fd, err := syscall.Socket(syscall.AF_NETLINK, syscall.SOCK_RAW|syscall.SOCK_CLOEXEC, syscall.NETLINK_ROUTE)
 	if err != nil {
@@ -122,7 +122,7 @@ func NewLinkWatcher() (*LinkWatcher, error) {
 	return &LinkWatcher{fd: fd}, nil
 }
 
-// Read wartet höchstens timeout auf Ereignisse. Ohne Ereignis kommt (nil, nil) zurück.
+// Read waits at most timeout for events. Without an event it returns (nil, nil).
 func (w *LinkWatcher) Read(timeout time.Duration) ([]LinkEvent, error) {
 	tv := syscall.NsecToTimeval(timeout.Nanoseconds())
 	if tv.Sec == 0 && tv.Usec == 0 {
@@ -138,7 +138,7 @@ func (w *LinkWatcher) Read(timeout time.Duration) ([]LinkEvent, error) {
 			return nil, nil
 		}
 		if errors.Is(err, syscall.ENOBUFS) {
-			// Puffer übergelaufen, Ereignisse fehlen. Der Aufrufer muss den Zustand neu lesen.
+			// Buffer overflowed, events are missing. The caller must read the state again.
 			return nil, ErrResync
 		}
 		return nil, err
@@ -146,14 +146,14 @@ func (w *LinkWatcher) Read(timeout time.Duration) ([]LinkEvent, error) {
 	return ParseLinkMessages(buf[:n])
 }
 
-// ErrResync bedeutet, dass Ereignisse verloren gingen und der Zustand neu gelesen werden muss.
-var ErrResync = errors.New("netlink: Ereignisse verloren, Zustand neu lesen")
+// ErrResync means that events were lost and the state must be read again.
+var ErrResync = errors.New("netlink: events lost, read state again")
 
-// Close schließt den Socket.
+// Close closes the socket.
 func (w *LinkWatcher) Close() error { return syscall.Close(w.fd) }
 
-// SetUp schaltet ein Interface administrativ ein (wie `ip link set <name> up`), ohne Adresse.
-// Erst dann meldet der Treiber, ob ein Kabel steckt. Braucht CAP_NET_ADMIN.
+// SetUp turns an interface on administratively (like `ip link set <name> up`), without an address.
+// Only then does the driver report whether a cable is plugged in. Needs CAP_NET_ADMIN.
 func SetUp(name string) error {
 	if len(name) >= syscall.IFNAMSIZ {
 		return fmt.Errorf("Interface-Name zu lang: %q", name)
@@ -170,14 +170,14 @@ func SetUp(name string) error {
 	}
 	copy(req.Name[:], name)
 	if _, _, e := syscall.Syscall(syscall.SYS_IOCTL, uintptr(fd), syscall.SIOCGIFFLAGS, uintptr(unsafe.Pointer(&req))); e != 0 {
-		return fmt.Errorf("%s: Flags lesen: %w", name, e)
+		return fmt.Errorf("%s: reading flags: %w", name, e)
 	}
 	if req.Flags&iffUp != 0 {
 		return nil
 	}
 	req.Flags |= iffUp
 	if _, _, e := syscall.Syscall(syscall.SYS_IOCTL, uintptr(fd), syscall.SIOCSIFFLAGS, uintptr(unsafe.Pointer(&req))); e != 0 {
-		return fmt.Errorf("%s: einschalten: %w", name, e)
+		return fmt.Errorf("%s: turning on: %w", name, e)
 	}
 	return nil
 }

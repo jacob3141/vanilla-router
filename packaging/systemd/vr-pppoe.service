@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-# PPPoE-Einwahl (pppd mit rp-pppoe-Plugin). Konfiguration /etc/ppp/peers/vr-wan erzeugt vrctl.
+# PPPoE dial-up (pppd with the rp-pppoe plugin). vrctl generates the configuration /etc/ppp/peers/vr-wan.
 [Unit]
-Description=vanilla-router Internet-Einwahl (PPPoE)
+Description=vanilla-router internet dial-up (PPPoE)
 After=systemd-networkd.service vr-firewall.service
 Wants=systemd-networkd.service
 ConditionPathExists=/etc/ppp/peers/vr-wan

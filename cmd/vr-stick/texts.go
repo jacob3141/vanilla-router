@@ -13,7 +13,7 @@ import (
 	"vanilla-router/internal/windisk"
 )
 
-// Sprache der Oberfläche nach der Windows-Sprache (F-STICK-09).
+// Language of the window, following the Windows language (F-STICK-09).
 type lang int
 
 const (
@@ -21,9 +21,9 @@ const (
 	langEN
 )
 
-var uiLang = langDE
+var uiLang = langEN
 
-// texts: Deutsch und Englisch. Laien-Texte ohne Fachbegriffe (CLAUDE.md, F-STICK-06).
+// texts: German and English. Plain texts without jargon (CLAUDE.md, F-STICK-06).
 var texts = map[string][2]string{
 	"title":   {"vanilla-router: Stick erstellen", "vanilla-router: create USB stick"},
 	"heading": {"USB-Stick für Ihren Router erstellen", "Create a USB stick for your router"},
@@ -82,7 +82,7 @@ var texts = map[string][2]string{
 	"incomplete":     {"\r\n\r\nDer Stick ist unvollständig. Bitte erstellen Sie ihn noch einmal.", "\r\n\r\nThe stick is incomplete. Please create it again."},
 }
 
-// tr liefert einen Text in der Sprache der Oberfläche.
+// tr returns a text in the window's language.
 func tr(key string, args ...any) string {
 	t, ok := texts[key]
 	if !ok {
@@ -94,7 +94,7 @@ func tr(key string, args ...any) string {
 	return fmt.Sprintf(t[uiLang], args...)
 }
 
-// size schreibt Größen wie die Hersteller (1 GB = 10⁹ Bytes), mit Komma im Deutschen.
+// size writes sizes the way manufacturers do (1 GB = 10⁹ bytes), with a comma in German.
 func size(b int64) string {
 	var s string
 	switch {
@@ -111,7 +111,7 @@ func size(b int64) string {
 	return s
 }
 
-// diskLabel ist der Eintrag in der Liste und in der Warnung, z. B. „SanDisk Ultra (32 GB), Laufwerk E:“.
+// diskLabel is the entry in the list and in the warning, e.g. "SanDisk Ultra (32 GB), drive E:".
 func diskLabel(d windisk.Disk) string {
 	s := fmt.Sprintf("%s (%s)", d.Name(), size(d.Size))
 	if len(d.Letters) > 0 {
@@ -120,7 +120,7 @@ func diskLabel(d windisk.Disk) string {
 	return s
 }
 
-// errText übersetzt einen Fehler in einen Laien-Text (F-STICK-06).
+// errText translates an error into a plain-language text (F-STICK-06).
 func errText(err error, local, wrote bool) string {
 	var s string
 	switch {

@@ -12,10 +12,10 @@ import (
 	"strings"
 )
 
-// ExecRunner führt Programme wirklich aus. Ausgaben kommen immer mit LC_ALL=C (L-17).
+// ExecRunner really runs programs. Output always comes with LC_ALL=C (L-17).
 type ExecRunner struct{}
 
-// Run startet name mit args. env ergänzt die Umgebung.
+// Run starts name with args. env adds to the environment.
 func (ExecRunner) Run(env []string, name string, args ...string) ([]byte, error) {
 	cmd := exec.Command(name, args...)
 	cmd.Env = append(append(os.Environ(), "LC_ALL=C"), env...)
@@ -25,16 +25,16 @@ func (ExecRunner) Run(env []string, name string, args ...string) ([]byte, error)
 	return out.Bytes(), err
 }
 
-// DryRunner ist für die Testinstanz der Oberfläche: Prüfungen (nft -c, dnsmasq --test) laufen echt,
-// alles, was das System ändert oder neu lädt, wird nur protokolliert und gilt als erfolgreich.
+// DryRunner is for the test instance of the web interface: checks (nft -c, dnsmasq --test) really run,
+// everything that changes or reloads the system is only logged and counts as successful.
 type DryRunner struct {
 	Log func(cmd string)
 }
 
-// Run führt nur prüfende Befehle aus.
+// Run only executes checking commands.
 func (d DryRunner) Run(env []string, name string, args ...string) ([]byte, error) {
 	check := (name == "nft" && len(args) > 0 && args[0] == "-c") || (name == "dnsmasq" && len(args) > 0 && args[0] == "--test")
-	if check && os.Geteuid() == 0 { // ohne root kann nft -c nicht prüfen, dann nur protokollieren
+	if check && os.Geteuid() == 0 { // without root nft -c cannot check, then only log
 		return ExecRunner{}.Run(env, name, args...)
 	}
 	if d.Log != nil {
@@ -43,10 +43,10 @@ func (d DryRunner) Run(env []string, name string, args ...string) ([]byte, error
 	return nil, nil
 }
 
-// DirSecrets liest Geheimnisse aus einem Ordner, eine Datei je Verweis (/etc/vanilla-router/secrets).
+// DirSecrets reads secrets from a folder, one file per reference (/etc/vanilla-router/secrets).
 type DirSecrets struct{ Dir string }
 
-var errBadRef = errors.New("ungültiger Verweis")
+var errBadRef = errors.New("invalid reference")
 
 func (s DirSecrets) file(ref string) (string, error) {
 	if ref == "" || strings.ContainsAny(ref, "/\\.") {
@@ -55,7 +55,7 @@ func (s DirSecrets) file(ref string) (string, error) {
 	return filepath.Join(s.Dir, ref), nil
 }
 
-// Get liest ein Geheimnis. Die Datei muss 0600 sein, sonst wird sie abgelehnt.
+// Get reads a secret. The file must be 0600, otherwise it is rejected.
 func (s DirSecrets) Get(ref string) (string, error) {
 	p, err := s.file(ref)
 	if err != nil {
@@ -63,10 +63,10 @@ func (s DirSecrets) Get(ref string) (string, error) {
 	}
 	fi, err := os.Stat(p)
 	if err != nil {
-		return "", fmt.Errorf("Geheimnis %q fehlt (vrctl secret set %s)", ref, ref)
+		return "", fmt.Errorf("secret %q is missing (vrctl secret set %s)", ref, ref)
 	}
 	if fi.Mode().Perm()&0o077 != 0 {
-		return "", fmt.Errorf("Geheimnis %q ist für andere lesbar (Rechte %o), bitte auf 0600 setzen", ref, fi.Mode().Perm())
+		return "", fmt.Errorf("secret %q is readable by others (mode %o), please set it to 0600", ref, fi.Mode().Perm())
 	}
 	b, err := os.ReadFile(p)
 	if err != nil {
@@ -75,7 +75,7 @@ func (s DirSecrets) Get(ref string) (string, error) {
 	return strings.TrimRight(string(b), "\r\n"), nil
 }
 
-// Set schreibt ein Geheimnis mit 0600.
+// Set writes a secret with 0600.
 func (s DirSecrets) Set(ref, value string) error {
 	p, err := s.file(ref)
 	if err != nil {

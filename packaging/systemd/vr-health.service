@@ -1,8 +1,8 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-# Gesundheitsprüfung nach jedem Start (M5). Bestätigt den Start für GRUB oder startet neu, wenn das
-# Heimnetz nach 10 Minuten nicht läuft; dann wählt GRUB den Stand vor dem letzten Update.
+# Health check after every start (M5). Confirms the start for GRUB or restarts if the
+# home network is not running after 10 minutes; GRUB then picks the state before the last update.
 [Unit]
-Description=vanilla-router Gesundheitsprüfung nach dem Start
+Description=vanilla-router health check after start
 After=multi-user.target vr-dnsmasq.service vr-firewall.service systemd-networkd.service
 Wants=multi-user.target
 

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-// Package auth enthält Passwort-Hashing, Sitzungen und die Login-Bremse der Weboberfläche.
+// Package auth contains password hashing, sessions and the login throttle of the web interface.
 package auth
 
 import (
@@ -16,26 +16,26 @@ import (
 	"unicode/utf8"
 )
 
-// OWASP-Empfehlung für PBKDF2-HMAC-SHA256 (Stand 2025)
+// OWASP recommendation for PBKDF2-HMAC-SHA256 (as of 2025)
 const pbkdf2Iterations = 600_000
 
-// MinPasswordLength ist die Mindestlänge für das Passwort der Oberfläche.
+// MinPasswordLength is the minimum length of the web interface password.
 const MinPasswordLength = 12
 
 var b64 = base64.RawStdEncoding
 
-// ValidatePassword prüft die Passwortregeln und liefert eine Meldung für die Oberfläche.
+// ValidatePassword checks the password rules and returns a message for the web interface.
 func ValidatePassword(pw string) error {
 	if utf8.RuneCountInString(pw) < MinPasswordLength {
-		return fmt.Errorf("Das Passwort muss mindestens %d Zeichen lang sein.", MinPasswordLength)
+		return fmt.Errorf("The password must be at least %d characters long.", MinPasswordLength)
 	}
 	if len(pw) > 1024 {
-		return errors.New("Das Passwort ist zu lang.")
+		return errors.New("The password is too long.")
 	}
 	return nil
 }
 
-// HashPassword erzeugt "pbkdf2-sha256$<runden>$<salt>$<hash>".
+// HashPassword creates "pbkdf2-sha256$<rounds>$<salt>$<hash>".
 func HashPassword(pw string) (string, error) {
 	salt := make([]byte, 16)
 	rand.Read(salt)
@@ -46,7 +46,7 @@ func HashPassword(pw string) (string, error) {
 	return fmt.Sprintf("pbkdf2-sha256$%d$%s$%s", pbkdf2Iterations, b64.EncodeToString(salt), b64.EncodeToString(dk)), nil
 }
 
-// VerifyPassword vergleicht in konstanter Zeit.
+// VerifyPassword compares in constant time.
 func VerifyPassword(encoded, pw string) bool {
 	parts := strings.Split(encoded, "$")
 	if len(parts) != 4 || parts[0] != "pbkdf2-sha256" {

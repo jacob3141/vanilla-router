@@ -1,20 +1,21 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { t } from '../i18n.js';
 import { h, clear, icon, fmt, badge, stateKind, STATE_LABEL } from '../ui.js';
 import { get } from '../api.js';
 import { chartElement, drawLines, clockFmt } from '../charts.js';
 
 const SERVICE_LABEL = {
-  'vr-dnsmasq': 'DNS und DHCP', 'systemd-networkd': 'Netzwerk', 'vr-firewall': 'Firewall',
-  'vr-pppoe': 'Einwahl (PPPoE)', ssh: 'SSH', 'unattended-upgrades': 'Auto-Updates',
+  'vr-dnsmasq': 'DNS and DHCP', 'systemd-networkd': 'Network', 'vr-firewall': 'Firewall',
+  'vr-pppoe': 'Dial-up (PPPoE)', ssh: 'SSH', 'unattended-upgrades': 'Auto-Updates',
   smbd: 'Samba', docker: 'Docker',
 };
 
-const LIVE_POINTS = 90; // 2 s Abstand = 3 Minuten
-const RANGES = [['live', 'Live'], ['60', '1 Std'], ['1440', '24 Std']];
+const LIVE_POINTS = 90; // 2 s apart = 3 minutes
+const RANGES = [['live', 'Live'], ['60', '1 h'], ['1440', '24 h']];
 
 export default {
-  title: 'Übersicht',
-  subtitle: 'Zustand des Routers auf einen Blick',
+  title: 'Overview',
+  subtitle: 'Router status at a glance',
   render(root) {
     const live = { wan0: [], lan0: [] };
     let iface = 'wan0';
@@ -33,8 +34,8 @@ export default {
 
     const rxVal = h('span', { class: 'legend-value' }, '–');
     const txVal = h('span', { class: 'legend-value' }, '–');
-    const rxLabel = h('span', { class: 'muted' }, 'Empfangen');
-    const txLabel = h('span', { class: 'muted' }, 'Gesendet');
+    const rxLabel = h('span', { class: 'muted' }, 'Received');
+    const txLabel = h('span', { class: 'muted' }, 'Sent');
     const totals = h('div', { class: 'stat-sub' });
     const chart = chartElement(190);
     const resChart = chartElement(150);
@@ -52,24 +53,24 @@ export default {
       banner, hintsBox,
       h('div', { class: 'grid cols-4' },
         statCard('CPU', 'cpu', cpuVal, h('div', { class: 'meter' }, cpuBar)),
-        statCard('Arbeitsspeicher', 'memory', memVal, memSub, h('div', { class: 'meter' }, memBar)),
-        statCard('Temperatur', 'thermo', tempVal),
-        statCard('Laufzeit', 'clock', upVal, upSub)),
+        statCard('Memory', 'memory', memVal, memSub, h('div', { class: 'meter' }, memBar)),
+        statCard('Temperature', 'thermo', tempVal),
+        statCard('Uptime', 'clock', upVal, upSub)),
       h('div', { class: 'grid cols-2 mt' },
         h('section', { class: 'card span-2' },
-          h('div', { class: 'card-head' }, badgeIcon('activity'), h('h2', null, 'Datenverkehr'), rangeSeg, ifSeg),
+          h('div', { class: 'card-head' }, badgeIcon('activity'), h('h2', null, 'Traffic'), rangeSeg, ifSeg),
           h('div', { class: 'legend' },
             legend('var(--rx)', rxLabel, rxVal),
             legend('var(--tx)', txLabel, txVal),
             h('div', { class: 'spacer' }), totals),
           chart),
         h('section', { class: 'card' }, h('div', { class: 'card-head' }, badgeIcon('globe'), h('h2', null, 'Internet (WAN)')), wanBody),
-        h('section', { class: 'card' }, h('div', { class: 'card-head' }, badgeIcon('home'), h('h2', null, 'Heimnetz (LAN)')), lanBody),
+        h('section', { class: 'card' }, h('div', { class: 'card-head' }, badgeIcon('home'), h('h2', null, 'Home network (LAN)')), lanBody),
         h('section', { class: 'card span-2' },
-          h('div', { class: 'card-head' }, badgeIcon('cpu'), h('h2', null, 'Auslastung (24 Std)'),
+          h('div', { class: 'card-head' }, badgeIcon('cpu'), h('h2', null, 'Load (24 h)'),
             h('div', { class: 'legend compact' }, legend('var(--accent)', h('span', { class: 'muted' }, 'CPU')), legend('var(--tx)', h('span', { class: 'muted' }, 'RAM')))),
           resChart),
-        h('section', { class: 'card' }, h('div', { class: 'card-head' }, badgeIcon('services'), h('h2', null, 'Dienste')), services),
+        h('section', { class: 'card' }, h('div', { class: 'card-head' }, badgeIcon('services'), h('h2', null, 'Services')), services),
         h('section', { class: 'card' }, h('div', { class: 'card-head' }, badgeIcon('system'), h('h2', null, 'System')), sysBody)));
 
     function applyLive(l) {
@@ -81,7 +82,7 @@ export default {
         const used = l.mem.total - l.mem.available;
         const pct = (100 * used) / l.mem.total;
         memVal.textContent = fmt.pct(pct);
-        memSub.textContent = `${fmt.bytes(used)} von ${fmt.bytes(l.mem.total)}`;
+        memSub.textContent = t(`${fmt.bytes(used)} of ${fmt.bytes(l.mem.total)}`);
         setMeter(memBar, pct);
       }
       const t = Date.parse(l.time) / 1000;
@@ -103,8 +104,8 @@ export default {
         tx = pts.map((p) => [p[0], p[2]]);
         t0 = now - LIVE_POINTS * 2;
         const cur = pts[pts.length - 1];
-        rxLabel.textContent = 'Empfangen';
-        txLabel.textContent = 'Gesendet';
+        rxLabel.textContent = t('Received');
+        txLabel.textContent = t('Sent');
         rxVal.textContent = cur ? fmt.rate(cur[1]) : '–';
         txVal.textContent = cur ? fmt.rate(cur[2]) : '–';
       } else {
@@ -113,17 +114,17 @@ export default {
         rx = pts.map((p) => [p.t + 30, p[k[0]]]);
         tx = pts.map((p) => [p.t + 30, p[k[1]]]);
         t0 = now - +range * 60;
-        // Datenmenge im Zeitraum (Minutenmittel × 60 s)
+        // data volume in the period (minute average × 60 s)
         const sum = (key) => pts.reduce((n, p) => n + p[key] * 60, 0);
-        rxLabel.textContent = 'Empfangen gesamt';
-        txLabel.textContent = 'Gesendet gesamt';
+        rxLabel.textContent = t('Received in total');
+        txLabel.textContent = t('Sent in total');
         rxVal.textContent = fmt.bytes(sum(k[0]));
         txVal.textContent = fmt.bytes(sum(k[1]));
       }
       const r = lastLive?.net?.[iface];
-      totals.textContent = r ? `seit dem Start: ↓ ${fmt.bytes(r.rx_total)} · ↑ ${fmt.bytes(r.tx_total)}` : '';
+      totals.textContent = t(r ? `since start: ↓ ${fmt.bytes(r.rx_total)} · ↑ ${fmt.bytes(r.tx_total)}` : '');
       drawLines(chart, [{ points: rx, cls: 'rx-line', area: 'rx-area' }, { points: tx, cls: 'tx-line' }],
-        { t0, t1: now, yMin: 1000, yFmt: fmt.rate, tFmt: range === 'live' ? (t) => (t === now ? 'jetzt' : '−3 min') : clockFmt, gapSec: range === 'live' ? 10 : 180 });
+        { t0, t1: now, yMin: 1000, yFmt: fmt.rate, tFmt: range === 'live' ? (t) => (t === now ? 'now' : '−3 min') : clockFmt, gapSec: range === 'live' ? 10 : 180 });
     }
 
     async function loadHistory() {
@@ -147,7 +148,7 @@ export default {
       if (!d.hints.length) return;
       const order = { crit: 0, warn: 1, info: 2 };
       hintsBox.append(h('section', { class: 'card hints' },
-        h('div', { class: 'card-head' }, badgeIcon('alert'), h('h2', null, 'Hinweise'), badge(String(d.hints.length))),
+        h('div', { class: 'card-head' }, badgeIcon('alert'), h('h2', null, 'Notes'), badge(String(d.hints.length))),
         h('div', { class: 'hint-list' }, d.hints.sort((a, b) => order[a.level] - order[b.level]).map((x) =>
           h(x.link ? 'a' : 'div', { class: `hint-item ${x.level}`, href: x.link || null },
             h('span', { class: `dot ${x.level === 'info' ? '' : x.level}` }),
@@ -159,30 +160,30 @@ export default {
       let d;
       try { d = await get('/api/dashboard'); } catch (e) { clear(banner).append(h('div', { class: 'banner crit' }, icon('alert'), e.message)); return; }
       clear(banner);
-      tempVal.textContent = d.temperature != null ? `${fmt.num(d.temperature)} °C` : '–';
+      tempVal.textContent = t(d.temperature != null ? `${fmt.num(d.temperature)} °C` : '–');
       upVal.textContent = fmt.duration(d.uptime_s);
-      upSub.textContent = `Last ${d.load.map((x) => fmt.num(x, 2)).join(' · ')}`;
+      upSub.textContent = t(`Last ${d.load.map((x) => fmt.num(x, 2)).join(' · ')}`);
 
       fillKV(wanBody, [
-        ['Status', d.wan.up ? badge('verbunden', 'ok') : badge('getrennt', 'crit')],
+        ['Status', d.wan.up ? badge('connected', 'ok') : badge('disconnected', 'crit')],
         ['IPv4', d.wan.ipv4.join(', ') || '–'],
         ['IPv6', d.wan.ipv6.length ? d.wan.ipv6.map((a) => h('div', { class: 'mono' }, a)) : '–'],
         ['Gateway', d.gateway.ip || '–'],
-        ['Verbindung', d.wan.speed_mbit ? `${d.wan.speed_mbit} Mbit/s` : '–'],
+        ['Connection', d.wan.speed_mbit ? `${d.wan.speed_mbit} Mbit/s` : '–'],
       ]);
       fillKV(lanBody, [
-        ['Status', d.lan.up ? badge('aktiv', 'ok') : badge('aus', 'crit')],
-        ['Adresse', d.lan.ipv4.join(', ') || '–'],
-        ['Geräte online', h('a', { href: '#/devices', class: 'num' }, String(d.clients))],
-        ['Verbindung', d.lan.speed_mbit ? `${d.lan.speed_mbit} Mbit/s` : '–'],
+        ['Status', d.lan.up ? badge('active', 'ok') : badge('aus', 'crit')],
+        ['Address', d.lan.ipv4.join(', ') || '–'],
+        ['Devices online', h('a', { href: '#/devices', class: 'num' }, String(d.clients))],
+        ['Connection', d.lan.speed_mbit ? `${d.lan.speed_mbit} Mbit/s` : '–'],
         ['MAC', h('span', { class: 'mono' }, d.lan.mac)],
       ]);
       fillKV(sysBody, [
         ['Name', d.hostname],
         ['System', d.release],
         ['Kernel', h('span', { class: 'mono' }, d.kernel)],
-        ['Helper', d.helper_ok ? badge('bereit', 'ok') : badge('nicht erreichbar', 'crit')],
-        ['Sitzungen', String(d.sessions)],
+        ['Helper', d.helper_ok ? badge('ready', 'ok') : badge('not reachable', 'crit')],
+        ['Sessions', String(d.sessions)],
       ]);
       clear(services).append(...Object.entries(d.services).sort(([a], [b]) => a.localeCompare(b)).map(([name, state]) =>
         h('div', { class: 'service' },

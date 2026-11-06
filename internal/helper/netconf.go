@@ -17,7 +17,7 @@ import (
 	"vanilla-router/internal/config"
 )
 
-// ManualDNS ist ein Eintrag, den die Oberfläche anzeigt, aber nicht bearbeitet (der Router selbst).
+// ManualDNS is an entry the web interface shows but does not edit (the router itself).
 type ManualDNS struct {
 	Name string `json:"name"`
 	IP   string `json:"ip"`
@@ -25,7 +25,7 @@ type ManualDNS struct {
 	File string `json:"file"`
 }
 
-// NetconfInfo ist die Antwort von netconf.get (Form wie im Prototyp).
+// NetconfInfo is the response of netconf.get (form as in the prototype).
 type NetconfInfo struct {
 	State     conf.State  `json:"state"`
 	Manual    []ManualDNS `json:"manual"`
@@ -36,7 +36,7 @@ type NetconfInfo struct {
 	DryRun    bool        `json:"dry_run"`
 }
 
-// loadConfig liest config.json. Im Probelauf zuerst die Kopie unter Root, sonst die echte Datei.
+// loadConfig reads config.json. In a dry run first the copy under Root, otherwise the real file.
 func (s *Server) loadConfig() (*config.Config, error) {
 	p := s.Path(config.Path)
 	if _, err := os.Stat(p); errors.Is(err, os.ErrNotExist) && s.cfg.DryRun {
@@ -62,7 +62,7 @@ func (s *Server) applier() *apply.Applier {
 	a := &apply.Applier{Root: "/", Run: apply.ExecRunner{}}
 	if s.cfg.DryRun {
 		a.Root = s.cfg.Root
-		a.Run = apply.DryRunner{Log: func(cmd string) { s.cfg.Log.Info("probelauf: übersprungen", "cmd", cmd) }}
+		a.Run = apply.DryRunner{Log: func(cmd string) { s.cfg.Log.Info("dry run: skipped", "cmd", cmd) }}
 		a.SkipHealth = true
 	}
 	return a
@@ -70,9 +70,9 @@ func (s *Server) applier() *apply.Applier {
 
 type parts struct{ dhcp, dns, portfw bool }
 
-// commit schreibt den neuen State in config.json und spielt ihn mit vrctl-apply-Logik ein:
-// prüfen, sichern, ersetzen, neu laden, Gesundheitsprüfung, bei Fehler zurück (P-05).
-// parts bleibt für die Lesbarkeit der Aufrufer, apply lädt ohnehin nur, was sich geändert hat.
+// commit writes the new State to config.json and applies it with vrctl-apply logic:
+// check, back up, replace, reload, health check, on failure restore (P-05).
+// parts stays for readability at the callers, apply only reloads what has changed anyway.
 func (s *Server) commit(ctx context.Context, prev, next conf.State, _ parts) error {
 	cur, err := s.loadConfig()
 	if err != nil {
@@ -84,12 +84,12 @@ func (s *Server) commit(ctx context.Context, prev, next conf.State, _ parts) err
 	}
 	_, err = s.applier().Apply(nc, s.secrets(), apply.Options{})
 	if err != nil {
-		return &UserError{Msg: "Die Änderung wurde nicht übernommen: " + firstLine(err.Error())}
+		return &UserError{Msg: "The change was not applied: " + firstLine(err.Error())}
 	}
 	return nil
 }
 
-// userConfigError macht aus den Feldfehlern der Konfiguration einen Text für die Oberfläche.
+// userConfigError turns the configuration's field errors into a text for the web interface.
 func userConfigError(err error) error {
 	var es config.Errors
 	if errors.As(err, &es) {
@@ -107,7 +107,7 @@ func firstLine(s string) string {
 	return s
 }
 
-// lastLines liefert die letzten n nicht leeren Zeilen, verbunden mit „ · “.
+// lastLines returns the last n non-empty lines, joined with " · ".
 func lastLines(s string, n int) string {
 	var keep []string
 	for _, l := range strings.Split(strings.TrimSpace(s), "\n") {
@@ -121,7 +121,7 @@ func lastLines(s string, n int) string {
 	return strings.Join(keep, " · ")
 }
 
-// restartUnit startet einen Dienst neu und prüft, dass er danach läuft.
+// restartUnit restarts a service and checks that it is running afterwards.
 func restartUnit(ctx context.Context, unit string) error {
 	if _, err := run(ctx, "systemctl", "restart", unit); err != nil {
 		return err
@@ -129,12 +129,12 @@ func restartUnit(ctx context.Context, unit string) error {
 	time.Sleep(time.Second)
 	out, _ := run(ctx, "systemctl", "is-active", unit)
 	if strings.TrimSpace(out) != "active" {
-		return fmt.Errorf("%s ist %s", unit, strings.TrimSpace(out))
+		return fmt.Errorf("%s is %s", unit, strings.TrimSpace(out))
 	}
 	return nil
 }
 
-// writeFile schreibt atomar und legt fehlende Ordner an.
+// writeFile writes atomically and creates missing folders.
 func writeFile(path string, data []byte, mode os.FileMode) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return err
@@ -142,7 +142,7 @@ func writeFile(path string, data []byte, mode os.FileMode) error {
 	return config.WriteFileAtomic(path, data, mode)
 }
 
-// --- Aktionen ------------------------------------------------------------------------
+// --- Actions ------------------------------------------------------------------------
 
 func (s *Server) registerNetconf() {
 	s.handle("netconf.get", func(ctx context.Context, _ json.RawMessage) (any, error) {
@@ -156,7 +156,7 @@ func (s *Server) registerNetconf() {
 		manual := []ManualDNS{{Name: c.System.Hostname + "." + c.DNS.Domain, IP: router.String(), Kind: "router", File: "config.json"}}
 		ups := c.DNS.Upstreams
 		if len(ups) == 0 {
-			ups = []string{"DNS-Server des Anbieters"}
+			ups = []string{"Provider's DNS servers"}
 		}
 		return NetconfInfo{State: conf.FromConfig(c), Manual: manual, Upstreams: ups, Domain: c.DNS.Domain,
 			LAN: c.LAN.IPv4, Lease: c.DHCP.Lease, DryRun: s.cfg.DryRun}, nil
@@ -208,7 +208,7 @@ func (s *Server) registerNetconf() {
 			}
 		}
 		if orig != "" && !replaced {
-			return nil, Userf("Die Reservierung für %s gibt es nicht mehr.", orig)
+			return nil, Userf("The reservation for %s no longer exists.", orig)
 		}
 		if !replaced {
 			next.Reservations = append(next.Reservations, r)
@@ -237,7 +237,7 @@ func (s *Server) registerNetconf() {
 		n := len(next.Reservations)
 		next.Reservations = deleteWhere(next.Reservations, func(r conf.Reservation) bool { return r.MAC == mac })
 		if len(next.Reservations) == n {
-			return nil, Userf("Keine Reservierung für %s gefunden.", mac)
+			return nil, Userf("No reservation found for %s.", mac)
 		}
 		return nil, s.commit(ctx, prev, next, parts{dhcp: true, dns: true})
 	})
@@ -273,7 +273,7 @@ func (s *Server) registerNetconf() {
 				}
 			}
 			if !replaced {
-				return nil, Userf("Den Eintrag %s gibt es nicht mehr.", p.OriginalName)
+				return nil, Userf("The record %s no longer exists.", p.OriginalName)
 			}
 		} else {
 			next.Records = append(next.Records, rec)
@@ -302,13 +302,13 @@ func (s *Server) registerNetconf() {
 		n := len(next.Records)
 		next.Records = deleteWhere(next.Records, func(r conf.Record) bool { return r.Name == name })
 		if len(next.Records) == n {
-			return nil, Userf("Kein DNS-Eintrag %s gefunden.", name)
+			return nil, Userf("No DNS record %s found.", name)
 		}
 		return nil, s.commit(ctx, prev, next, parts{dns: true})
 	})
 
 	s.handle("dns.flush", func(ctx context.Context, _ json.RawMessage) (any, error) {
-		// dnsmasq leert den Cache bei SIGHUP, ohne Neustart und ohne DNS-Aussetzer
+		// dnsmasq clears its cache on SIGHUP, without a restart and without a DNS outage
 		return nil, s.apply(ctx, "systemctl", "kill", "--signal=HUP", "vr-dnsmasq.service")
 	})
 }

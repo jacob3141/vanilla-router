@@ -3,8 +3,8 @@ import { h, every, clear, icon, badge, toast, confirmDialog, logDialog, stateKin
 import { get, post } from '../api.js';
 
 export default {
-  title: 'Container',
-  subtitle: 'Docker-Container auf dem Router',
+  title: 'Containers',
+  subtitle: 'Docker containers on the router',
   render(root) {
     const grid = h('div', { class: 'grid cols-2' });
     const banner = h('div');
@@ -19,7 +19,7 @@ export default {
       if (key === last) return;
       last = key;
       clear(grid);
-      if (!list.length) grid.append(h('section', { class: 'card empty' }, 'Keine Container.'));
+      if (!list.length) grid.append(h('section', { class: 'card empty' }, 'No containers.'));
       for (const c of list) {
         const age = c.image_created ? Math.floor((Date.now() - new Date(c.image_created)) / 86400000) : null;
         const running = c.state === 'running';
@@ -28,27 +28,27 @@ export default {
             h('span', { class: `dot ${stateKind(c.state)}` }),
             h('h2', null, c.name),
             badge(STATE_LABEL[c.state] || c.state, stateKind(c.state)),
-            c.health && badge(c.health === 'healthy' ? 'gesund' : c.health, c.health === 'healthy' ? 'ok' : 'warn')),
+            c.health && badge(c.health === 'healthy' ? 'healthy' : c.health, c.health === 'healthy' ? 'ok' : 'warn')),
           h('dl', { class: 'kv' },
             h('dt', null, 'Image'), h('dd', { class: 'mono' }, c.image),
-            h('dt', null, 'Image vom'), h('dd', null, c.image_created ? fmt.date(c.image_created) : '–',
-              age != null && age > 90 && badge(`${age} Tage alt`, 'warn')),
+            h('dt', null, 'Image from'), h('dd', null, c.image_created ? fmt.date(c.image_created) : '–',
+              age != null && age > 90 && badge(`${age} days old`, 'warn')),
             h('dt', null, 'IP'), h('dd', { class: 'mono' }, c.ip || '–'),
-            h('dt', null, 'Neustart'), h('dd', null, { 'unless-stopped': 'automatisch (außer gestoppt)', always: 'immer automatisch', 'on-failure': 'bei Fehlern', no: 'nein' }[c.restart_policy] || c.restart_policy || 'nein'),
-            c.docker_sock && [h('dt', null, 'Hinweis'), h('dd', null, badge('hat docker.sock = root-Rechte', 'crit'))]),
+            h('dt', null, 'Restart'), h('dd', null, { 'unless-stopped': 'automatic (unless stopped)', always: 'always automatic', 'on-failure': 'on errors', no: 'no' }[c.restart_policy] || c.restart_policy || 'no'),
+            c.docker_sock && [h('dt', null, 'Note'), h('dd', null, badge('has docker.sock = root rights', 'crit'))]),
           h('div', { class: 'row end', style: { marginTop: '14px' } },
             h('button', { class: 'btn sm', onclick: () => logDialog(`Logs: ${c.name}`, async () => (await get(`/api/containers/logs?name=${encodeURIComponent(c.name)}&lines=300`)).text) }, icon('file'), 'Logs'),
             running
-              ? [h('button', { class: 'btn sm', onclick: () => act(c, 'restart') }, icon('refresh'), 'Neu starten'),
-                 h('button', { class: 'btn sm danger', onclick: () => act(c, 'stop') }, icon('stop'), 'Stoppen')]
-              : h('button', { class: 'btn sm primary', onclick: () => act(c, 'start') }, icon('play'), 'Starten'))));
+              ? [h('button', { class: 'btn sm', onclick: () => act(c, 'restart') }, icon('refresh'), 'Restart'),
+                 h('button', { class: 'btn sm danger', onclick: () => act(c, 'stop') }, icon('stop'), 'Stop')]
+              : h('button', { class: 'btn sm primary', onclick: () => act(c, 'start') }, icon('play'), 'Start'))));
       }
     }
 
     async function act(c, action) {
-      const label = { start: 'starten', stop: 'stoppen', restart: 'neu starten' }[action];
-      if (action !== 'start' && !(await confirmDialog({ title: `${c.name} ${label}?`, text: action === 'stop' ? 'Der Dienst im Container ist danach nicht mehr erreichbar.' : 'Der Container ist kurz nicht erreichbar.', confirm: label[0].toUpperCase() + label.slice(1), danger: action === 'stop' }))) return;
-      try { await post('/api/containers/action', { name: c.name, action }); toast(`${c.name}: ${label} erledigt.`); } catch (e) { toast(e.message, 'crit'); }
+      const label = { start: 'start', stop: 'stop', restart: 'restart' }[action];
+      if (action !== 'start' && !(await confirmDialog({ title: `${c.name} ${label}?`, text: action === 'stop' ? 'The service in the container is no longer reachable afterwards.' : 'The container is briefly unreachable.', confirm: label[0].toUpperCase() + label.slice(1), danger: action === 'stop' }))) return;
+      try { await post('/api/containers/action', { name: c.name, action }); toast(`${c.name}: ${label} done.`); } catch (e) { toast(e.message, 'crit'); }
       load();
     }
 

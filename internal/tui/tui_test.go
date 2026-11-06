@@ -20,7 +20,7 @@ const (
 	down = "\x1b[B"
 )
 
-func TestMenuPfeiltasten(t *testing.T) {
+func TestMenuArrowKeys(t *testing.T) {
 	p, out := prompt(down + down + down + up + "\n")
 	n, err := p.Menu([]string{"a", "b", "c"}, 0)
 	if err != nil || n != 1 {
@@ -31,35 +31,35 @@ func TestMenuPfeiltasten(t *testing.T) {
 	}
 }
 
-func TestMenuVorgabeUndAndereTasten(t *testing.T) {
-	// Buchstaben und unbekannte Folgen werden ignoriert, Enter nimmt die Vorauswahl
+func TestMenuDefaultAndOtherKeys(t *testing.T) {
+	// Letters and unknown sequences are ignored, Enter takes the preselection
 	p, _ := prompt("x\x1b[Cj\n")
 	if n, err := p.Menu([]string{"a", "b"}, 1); err != nil || n != 1 {
 		t.Fatal(n, err)
 	}
-	// Anwendungsmodus der Pfeiltasten (ESC O A)
+	// application mode of the arrow keys (ESC O A)
 	p, _ = prompt("\x1bOB\r")
 	if n, _ := p.Menu([]string{"a", "b"}, 0); n != 1 {
-		t.Error("ESC O B nicht erkannt")
+		t.Error("ESC O B not recognized")
 	}
 }
 
-func TestMenuAsyncAbbrechen(t *testing.T) {
+func TestMenuAsyncCancel(t *testing.T) {
 	r, w := io.Pipe()
 	var out bytes.Buffer
 	p := New(r, &out, true)
 	ch, cancel := p.MenuAsync([]string{"a", "b"}, 0)
 	cancel()
-	cancel() // zweimal ist harmlos
+	cancel() // twice does no harm
 	select {
 	case _, ok := <-ch:
 		if ok {
-			t.Error("abgebrochenes Menü lieferte eine Wahl")
+			t.Error("cancelled menu returned a choice")
 		}
 	case <-time.After(time.Second):
-		t.Fatal("Menü nicht beendet")
+		t.Fatal("menu not ended")
 	}
-	// Danach gehören die Tasten dem nächsten Menü
+	// After that the keys belong to the next menu
 	go w.Write([]byte(down + "\n"))
 	if n, err := p.Menu([]string{"x", "y"}, 0); err != nil || n != 1 {
 		t.Fatal(n, err)
@@ -68,11 +68,11 @@ func TestMenuAsyncAbbrechen(t *testing.T) {
 
 func TestBanner(t *testing.T) {
 	p, out := prompt("")
-	p.Banner("vanilla-router 1.0", "Willkommen!")
+	p.Banner("vanilla-router 1.0", "Welcome!")
 	want := "\n" +
 		"     .---.\n" +
 		"    (     )   vanilla-router 1.0\n" +
-		"     '---'    Willkommen!\n" +
+		"     '---'    Welcome!\n" +
 		"    \\     /\n" +
 		"     \\   /\n" +
 		"      \\ /\n" +
@@ -80,16 +80,16 @@ func TestBanner(t *testing.T) {
 	if out.String() != want {
 		t.Errorf("\n%s", out.String())
 	}
-	// Mit Farben: gleicher Text, sobald die Steuerfolgen entfernt sind
+	// With colors: same text once the control sequences are removed
 	var col bytes.Buffer
 	c := New(strings.NewReader(""), &col, false)
-	c.Banner("vanilla-router 1.0", "Willkommen!")
-	c.Heading("Festplatte")
+	c.Banner("vanilla-router 1.0", "Welcome!")
+	c.Heading("Hard disk")
 	plain := col.String()
 	for _, s := range []string{brown, vanilla, bold, reset} {
 		plain = strings.ReplaceAll(plain, s, "")
 	}
-	if !strings.HasPrefix(plain, want) || !strings.Contains(plain, "━━━ Festplatte ━━━") || !strings.Contains(col.String(), brown) {
+	if !strings.HasPrefix(plain, want) || !strings.Contains(plain, "━━━ Hard disk ━━━") || !strings.Contains(col.String(), brown) {
 		t.Errorf("%q", col.String())
 	}
 }
@@ -99,7 +99,7 @@ func TestEOF(t *testing.T) {
 	if _, err := p.Menu([]string{"a"}, 0); err != ErrEOF {
 		t.Error(err)
 	}
-	if err := p.WaitEnter("weiter"); err != ErrEOF {
+	if err := p.WaitEnter("next"); err != ErrEOF {
 		t.Error(err)
 	}
 }

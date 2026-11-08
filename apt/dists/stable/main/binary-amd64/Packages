@@ -34,3 +34,39 @@ Description: Router built from an unmodified Ubuntu Server
  Generates network, firewall, DNS and DHCP from a single configuration file
  (/etc/vanilla-router/config.json) and applies changes checked and with rollback.
 
+Package: vanilla-router
+Architecture: amd64
+Version: 0.0.7
+Priority: optional
+Section: net
+Maintainer: vanilla-router <vanilla-router@invalid>
+Depends: ubuntu-minimal, systemd-resolved, ca-certificates, nftables, dnsmasq-base, ppp, btrfs-progs, chrony, openssh-server, unattended-upgrades, apparmor, ethtool, iproute2, samba
+Filename: pool/main/v/vanilla-router/vanilla-router_0.0.7_amd64.deb
+Size: 5341724
+MD5sum: 8e4fd033b03daad0d2bc5dc7dffc2ec0
+SHA1: b548149f037dc5a9439f71d6e7fe52539739cea6
+SHA256: ffa3282cfbfd7181bae793ab443ae2728b279958c26e268a220bed4e62516ab6
+SHA512: 4b9a988f694fbeb1054b5cdf8bfe7b86c0e6930db1ee6dca6524b4b7e3cbd5fdbf7f7eb4f53ac2e696974563e755ff16c86b4856069bf0a7be9567e440922c33
+Homepage: https://github.com/jacob3141/vanilla-router
+Description: Router built from an unmodified Ubuntu Server
+ Generates network, firewall, DNS and DHCP from a single configuration file
+ (/etc/vanilla-router/config.json) and applies changes checked and with rollback.
+
+Package: vanilla-router
+Architecture: amd64
+Version: 0.0.7
+Priority: optional
+Section: net
+Maintainer: vanilla-router <vanilla-router@invalid>
+Depends: ubuntu-minimal, systemd-resolved, ca-certificates, nftables, dnsmasq-base, ppp, btrfs-progs, chrony, openssh-server, unattended-upgrades, apparmor, ethtool, iproute2, samba
+Filename: pool/main/v/vanilla-router/vr-0.0.7.deb
+Size: 5341724
+MD5sum: 8e4fd033b03daad0d2bc5dc7dffc2ec0
+SHA1: b548149f037dc5a9439f71d6e7fe52539739cea6
+SHA256: ffa3282cfbfd7181bae793ab443ae2728b279958c26e268a220bed4e62516ab6
+SHA512: 4b9a988f694fbeb1054b5cdf8bfe7b86c0e6930db1ee6dca6524b4b7e3cbd5fdbf7f7eb4f53ac2e696974563e755ff16c86b4856069bf0a7be9567e440922c33
+Homepage: https://github.com/jacob3141/vanilla-router
+Description: Router built from an unmodified Ubuntu Server
+ Generates network, firewall, DNS and DHCP from a single configuration file
+ (/etc/vanilla-router/config.json) and applies changes checked and with rollback.
+

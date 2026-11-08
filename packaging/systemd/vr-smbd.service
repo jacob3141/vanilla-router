@@ -1,0 +1,21 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# File share (Samba). vrctl generates the configuration, the web interface turns the service on and off.
+# The package's own smbd.service stays off.
+[Unit]
+Description=vanilla-router file share (Samba)
+After=network.target vr-firewall.service
+ConditionPathExists=/etc/vanilla-router/samba/smb.conf
+
+[Service]
+Type=notify
+NotifyAccess=all
+RuntimeDirectory=samba
+RuntimeDirectoryPreserve=yes
+ExecStart=/usr/sbin/smbd --foreground --no-process-group --configfile=/etc/vanilla-router/samba/smb.conf
+ExecReload=/bin/kill -HUP $MAINPID
+LimitNOFILE=16384
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

@@ -2,6 +2,13 @@
 
 Pre-releases: **not ready for production use**. See [the status](docs/architecture.md#15-status-what-has-been-tested-for-real).
 
+## 0.0.7 (2026-11-09)
+
+### Added
+
+- File share: Samba (SMB3 with signing and encryption, home network only) and the file browser in the web interface, switched on in Settings. Off by default.
+- Docker and the Containers page are part of the image. Docker does not touch the firewall.
+
 ## 0.0.6 (2026-11-08)
 
 ### Added

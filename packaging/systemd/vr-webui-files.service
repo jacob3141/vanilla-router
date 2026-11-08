@@ -1,0 +1,45 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# File browser of the web interface. Runs as the owner of the share, without capabilities and without network, and may
+# only write to the share. The web server reaches it through a socket after its login and CSRF checks.
+[Unit]
+Description=vanilla-router file service
+After=local-fs.target
+ConditionPathExists=/etc/vanilla-router/samba/smb.conf
+
+[Service]
+User=smbuser
+Group=smbuser
+# Only so that the socket may belong to the group vr-webui
+SupplementaryGroups=vr-webui
+ExecStart=/usr/sbin/vr-webui files --root /media/shares/guest --socket /run/vr-webui-files/files.sock
+Restart=always
+RestartSec=2
+RuntimeDirectory=vr-webui-files
+RuntimeDirectoryMode=0755
+# As Samba: files rw-rw-r--, folders rwxrwxr-x
+UMask=0002
+
+CapabilityBoundingSet=
+NoNewPrivileges=yes
+ProtectSystem=strict
+ReadWritePaths=/media/shares/guest
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+PrivateNetwork=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+RestrictAddressFamilies=AF_UNIX
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+SystemCallArchitectures=native
+
+[Install]
+WantedBy=multi-user.target

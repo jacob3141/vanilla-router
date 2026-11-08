@@ -15,3 +15,4 @@ unattended-upgrades
 apparmor
 ethtool
 iproute2
+samba

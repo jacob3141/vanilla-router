@@ -73,6 +73,32 @@ export default {
     }
     loadSSH();
 
+    const shareBox = h('section', { class: 'card span-2' });
+    async function loadShare() {
+      let d;
+      try { d = await get('/api/settings/fileshare'); } catch { return; }
+      const on = h('input', { type: 'checkbox', checked: d.enabled });
+      const pass = h('input', { class: 'input', type: 'password', autocomplete: 'new-password', maxlength: '127', placeholder: d.has_password ? 'leave unchanged' : 'at least 8 characters' });
+      const shareErr = h('div', { class: 'form-error hidden' });
+      const shareForm = h('form', null, shareErr,
+        h('div', { class: 'field' }, h('label', { class: 'row' }, on, 'Offer a file share in the home network')),
+        field('Password', pass, d.has_password ? 'Only enter one to change it. Your devices then need the new one.' : 'At least 8 characters.'),
+        h('div', { class: 'row end' }, h('button', { class: 'btn primary', type: 'submit' }, icon('check'), 'Save')));
+      shareForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        shareErr.classList.add('hidden');
+        try {
+          toast((await post('/api/settings/fileshare', { enabled: on.checked, password: pass.value })).message);
+          loadShare();
+        } catch (ex) { shareErr.textContent = t(ex.message); shareErr.classList.remove('hidden'); }
+      });
+      clear(shareBox).append(
+        h('div', { class: 'card-head' }, h('span', { class: 'icon-badge' }, icon('drive')), h('h2', null, 'File share')),
+        h('p', { class: 'muted small' }, `On Windows: \\\\${d.address}\\${d.share}, user ${d.user}. After switching it on, reload the page to see the file browser.`),
+        shareForm);
+    }
+    loadShare();
+
     root.append(h('div', { class: 'grid cols-2' },
       h('section', { class: 'card' },
         h('div', { class: 'card-head' }, h('span', { class: 'icon-badge' }, icon('lock')), h('h2', null, 'Password')),
@@ -89,6 +115,7 @@ export default {
           h('a', { class: 'btn', href: '/api/config/export', download: '' }, icon('download'), 'Export'),
           h('button', { class: 'btn', onclick: () => importInput.click() }, icon('arrowRight', 'rot-up'), 'Import …'),
           importInput)),
+      shareBox,
       sshBox,
       h('section', { class: 'card span-2' },
         h('div', { class: 'card-head' }, h('span', { class: 'icon-badge' }, icon('info')), h('h2', null, 'Forgot your password?')),

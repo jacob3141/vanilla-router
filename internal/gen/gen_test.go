@@ -96,8 +96,11 @@ func cases(t *testing.T) map[string]*config.Config {
 		{ID: "older", Name: "Older devices", VLAN: 30, Access: config.AccessInternet, IPv4: "192.168.30.1/28", ReachableFrom: []string{"home"}},
 	}, Networks: []config.WNetwork{}, AccessPoints: []config.AccessPoint{}}
 
+	share := base(t)
+	share.Services.Files = &config.FileShare{Enabled: true}
+
 	return map[string]*config.Config{"dhcp": dhcp, "pppoe-vlan7": pppoe, "static-full": full, "ipv6-pinhole": pin,
-		"wifi-24": wifi24, "wifi-5-80": wifi5, "wifi-5-40": wifi5ht, "wifi-off": wifiOff, "wireless-segments": segments}
+		"wifi-24": wifi24, "wifi-5-80": wifi5, "wifi-5-40": wifi5ht, "wifi-off": wifiOff, "wireless-segments": segments, "fileshare": share}
 }
 
 func TestGolden(t *testing.T) {

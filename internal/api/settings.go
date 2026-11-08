@@ -21,6 +21,8 @@ func (s *Server) registerSettings() {
 	s.route("POST /api/settings/revert", s.forward("settings.revert", "Change rolled back."))
 	s.route("GET /api/settings/ssh", s.get("ssh.get"))
 	s.route("POST /api/settings/ssh", s.forward("ssh.set", "Saved."))
+	s.route("GET /api/settings/fileshare", s.get("fileshare.get"))
+	s.route("POST /api/settings/fileshare", s.forward("fileshare.set", "Saved."))
 	s.route("GET /api/settings/check", s.handleInternetCheck)
 }
 

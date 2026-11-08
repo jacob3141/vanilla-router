@@ -192,6 +192,13 @@ type Block struct {
 // Services are services on the router.
 type Services struct {
 	SSH SSH `json:"ssh"`
+	// Files is the file share (Samba and the file browser), absent = off.
+	Files *FileShare `json:"files,omitempty"`
+}
+
+// FileShare turns the file share on. The password is only in Samba's own database.
+type FileShare struct {
+	Enabled bool `json:"enabled"`
 }
 
 // SSH is off by default (F-SEC-04). On means: keys only, only from the home network.

@@ -404,6 +404,14 @@ func (a *Applier) reload(groups map[string]bool, c *config.Config) ([]string, er
 	if groups[gen.GroupDNSmasq] {
 		run("dnsmasq", nil, "systemctl", "restart", "vr-dnsmasq.service")
 	}
+	if groups[gen.GroupFiles] {
+		if gen.FileShareOn(c) {
+			run("files", nil, "systemctl", "enable", "--now", "vr-smbd.service", "vr-webui-files.service")
+			run("files", nil, "systemctl", "try-reload-or-restart", "vr-smbd.service")
+		} else {
+			run("files", nil, "systemctl", "disable", "--now", "vr-smbd.service", "vr-webui-files.service")
+		}
+	}
 	if groups[gen.GroupSSH] {
 		if ssh {
 			run("ssh", nil, "systemctl", "enable", "--now", "ssh.socket")

@@ -28,6 +28,10 @@ install -Dm644 -t "$STAGE/usr/lib/systemd/system" packaging/systemd/*
 install -Dm644 packaging/sysusers.d/vanilla-router.conf "$STAGE/usr/lib/sysusers.d/vanilla-router.conf"
 install -Dm644 packaging/tmpfiles.d/vanilla-router.conf "$STAGE/usr/lib/tmpfiles.d/vanilla-router.conf"
 install -Dm644 LICENSE "$STAGE/usr/share/doc/vanilla-router/copyright"
+# Docker comes from universe (D-20), limited to its own packages. Its configuration keeps the firewall ours.
+install -Dm644 packaging/docker/daemon.json "$STAGE/etc/docker/daemon.json"
+install -Dm644 packaging/docker/vr-docker.sources "$STAGE/etc/apt/sources.list.d/vr-docker.sources"
+install -Dm644 packaging/docker/vr-docker.pref "$STAGE/etc/apt/preferences.d/vr-docker"
 # Own package source (F-UPD-04): public key and source entry. VR_ARCHIVE_KEYRING replaces the key for tests.
 KEYRING=${VR_ARCHIVE_KEYRING:-packaging/repo/vanilla-router-archive-keyring.gpg}
 if [ -f "$KEYRING" ]; then
@@ -69,6 +73,8 @@ if [ "$1" = configure ]; then
 	systemd-sysusers vanilla-router.conf || true
 	systemd-tmpfiles --create vanilla-router.conf || true
 	systemctl daemon-reload || true
+	# vr-smbd.service replaces the services of the package samba
+	systemctl disable --now smbd.service nmbd.service samba-ad-dc.service 2>/dev/null || true
 	# Update ($2 = old version): run the new programs. Sessions of the web interface end, the setup stays (F-UPD-08).
 	if [ -n "$2" ]; then
 		systemctl try-restart vr-webui-helper.service vr-webui.service vr-apd.service vr-ap.service vr-dnsmasq.service || true

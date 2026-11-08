@@ -1,3 +1,5 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 # Justified exceptions to NF-09 (packages from universe). Format: <package>  <D-NN with reason>
 hostapd  D-18: Wi-Fi extension, only on routers with an adapter, same source package as wpasupplicant from main
+docker.io  D-20: containers on the router, part of the image, limited by an apt pin
+docker-compose-v2  D-20: as docker.io

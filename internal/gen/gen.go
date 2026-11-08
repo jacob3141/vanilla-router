@@ -28,6 +28,7 @@ const (
 	GroupSSH      = "ssh"
 	GroupAPT      = "apt"
 	GroupWiFi     = "wifi"
+	GroupFiles    = "files"
 )
 
 // File is a generated file.
@@ -48,6 +49,7 @@ var Managed = []struct{ Dir, Glob, Group string }{
 	{"/etc/ppp/peers", "vr-*", GroupPPP},
 	{"/etc/vanilla-router/wifi", "*.conf", GroupWiFi},
 	{"/etc/sudoers.d", "vr-*", GroupSSH},
+	{"/etc/vanilla-router/samba", "*.conf", GroupFiles},
 }
 
 // Header is in every generated text file.
@@ -120,6 +122,7 @@ func Render(c *config.Config, sec Secrets) ([]File, error) {
 		return nil, err
 	}
 	add(wifi...)
+	add(fileShare(c)...)
 	add(misc(c)...)
 
 	sort.Slice(files, func(i, j int) bool { return files[i].Path < files[j].Path })

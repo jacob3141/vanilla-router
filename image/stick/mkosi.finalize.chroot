@@ -20,6 +20,7 @@ systemctl mask getty@tty1.service
 # No network services should run on the stick: the assistant turns the ports on itself.
 for unit in systemd-networkd.service systemd-networkd.socket ssh.service ssh.socket \
 	vr-firewall.service vr-firewall-reload.timer vr-dnsmasq.service vr-pppoe.service \
-	vr-webui.service vr-webui-helper.service vr-apd.service vr-health.service; do
+	vr-webui.service vr-webui-helper.service vr-apd.service vr-health.service \
+	vr-smbd.service vr-webui-files.service; do
 	systemctl disable "$unit" 2>/dev/null || true
 done

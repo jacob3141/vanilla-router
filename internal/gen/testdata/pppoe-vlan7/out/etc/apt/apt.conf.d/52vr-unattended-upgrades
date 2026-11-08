@@ -3,3 +3,5 @@
 Unattended-Upgrade::Automatic-Reboot "true";
 Unattended-Upgrade::Automatic-Reboot-Time "04:00";
 Unattended-Upgrade::Remove-Unused-Kernel-Packages "true";
+// Updates of vanilla-router itself (F-UPD-04, packaging/repo/build-repo.sh sets origin and suite)
+Unattended-Upgrade::Origins-Pattern { "origin=vanilla-router,archive=stable"; };

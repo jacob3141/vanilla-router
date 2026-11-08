@@ -118,6 +118,8 @@ APT::Periodic::Unattended-Upgrade "%s";
 	add("/etc/apt/apt.conf.d/52vr-unattended-upgrades", GroupAPT, 0o644, header("//")+fmt.Sprintf(`Unattended-Upgrade::Automatic-Reboot "%s";
 Unattended-Upgrade::Automatic-Reboot-Time "%s";
 Unattended-Upgrade::Remove-Unused-Kernel-Packages "true";
+// Updates of vanilla-router itself (F-UPD-04, packaging/repo/build-repo.sh sets origin and suite)
+Unattended-Upgrade::Origins-Pattern { "origin=vanilla-router,archive=stable"; };
 `, reboot, c.Updates.RebootWindow))
 	return fs
 }

@@ -12,6 +12,8 @@ First release with a boot stick image and a complete installation, tested in a v
 - Activity indicator with elapsed seconds whenever the assistant waits or installs.
 - Boot stick image built with mkosi, `Bootloader=grub-signed` for Secure Boot.
 - Small base system on the stick that also works without internet, for PPPoE lines. `vrctl complete` fetches the rest.
+- Updates of vanilla-router itself from its own signed package source, installed automatically like Ubuntu's security updates, with a snapshot before and a health check after.
+- Password, configuration and secrets survive the rollback of a broken update.
 - Wi-Fi access point as an optional extension (F-WIFI, D-18): a Wi-Fi adapter in the router joins the home network, so addresses, names and firewall work as on a cable. The new page sets network name, password, band, channel, channel width, country and on/off, and shows the connected devices. Changes roll back without confirmation within 5 minutes. **Never tested with a real radio so far.**
 - `hostapd` comes from Ubuntu's *universe* and is downloaded on request only if an adapter exists. Apt is limited to this one package from *universe*.
 
@@ -32,7 +34,7 @@ First release with a boot stick image and a complete installation, tested in a v
 ### Known limits
 
 - The image and the package are **not signed**. Compare them with `SHA256SUMS` from this release page.
-- An installed router cannot update vanilla-router itself yet. Ubuntu's package sources are set up, automatic installation of security updates has not been observed yet.
+- Updates have been tested in a container and the rollback in a virtual machine, not yet an update from the published package source on a running router.
 - Rollback after a broken update has only been tested with a fake system.
 - Never tested on real router hardware, nor with a real PPPoE line.
 - The stick creator for Windows is not part of this release: its download address and signing key are not decided yet. Write the image with Rufus, Etcher or `dd`.

@@ -328,6 +328,25 @@ Notes:
 - The logo is code ([internal/logo](../internal/logo/logo.go)). Anyone changing it regenerates the files. A test
   fails as long as `docs/logo/` and the favicon do not match the code.
 
+### 7.1 Releasing and the package source
+
+Installed routers update vanilla-router like any Ubuntu package from `https://jacob3141.github.io/vanilla-router/apt`
+(D-19). The package brings the source entry and the public key `packaging/repo/vanilla-router-archive-keyring.gpg`.
+
+1. **Once:** the project owner creates the signing key with `packaging/repo/new-key.sh` and keeps the private key
+   offline. Losing it means routers can only be moved to a new key by an update signed with the old one.
+2. Build the package and the stick with the release version: `image/build.sh 0.0.3`. A version without `~` fails
+   without the key.
+3. Check out the published repository (branch `gh-pages`, folder `apt/`) and add the package:
+   `packaging/repo/build-repo.sh <checkout>/apt <fingerprint> dist/vanilla-router_0.0.3_amd64.deb`. Old packages stay
+   in `pool/`, so a router can still go back.
+4. Commit and push `gh-pages`. Routers fetch the update at the next unattended-upgrades run, with a snapshot before
+   and a health check after.
+
+`sudo test/repo/test-repo.sh [rootfs.tar.zst]` tests the whole chain without network and with a throwaway key: two
+versions, apt and unattended-upgrades see the newer one, the update installs, a tampered repository is refused. It
+runs in its own mount namespace, because unmounting the bound `/dev` would otherwise also unmount the host's.
+
 ## 8. Stick creator (Windows)
 
 The stick creator is built and tested on Linux like everything else. Only the window and drive access need Windows.

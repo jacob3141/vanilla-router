@@ -28,6 +28,17 @@ install -Dm644 -t "$STAGE/usr/lib/systemd/system" packaging/systemd/*
 install -Dm644 packaging/sysusers.d/vanilla-router.conf "$STAGE/usr/lib/sysusers.d/vanilla-router.conf"
 install -Dm644 packaging/tmpfiles.d/vanilla-router.conf "$STAGE/usr/lib/tmpfiles.d/vanilla-router.conf"
 install -Dm644 LICENSE "$STAGE/usr/share/doc/vanilla-router/copyright"
+# Own package source (F-UPD-04): public key and source entry. VR_ARCHIVE_KEYRING replaces the key for tests.
+KEYRING=${VR_ARCHIVE_KEYRING:-packaging/repo/vanilla-router-archive-keyring.gpg}
+if [ -f "$KEYRING" ]; then
+	install -Dm644 "$KEYRING" "$STAGE/usr/share/keyrings/vanilla-router-archive-keyring.gpg"
+	install -Dm644 packaging/repo/vanilla-router.sources "$STAGE/etc/apt/sources.list.d/vanilla-router.sources"
+else
+	case "$VERSION" in
+	*~*) echo "note: no signing key yet ($KEYRING), the package gets no update source" >&2 ;;
+	*) echo "a release needs $KEYRING (packaging/repo/new-key.sh)" >&2; exit 1 ;;
+	esac
+fi
 mkdir -p "$STAGE/usr/share/vanilla-router"
 grep -v '^\s*#' image/packages-online.txt >"$STAGE/usr/share/vanilla-router/online-packages"
 install -Dm644 packaging/system.conf.d/vanilla-router.conf "$STAGE/usr/lib/systemd/system.conf.d/vanilla-router.conf"
@@ -58,6 +69,10 @@ if [ "$1" = configure ]; then
 	systemd-sysusers vanilla-router.conf || true
 	systemd-tmpfiles --create vanilla-router.conf || true
 	systemctl daemon-reload || true
+	# Update ($2 = old version): run the new programs. Sessions of the web interface end, the setup stays (F-UPD-08).
+	if [ -n "$2" ]; then
+		systemctl try-restart vr-webui-helper.service vr-webui.service vr-dnsmasq.service || true
+	fi
 fi
 EOF
 chmod 755 "$STAGE/DEBIAN/postinst"

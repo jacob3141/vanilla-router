@@ -266,8 +266,9 @@ fetches `ubuntu-server` and restores all firmware packages (the image keeps only
 runs `vrctl setup` again, because the new packages bring services. This goes through the same apt hook, so it is
 covered by the snapshot and the health check.
 
-vanilla-router itself does **not update yet**: there is no package source for it, so an installed router keeps its
-version (F-UPD-04, design question Q-22 in PLAN.md).
+vanilla-router itself updates from its own signed apt repository (D-19, `packaging/repo/`): the package brings
+source entry and key, unattended-upgrades takes `origin=vanilla-router,archive=stable`, and the postinst restarts the
+services. Sessions of the web interface end, the setup stays.
 
 ## 9. Stick creator for Windows
 

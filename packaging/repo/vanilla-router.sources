@@ -1,0 +1,7 @@
+# Updates for vanilla-router itself (F-UPD-04). Installed like Ubuntu's own updates, with a snapshot before
+# and a health check after (D-13). The key comes with the package, so a new key arrives as an update.
+Types: deb
+URIs: https://jacob3141.github.io/vanilla-router/apt
+Suites: stable
+Components: main
+Signed-By: /usr/share/keyrings/vanilla-router-archive-keyring.gpg

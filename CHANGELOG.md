@@ -2,6 +2,29 @@
 
 Pre-releases: **not ready for production use**. See [the status](docs/architecture.md#15-status-what-has-been-tested-for-real).
 
+## 0.0.3 (2026-11-08)
+
+**Untested pre-release.** It was published to get a working update path for bug fixes. Expect errors. The new access point feature has never run on a real radio.
+
+### Added
+
+- Several access points with the router as their center (`docs/sdn-concept.md`): a new page "Access points" for Wi-Fi networks, pairing by comparing a code, a central channel plan, and a preview of what each access point receives. An access point is a PC with Ubuntu Server, this package and `vrctl ap enable`.
+- Segments: guest and older-devices networks as VLANs with their own DHCP, DNS and firewall rules. Your switches must pass VLAN tags. A router without segments generates the same files as before.
+- New services `vr-apd` on the router (TLS 1.3 with pinned keys, home network only) and `vr-ap` on an access point (rollback timer and health check after each change).
+- Own signed package source for updates of vanilla-router itself (D-19).
+
+### Fixed
+
+- Online step: only Ubuntu's sources are read, an unreachable vanilla-router repository no longer blocks it.
+- Installed system: package sources, working DNS and DHCP, settings survive a rollback.
+
+### Known limits
+
+- Access points: never tested with a real radio, a real access point or a VLAN switch. See `docs/webui-sdn-log.md`.
+- The assistant does not detect the access point role yet, and the router's own Wi-Fi card is not part of the roaming network.
+- The image and the package are **not signed**. Compare them with `SHA256SUMS` from this release page.
+- Never tested on real router hardware, nor with a real PPPoE line.
+
 ## 0.0.2 (2026-11-06)
 
 First release with a boot stick image and a complete installation, tested in a virtual machine. The stick holds a small base system of 1.2 GB, and the router fetches the rest of Ubuntu Server by itself once it is online.

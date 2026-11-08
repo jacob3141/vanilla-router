@@ -150,8 +150,8 @@ export default {
         text: 'Forwards connections from the internet to a device in the home network. Best give the target a fixed address first.',
         fields: [
           { name: 'proto', label: 'Protocol', type: 'select', value: p?.proto || 'tcp', options: Object.entries(PROTO).map(([value, label]) => ({ value, label })) },
-          { name: 'ext', label: 'External port or range', value: p ? (p.ext_port_end ? `${p.ext_port}-${p.ext_port_end}` : String(p.ext_port)) : '', placeholder: 'z. B. 8080 oder 27015-27030' },
-          { name: 'int_ip', label: 'Target IP in the home network', value: p?.int_ip || '', placeholder: 'z. B. 192.168.42.20', hint: Object.entries(data.devices).map(([ip, n]) => `${n} = ${ip}`).join(' · ') || '' },
+          { name: 'ext', label: 'External port or range', value: p ? (p.ext_port_end ? `${p.ext_port}-${p.ext_port_end}` : String(p.ext_port)) : '', placeholder: 'e.g. 8080 or 27015-27030' },
+          { name: 'int_ip', label: 'Target IP in the home network', value: p?.int_ip || '', placeholder: 'e.g. 192.168.42.20', hint: Object.entries(data.devices).map(([ip, n]) => `${n} = ${ip}`).join(' · ') || '' },
           { name: 'int_port', label: 'Target port (optional)', value: p?.int_port ? String(p.int_port) : '', placeholder: 'empty = same as external', hint: 'With a port range this field stays empty.' },
           { name: 'comment', label: 'Note (optional)', value: p?.comment || '', placeholder: 'e.g. game server' },
           { name: 'enabled', label: 'Active', type: 'checkbox', value: p ? p.enabled : true },

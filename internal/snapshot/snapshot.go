@@ -260,7 +260,7 @@ func (m *Manager) MakePermanent(id string) error {
 		if dev, err = m.run("findmnt", "-no", "SOURCE", "--target", m.snapDir()); err != nil {
 			return err
 		}
-		dev, _, _ = strings.Cut(dev, "[") // „/dev/sda2[/@snapshots]“
+		dev, _, _ = strings.Cut(dev, "[") // "/dev/sda2[/@snapshots]"
 	}
 	top := m.p("/run/vr-btrfs-top")
 	if err := os.MkdirAll(top, 0o700); err != nil {

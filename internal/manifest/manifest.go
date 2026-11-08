@@ -29,6 +29,7 @@ const Schema = 1
 const (
 	None = "none"
 	Gzip = "gzip"
+	Zip  = "zip" // one deflated entry, so that Windows opens it with a double click
 )
 
 // MaxImage limits the size of an image (protection against nonsensical values).
@@ -88,7 +89,7 @@ func (m *Manifest) Validate() error {
 		return errors.New("file.size invalid")
 	case !shaRe.MatchString(m.File.SHA256):
 		return errors.New("file.sha256 invalid")
-	case m.File.Compression != None && m.File.Compression != Gzip:
+	case m.File.Compression != None && m.File.Compression != Gzip && m.File.Compression != Zip:
 		return errors.New("file.compression invalid")
 	case m.Image.Size <= 0 || m.Image.Size > MaxImage || m.Image.Size%512 != 0:
 		return errors.New("image.size invalid (multiple of 512)")

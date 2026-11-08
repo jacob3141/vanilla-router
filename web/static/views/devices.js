@@ -28,7 +28,7 @@ export async function reservationDialog(d, pool) {
     fields: [
       { name: 'name', label: 'Name', value: suggestion, placeholder: 'e.g. printer-basement', hint: 'Lowercase letters, digits and hyphens. Becomes name.home.arpa.' },
       { name: 'mac', label: 'MAC address', value: r?.mac || d?.mac || '', placeholder: 'aa:bb:cc:dd:ee:ff' },
-      { name: 'ip', label: 'IP address', value: r?.ip || d?.ip || '', placeholder: 'z. B. 192.168.42.20', hint: pool ? `Dynamic range: ${pool.start} – ${pool.end}. Any free address in the home network is possible.` : '' },
+      { name: 'ip', label: 'IP address', value: r?.ip || d?.ip || '', placeholder: 'e.g. 192.168.42.20', hint: pool ? `Dynamic range: ${pool.start} – ${pool.end}. Any free address in the home network is possible.` : '' },
       { name: 'comment', label: 'Note (optional)', value: r?.comment || '', placeholder: 'e.g. 3D printer in the basement' },
     ],
     onSubmit: (v) => post('/api/reservations', { ...v, original_mac: r?.mac || '' }),

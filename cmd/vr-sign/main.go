@@ -9,6 +9,7 @@
 package main
 
 import (
+	"archive/zip"
 	"compress/gzip"
 	"crypto/rand"
 	"crypto/sha256"
@@ -109,6 +110,7 @@ func makeManifest(args []string) error {
 	name := fs.String("name", "vanilla-router-stick", "Name")
 	url := fs.String("url", "", "URL of the file (empty: next to the manifest)")
 	gz := fs.Bool("gzip", false, "compress the file with gzip")
+	zipped := fs.Bool("zip", false, "put the file into a zip archive")
 	out := fs.String("o", "", "output folder")
 	fs.Parse(args)
 	if *key == "" || *img == "" || *ver == "" || *out == "" {
@@ -137,7 +139,15 @@ func makeManifest(args []string) error {
 	fileName := fmt.Sprintf("%s-%s.img", *name, *ver)
 	comp := manifest.None
 	filePath := filepath.Join(*out, fileName)
-	if *gz {
+	if *zipped {
+		inner := fileName
+		fileName = fmt.Sprintf("%s-%s.zip", *name, *ver)
+		filePath = filepath.Join(*out, fileName)
+		comp = manifest.Zip
+		if err := zipFile(*img, filePath, inner); err != nil {
+			return err
+		}
+	} else if *gz {
 		fileName += ".gz"
 		filePath += ".gz"
 		comp = manifest.Gzip
@@ -172,6 +182,31 @@ func makeManifest(args []string) error {
 	}
 	fmt.Printf("%s: %s, stick.json at %d, key %s\n", *out, fileName, off, manifest.Public(seed))
 	return nil
+}
+
+func zipFile(src, dst, entry string) error {
+	in, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer in.Close()
+	out, err := os.Create(dst)
+	if err != nil {
+		return err
+	}
+	zw := zip.NewWriter(out)
+	w, err := zw.Create(entry)
+	if err == nil {
+		_, err = io.Copy(w, in)
+	}
+	if err == nil {
+		err = zw.Close()
+	}
+	if err != nil {
+		out.Close()
+		return err
+	}
+	return out.Close()
 }
 
 func gzipFile(src, dst string) error {

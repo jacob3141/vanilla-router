@@ -7,9 +7,11 @@ package stickwrite
 
 import (
 	"bytes"
+	"compress/flate"
 	"compress/gzip"
 	"context"
 	"crypto/sha256"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"hash"
@@ -73,7 +75,7 @@ type stream struct {
 	fileSum hash.Hash
 	fileN   *countWriter
 	imgSum  hash.Hash
-	gz      *gzip.Reader
+	dec     io.Closer // gzip or zip decompressor
 }
 
 type countWriter struct{ n int64 }
@@ -96,12 +98,37 @@ func openStream(open Open, m *manifest.Manifest) (*stream, error) {
 			return nil, fmt.Errorf("%w: %v", ErrCorrupt, err)
 		}
 		gz.Multistream(false)
-		s.gz = gz
+		s.dec = gz
 		s.img = io.LimitReader(gz, m.Image.Size+1)
+	} else if m.File.Compression == manifest.Zip {
+		zr, err := zipEntry(tee)
+		if err != nil {
+			f.Close()
+			return nil, fmt.Errorf("%w: %v", ErrCorrupt, err)
+		}
+		s.dec = zr
+		s.img = io.LimitReader(zr, m.Image.Size+1)
 	} else {
 		s.img = tee
 	}
 	return s, nil
+}
+
+// zipEntry reads the first entry of a zip file as a stream. The file is read from start to end and its checksum
+// was signed, so the central directory at the end is not needed.
+func zipEntry(r io.Reader) (io.ReadCloser, error) {
+	var h [30]byte
+	if _, err := io.ReadFull(r, h[:]); err != nil {
+		return nil, err
+	}
+	le := binary.LittleEndian
+	if le.Uint32(h[0:]) != 0x04034b50 || le.Uint16(h[6:])&1 != 0 || le.Uint16(h[8:]) != 8 {
+		return nil, errors.New("not a zip file with one deflated entry")
+	}
+	if _, err := io.CopyN(io.Discard, r, int64(le.Uint16(h[26:]))+int64(le.Uint16(h[28:]))); err != nil {
+		return nil, err
+	}
+	return flate.NewReader(r), nil
 }
 
 // finish reads the rest of the file and compares both checksums.
@@ -109,12 +136,12 @@ func (s *stream) finish(m *manifest.Manifest, imgN int64) error {
 	if _, err := io.Copy(io.Discard, s.img); err != nil {
 		return fmt.Errorf("%w: %v", ErrCorrupt, err)
 	}
-	if s.gz != nil {
-		if err := s.gz.Close(); err != nil {
+	if s.dec != nil {
+		if err := s.dec.Close(); err != nil {
 			return fmt.Errorf("%w: %v", ErrCorrupt, err)
 		}
 	}
-	// Nothing may come after the end of the gzip stream.
+	// Nothing may come after the end of the stream (with zip: the central directory, which the checksum covers).
 	if _, err := io.Copy(io.Discard, s.tee); err != nil {
 		return err
 	}

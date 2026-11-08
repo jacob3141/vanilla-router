@@ -13,7 +13,7 @@ export default {
         { name: 'ipv6', type: 'checkbox', label: 'IPv6' },
       ], (v) => post('/api/tools/ping', { target: v.target, count: 4, ipv6: v.ipv6 })),
       tool('Route tracing', 'arrowRight', 'Which hops packets travel through (tracepath).', [
-        { name: 'target', placeholder: 'z. B. ubuntu.com' },
+        { name: 'target', placeholder: 'e.g. ubuntu.com' },
         { name: 'ipv6', type: 'checkbox', label: 'IPv6' },
       ], (v) => post('/api/tools/trace', { target: v.target, ipv6: v.ipv6 })),
       tool('DNS lookup', 'dns', 'Asks dnsmasq on the router (or another server).', [
@@ -27,7 +27,7 @@ export default {
       ], async (v) => {
         const r = (await post('/api/tools/port', { target: v.target, port: +v.port || 0 })).data;
         const what = { open: 'OPEN: the service accepts connections', closed: 'CLOSED: the target refuses (nothing is listening there)', timeout: 'NO ANSWER: firewall or device off', error: `FEHLER: ${r.error}` }[r.state];
-        return { data: { text: `${r.target}:${r.port}\n${what}\nnach ${r.ms.toFixed(1)} ms${r.remote ? `\nverbunden mit ${r.remote}` : ''}` } };
+        return { data: { text: `${r.target}:${r.port}\n${what}\nafter ${r.ms.toFixed(1)} ms${r.remote ? `\nconnected to ${r.remote}` : ''}` } };
       }),
     ));
   },

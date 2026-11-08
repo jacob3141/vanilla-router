@@ -94,7 +94,7 @@ type PPPoE struct {
 
 // StaticWAN is a fixed address on the internet port.
 type StaticWAN struct {
-	Address string   `json:"address"` // CIDR, z. B. 203.0.113.10/29
+	Address string   `json:"address"` // CIDR, e.g. 203.0.113.10/29
 	Gateway string   `json:"gateway"`
 	DNS     []string `json:"dns,omitempty"`
 }
@@ -169,7 +169,7 @@ type PortForward struct {
 // Pinhole opens a port of a device for IPv6 from outside. Because the provider's prefix can
 // change, the device is identified by the rear part of the address (interface ID).
 type Pinhole struct {
-	InterfaceID string `json:"interface_id"` // z. B. ::1a2b:3c4d:5e6f:7890
+	InterfaceID string `json:"interface_id"` // e.g. ::1a2b:3c4d:5e6f:7890
 	Proto       string `json:"proto"`
 	Port        int    `json:"port"`
 	PortEnd     int    `json:"port_end,omitempty"`

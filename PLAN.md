@@ -594,7 +594,7 @@ Columns: ID · priority · requirement · status. "Prototype" means: exists in t
 | F-INST-07 | MUST | Show the setup code and address of the web interface at the end (text and QR) | open |
 | F-INST-08 | SHOULD | Unattended installation with a prepared `config.json` on the stick. Since 0.8 only for automated tests, not in the stick creator (D-15) | open |
 | F-INST-09 | SHOULD | Port identification by LED blinking (`ethtool --identify`) | open |
-| F-INST-10 | SHOULD | German and English, default from `vr/stick.json` (3.9.1) | done (D-16), the language question comes first |
+| F-INST-10 | SHOULD | English only, no language question in the assistant (owner, 2026-11-08). Keyboard layout and time zone still come from `vr/stick.json` (3.9.1). A language setting comes to the web interface later | done |
 | F-INST-11 | MAY | Installation on an existing Debian/Ubuntu ("conversion" mode) | open |
 | F-INST-12 | MUST | The stick recognizes an existing installation and offers rescue actions (3.9.5) | open |
 | F-INST-13 | MUST | Reset the web interface password from the stick | open |
@@ -685,9 +685,9 @@ Columns: ID · priority · requirement · status. "Prototype" means: exists in t
 | F-STICK-04 | MUST | Download the image and verify it against a signed manifest before writing (Ed25519, SHA-256) | done (T-M4-08), download address and key open (Q-19) |
 | F-STICK-05 | MUST | Lock and dismount volumes, write the image raw, then read back and verify | done (T-M4-08), checked with a real stick (test image, 2026-11-05) |
 | F-STICK-06 | MUST | Clear messages on errors (stick too small, write-protected, unplugged, download interrupted), cancel at any time | done (T-M4-08) |
-| F-STICK-07 | SHOULD | Enter language, keyboard layout and time zone from Windows into `vr/stick.json` | done (T-M4-08) |
+| F-STICK-07 | SHOULD | Enter keyboard layout and time zone from Windows into `vr/stick.json` | done (T-M4-08) |
 | F-STICK-08 | SHOULD | Cache the image, recognize a newer image; alternatively choose a local image file (offline) | done (T-M4-08) |
-| F-STICK-09 | SHOULD | German and English depending on the Windows language | done (T-M4-08) |
+| F-STICK-09 | SHOULD | English only (owner, 2026-11-08) | done |
 | F-STICK-10 | SHOULD | A note at the end on how to start from a USB stick (boot menu, typical keys) | done (T-M4-08) |
 | F-STICK-11 | MAY | Versions for macOS and Linux (Q-18) | open |
 
@@ -772,7 +772,7 @@ New in 0.21 (D-18, Q-06). "Untested on radio" means: tested with unit tests, gol
 | Q-16 | Secure Boot | shim + GRUB (signed, Ubuntu's default) · systemd-boot (check signing) · Secure Boot off | open. Must work with Secure Boot, many non-experts' computers have it on. |
 | Q-17 | Code signing of the stick creator | without (SmartScreen warns "unknown publisher", instructions needed) · OV/EV certificate (costs yearly) · signing service for open source (e.g. SignPath Foundation) | open. The warning is off-putting for non-experts, a signing service for open source would be ideal |
 | Q-18 | Stick creator also for macOS and Linux? | Windows only · later all three | Windows first (the project owner's wish), build the core (download, verification, writing) so that only the window and drive access are new per system |
-| Q-19 | Where do images come from, who signs? | GitHub Releases · own server · both | open. Keep the signing key offline, sign the manifest separately from the image |
+| Q-19 | Where do images come from, who signs? | GitHub Releases · own server · both | **done (2026-11-08): GitHub Releases.** The stick creator of a release downloads the image of that release. The signing key stays off the repository, the manifest is signed separately from the image |
 | Q-20 | Reporting channel for security issues (SECURITY.md) | own address with PGP · the platform's reporting feature ("private vulnerability reporting") · both | done (2026-11-05): GitHub's reporting feature ("Private vulnerability reporting"), linked in SECURITY.md. An address of our own can be added later |
 | Q-21 | The boot stick's build uses *universe*, because mkosi's default initrd needs `systemd-repart`. Is that acceptable? | accept for the stick only (it is not a long-lived system, no security updates apply to it) · own initrd from *main* (more work) | accept for the stick only, the target system stays *main* (NF-09). Decision by the project owner open |
 | Q-22 | How does vanilla-router update itself (F-UPD-04)? | own signed apt repository (GitHub Pages or own server) · download of the `.deb` by an own updater · A/B images | decided on 2026-11-08: signed apt repository, see D-19 |

@@ -86,11 +86,6 @@ type app struct {
 var theApp *app
 
 func main() {
-	if germanUI() {
-		uiLang = langDE
-	} else {
-		uiLang = langEN
-	}
 	pCoInitializeEx.Call(0, coinitApartment)
 	icc := initCommonControlsEx{Size: uint32(unsafe.Sizeof(initCommonControlsEx{})), ICC: iccStandard | iccProgress}
 	pInitCommonControlsEx.Call(uintptr(unsafe.Pointer(&icc)))
@@ -102,8 +97,8 @@ func main() {
 		cache = filepath.Join(d, "vanilla-router", "stick")
 	}
 	a.src = newSource(manifestURL, cache, keys())
-	loc, klid, zone := windowsLocale()
-	if b, err := windefaults.Info(loc, klid, zone).Encode(); err == nil {
+	klid, zone := windowsDefaults()
+	if b, err := windefaults.Info(klid, zone).Encode(); err == nil {
 		a.stickJSON = b
 	}
 	if err := a.create(); err != nil {
@@ -433,7 +428,7 @@ func (a *app) updateButtons() {
 func (a *app) chooseFile() {
 	buf := make([]uint16, 4096)
 	ofn := openFileName{Owner: a.hwnd, File: &buf[0], MaxFile: uint32(len(buf)),
-		Filter: u16z(tr("file_filter"), "*.img;*.img.gz;*.raw;*.gz", "*.*", "*.*"),
+		Filter: u16z(tr("file_filter"), "*.zip;*.img;*.img.gz;*.raw;*.gz", "*.*", "*.*"),
 		Flags:  ofnFileMustExist | ofnPathMustExist | ofnHideReadOnly | ofnNoChangeDir | ofnExplorer}
 	ofn.StructSize = uint32(unsafe.Sizeof(ofn))
 	if r, _, _ := pGetOpenFileNameW.Call(uintptr(unsafe.Pointer(&ofn))); r == 0 {

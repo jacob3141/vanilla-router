@@ -35,10 +35,10 @@ func (t Tri) String() string {
 
 // Port describes a physical Ethernet port.
 type Port struct {
-	Name      string // Kernel-Name, z. B. enp1s0
+	Name      string // kernel name, e.g. enp1s0
 	Index     int    // interface index (for netlink and AF_PACKET)
 	MAC       string
-	Driver    string // z. B. r8169, e1000e, igc, virtio_net
+	Driver    string // e.g. r8169, e1000e, igc, virtio_net
 	Bus       string // pci, usb, virtio …
 	DevPath   string // resolved device path under /sys/devices, determines the order
 	AdminUp   bool   // IFF_UP set

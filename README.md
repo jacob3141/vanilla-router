@@ -17,7 +17,7 @@ it into a router without requiring any Linux knowledge.
 ## How it is meant to work for users
 
 1. **Create the stick:** a Windows program that needs no installation. Plug in a USB stick, select it,
-   done. It takes language, keyboard layout and time zone from Windows.
+   done. It takes keyboard layout and time zone from Windows.
 2. **Install:** boot the future router from the stick. The assistant asks only two things: which cable
    goes to the modem (just plug it in, it detects it) and which disk it may use.
 3. **Set up:** open `https://router.home.arpa` in a browser, enter the code shown on the router's screen

@@ -29,12 +29,12 @@ func TestFindWithPadding(t *testing.T) {
 	os.MkdirAll(filepath.Join(dir, "vr"), 0o755)
 	os.WriteFile(filepath.Join(dir, "vr", "stick.json"), []byte(padded), 0o644)
 	in, ok := Find([]string{"/does/not/exist", dir})
-	if !ok || in.Locale != "de_AT.UTF-8" || in.Timezone != "UTC" {
+	if !ok || in.Timezone != "UTC" {
 		t.Fatalf("%+v %v", in, ok)
 	}
 	c := defaultConfig(t)
 	in.Apply(c)
-	if c.System.Locale != "de_AT.UTF-8" || c.System.Timezone != "UTC" {
+	if c.System.Locale != "en_US.UTF-8" || c.System.Timezone != "UTC" {
 		t.Errorf("%+v", c.System)
 	}
 }
@@ -46,7 +46,7 @@ func TestEmptyReservation(t *testing.T) {
 }
 
 func TestEncodeRoundTrip(t *testing.T) {
-	in := Info{Schema: 1, Locale: "de_CH.UTF-8", Keymap: "ch", Timezone: "Europe/Zurich"}
+	in := Info{Schema: 1, Keymap: "ch", Timezone: "Europe/Zurich"}
 	b, err := in.Encode()
 	if err != nil || len(b) != Size || Blank(b) {
 		t.Fatalf("%d %v", len(b), err)
@@ -58,14 +58,14 @@ func TestEncodeRoundTrip(t *testing.T) {
 	if !Blank([]byte(strings.Repeat(" ", Size))) || Blank([]byte(strings.Repeat(" ", Size-1))) {
 		t.Error("Blank")
 	}
-	if _, err := (Info{Schema: 1, Locale: strings.Repeat("x", Size)}).Encode(); err == nil {
+	if _, err := (Info{Schema: 1, Keymap: strings.Repeat("x", Size)}).Encode(); err == nil {
 		t.Error("too big must fail")
 	}
 }
 
 func TestInvalidValuesDiscarded(t *testing.T) {
 	c := defaultConfig(t)
-	Info{Schema: 1, Locale: "de_DE.UTF-8; rm -rf /", Timezone: "../../etc/passwd", Keymap: "us"}.Apply(c)
+	Info{Schema: 1, Timezone: "../../etc/passwd", Keymap: "us"}.Apply(c)
 	if c.System.Locale != "en_US.UTF-8" || c.System.Timezone != "UTC" || c.System.Keymap != "us" {
 		t.Errorf("%+v", c.System)
 	}

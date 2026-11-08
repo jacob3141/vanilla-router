@@ -3,6 +3,7 @@
 package stickwrite
 
 import (
+	"archive/zip"
 	"bytes"
 	"compress/gzip"
 	"context"
@@ -80,6 +81,14 @@ func build(t *testing.T, img []byte, compression string) (*manifest.Manifest, []
 		zw.Close()
 		file = buf.Bytes()
 	}
+	if compression == manifest.Zip {
+		var buf bytes.Buffer
+		zw := zip.NewWriter(&buf)
+		w, _ := zw.Create("stick.img")
+		w.Write(img)
+		zw.Close()
+		file = buf.Bytes()
+	}
 	m := &manifest.Manifest{Schema: 1, Name: "vanilla-router-stick", Version: "0.1.0",
 		File:      manifest.File{Name: "stick.img", Size: int64(len(file)), SHA256: sum(file), Compression: compression},
 		Image:     manifest.Image{Size: int64(len(img)), SHA256: sum(img)},
@@ -95,7 +104,7 @@ func opener(b []byte) Open {
 }
 
 func stickJSON(t *testing.T) []byte {
-	b, err := stick.Info{Schema: 1, Locale: "de_AT.UTF-8", Keymap: "de", Timezone: "Europe/Vienna"}.Encode()
+	b, err := stick.Info{Schema: 1, Keymap: "de", Timezone: "Europe/Vienna"}.Encode()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -111,6 +120,8 @@ func TestWriteAndVerify(t *testing.T) {
 		{manifest.None, 9<<20 + 512*3, 512},
 		{manifest.Gzip, 9<<20 + 512*3, 4096},
 		{manifest.Gzip, 3 << 20, 512},
+		{manifest.Zip, 9<<20 + 512*3, 512},
+		{manifest.Zip, 3 << 20, 4096},
 	} {
 		t.Run(fmt.Sprintf("%s-%d-%d", tc.comp, tc.size, tc.sector), func(t *testing.T) {
 			img := testImage(tc.size)

@@ -63,8 +63,6 @@ var (
 	pRoundRect              = gdi32.NewProc("RoundRect")
 	pSetTextColor           = gdi32.NewProc("SetTextColor")
 	pGetStockObject         = gdi32.NewProc("GetStockObject")
-	pGetUserDefaultLocale   = kernel32.NewProc("GetUserDefaultLocaleName")
-	pGetUserDefaultUILang   = kernel32.NewProc("GetUserDefaultUILanguage")
 	pGetDynamicTimeZoneInfo = kernel32.NewProc("GetDynamicTimeZoneInformation")
 	pCreateFontIndirectW    = gdi32.NewProc("CreateFontIndirectW")
 	pGetDeviceCaps          = gdi32.NewProc("GetDeviceCaps")
@@ -345,13 +343,9 @@ func messageBox(owner uintptr, text, title string, flags uint32) int {
 	return int(r)
 }
 
-// windowsLocale returns the locale (de-AT), keyboard KLID (00000407) and time zone key
+// windowsDefaults returns the keyboard KLID (00000407) and time zone key
 // (W. Europe Standard Time) for vr/stick.json (F-STICK-07).
-func windowsLocale() (locale, klid, zone string) {
-	buf := make([]uint16, 85)
-	if r, _, _ := pGetUserDefaultLocale.Call(uintptr(unsafe.Pointer(&buf[0])), uintptr(len(buf))); r != 0 {
-		locale = syscall.UTF16ToString(buf)
-	}
+func windowsDefaults() (klid, zone string) {
 	kb := make([]uint16, 9)
 	if r, _, _ := pGetKeyboardLayoutNameW.Call(uintptr(unsafe.Pointer(&kb[0]))); r != 0 {
 		klid = syscall.UTF16ToString(kb)
@@ -362,10 +356,4 @@ func windowsLocale() (locale, klid, zone string) {
 		zone = syscall.UTF16ToString(tz[86 : 86+128])
 	}
 	return
-}
-
-// germanUI: is the Windows display language German (F-STICK-09)?
-func germanUI() bool {
-	r, _, _ := pGetUserDefaultUILang.Call()
-	return r&0x3ff == 0x07
 }

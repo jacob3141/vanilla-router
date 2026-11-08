@@ -24,17 +24,6 @@ func TestTimezone(t *testing.T) {
 	}
 }
 
-func TestLocale(t *testing.T) {
-	for win, want := range map[string]string{
-		"de-DE": "de_DE.UTF-8", "de-AT": "de_AT.UTF-8", "en-US": "en_US.UTF-8",
-		"sr-Latn-RS": "sr_RS.UTF-8", "de": "", "x; rm": "", "": "", "de-de": "",
-	} {
-		if got := Locale(win); got != want {
-			t.Errorf("Locale(%q) = %q, expected %q", win, got, want)
-		}
-	}
-}
-
 func TestKeymap(t *testing.T) {
 	for klid, want := range map[string]string{
 		"00000407": "de", "00000807": "ch", "00000409": "us", "00000c07": "at", "00000C07": "at",
@@ -47,8 +36,8 @@ func TestKeymap(t *testing.T) {
 }
 
 func TestInfo(t *testing.T) {
-	in := Info("de-AT", "00000407", "W. Europe Standard Time")
-	if in.Schema != 1 || in.Locale != "de_AT.UTF-8" || in.Keymap != "de" || in.Timezone != "Europe/Berlin" {
+	in := Info("00000407", "W. Europe Standard Time")
+	if in.Schema != 1 || in.Keymap != "de" || in.Timezone != "Europe/Berlin" {
 		t.Fatalf("%+v", in)
 	}
 }

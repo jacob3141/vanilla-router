@@ -116,9 +116,9 @@ export default {
       const pass = h('input', { class: 'input', type: 'password', autocomplete: 'new-password',
         placeholder: w.has_password ? 'leave unchanged' : 'password from the letter' });
       const vlan = inp({ inputmode: 'numeric', value: w.pppoe_vlan ? String(w.pppoe_vlan) : (data.needs_setup && d.vlan ? String(d.vlan) : ''), placeholder: 'empty = none' });
-      const addr = inp({ value: w.static_address, placeholder: 'z. B. 203.0.113.10/29' });
-      const gw = inp({ value: w.static_gateway, placeholder: 'z. B. 203.0.113.9' });
-      const dns = inp({ value: (w.static_dns || []).join(', '), placeholder: 'z. B. 9.9.9.9, 149.112.112.112' });
+      const addr = inp({ value: w.static_address, placeholder: 'e.g. 203.0.113.10/29' });
+      const gw = inp({ value: w.static_gateway, placeholder: 'e.g. 203.0.113.9' });
+      const dns = inp({ value: (w.static_dns || []).join(', '), placeholder: 'e.g. 9.9.9.9, 149.112.112.112' });
       const ipv6 = h('input', { type: 'checkbox', checked: w.ipv6 });
       const mtu = inp({ inputmode: 'numeric', value: w.mtu ? String(w.mtu) : '', placeholder: 'empty = automatic' });
 

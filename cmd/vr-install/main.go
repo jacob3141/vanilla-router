@@ -127,23 +127,10 @@ func runUnattended(path, rootfs string, dry bool) error {
 // which cable goes to the modem and which disk may be wiped (P-11). It is operated with arrow keys
 // and Enter only. Everything else is set up afterwards in the web interface.
 func assistant(p *tui.Prompt, rootfs string, dry bool, lo netdetect.Options, mounts []string) error {
-	// S1 language: from the stick creator, otherwise one question (F-INST-10). It comes first, so that
-	// all other texts already appear in the chosen language.
+	// Keyboard layout and time zone from the stick creator, if there is a stick.json. The assistant is in English,
+	// the language will become a setting in the web interface.
 	p.Clear()
-	info, ok := stick.Find(mounts)
-	if !ok {
-		p.Heading("Language and region")
-		var labels []string
-		for _, l := range stick.Languages {
-			labels = append(labels, l.Label)
-		}
-		i, err := p.Menu(labels, 0)
-		if err != nil {
-			return err
-		}
-		info = stick.Languages[i].Info()
-	}
-	i18n.SetLocale(info.Locale)
+	info, _ := stick.Find(mounts)
 
 	p.Banner("vanilla-router "+version, "Welcome!")
 	p.Say("This computer is about to become a router. You only need to do two things:")

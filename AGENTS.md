@@ -1,4 +1,4 @@
-# Hinweise für KI-Agenten
+# Notes for AI agents
 
-Die Arbeitsregeln für dieses Projekt stehen in [CLAUDE.md](CLAUDE.md), der Plan in [PLAN.md](PLAN.md).
-Beide gelten für alle Agenten, unabhängig vom Werkzeug.
+The working rules for this project are in [CLAUDE.md](CLAUDE.md), the plan is in [PLAN.md](PLAN.md).
+Both apply to all agents, regardless of the tool.

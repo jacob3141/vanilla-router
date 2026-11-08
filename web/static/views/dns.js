@@ -62,7 +62,7 @@ export default {
         h('div', { class: 'row kpis' },
           kpi('Queries', fmt.num(s.queries, 0), `≈ ${fmt.num(s.queries / hours, 0)} per hour`),
           !client && kpi('From the cache', answered ? fmt.pct((100 * s.cached) / answered) : '–', `${fmt.num(s.cached, 0)} answers`),
-          !client && kpi('Forwarded', fmt.num(s.forwarded, 0), 'an die Upstream-Server'),
+          !client && kpi('Forwarded', fmt.num(s.forwarded, 0), 'to the upstream servers'),
           !client && kpi('Answered locally', fmt.num(s.local, 0), 'Names under home.arpa')),
         h('div', { class: 'grid cols-2 mt' },
           list('Most frequent names', s.top_domains, (r) => h('span', { class: 'mono small' }, r.name)),
@@ -96,8 +96,8 @@ export default {
         title: e ? `Edit ${e.name}` : 'Create a local name',
         text: 'For devices with a fixed IP or services that do not come through DHCP. For DHCP devices, better assign a fixed address under "Devices".',
         fields: [
-          { name: 'name', label: 'Name', value: short || '', placeholder: 'z. B. nas', hint: 'Becomes name.home.arpa.' },
-          { name: 'ip', label: 'IP address', value: e?.ip || '', placeholder: 'IPv4 oder IPv6' },
+          { name: 'name', label: 'Name', value: short || '', placeholder: 'e.g. nas', hint: 'Becomes name.home.arpa.' },
+          { name: 'ip', label: 'IP address', value: e?.ip || '', placeholder: 'IPv4 or IPv6' },
         ],
         onSubmit: (v) => post('/api/dns', { ...v, original_name: short || '' }),
       });

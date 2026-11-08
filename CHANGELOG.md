@@ -2,16 +2,22 @@
 
 Pre-releases: **not ready for production use**. See [the status](docs/architecture.md#15-status-what-has-been-tested-for-real).
 
-## 0.0.3 (2026-11-08)
+## 0.0.4 (2026-11-08)
 
 **Untested pre-release.** It was published to get a working update path for bug fixes. Expect errors. The new access point feature has never run on a real radio.
 
 ### Added
 
+- Stick creator for Windows: a program that downloads the image, checks it and writes the boot stick.
 - Several access points with the router as their center (`docs/sdn-concept.md`): a new page "Access points" for Wi-Fi networks, pairing by comparing a code, a central channel plan, and a preview of what each access point receives. An access point is a PC with Ubuntu Server, this package and `vrctl ap enable`.
 - Segments: guest and older-devices networks as VLANs with their own DHCP, DNS and firewall rules. Your switches must pass VLAN tags. A router without segments generates the same files as before.
 - New services `vr-apd` on the router (TLS 1.3 with pinned keys, home network only) and `vr-ap` on an access point (rollback timer and health check after each change).
 - Own signed package source for updates of vanilla-router itself (D-19).
+
+### Changed
+
+- English only for now: the assistant no longer asks for a language, the stick creator no longer follows the Windows language. A language setting comes to the web interface later.
+- The image is a zip file.
 
 ### Fixed
 

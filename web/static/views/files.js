@@ -138,7 +138,7 @@ export default {
 
     async function remove(paths) {
       const inTrash = cwd === data.trash || cwd.startsWith(`${data.trash}/`);
-      const what = paths.length === 1 ? `„${paths[0].split('/').pop()}“` : `${paths.length} entries`;
+      const what = paths.length === 1 ? `"${paths[0].split('/').pop()}"` : `${paths.length} entries`;
       if (!(await confirmDialog({
         title: inTrash ? `Permanently delete ${what}?` : `Delete ${what}?`,
         text: inTrash ? 'This cannot be undone.' : 'Deleted items go to the .trash folder and can be restored from there.',

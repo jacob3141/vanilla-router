@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 // Package windefaults translates settings from Windows into defaults for vr/stick.json
-// (F-STICK-07, PLAN.md 3.12): language, keyboard layout and time zone. The package is platform-independent,
+// (F-STICK-07, PLAN.md 3.12): keyboard layout and time zone. The package is platform-independent,
 // so it can be tested on Linux. cmd/vr-stick reads the values from Windows.
 //
 // The time zone table windowsZones.xml comes from Unicode CLDR
@@ -12,7 +12,6 @@ package windefaults
 import (
 	_ "embed"
 	"encoding/xml"
-	"regexp"
 	"strings"
 	"sync"
 
@@ -56,18 +55,6 @@ func Timezone(windows string) string {
 	return zones[windows]
 }
 
-var bcp47Re = regexp.MustCompile(`^([a-z]{2,3})(?:-[A-Z][a-z]{3})?-([A-Z]{2})$`)
-
-// Locale turns a Windows locale (BCP 47, e.g. de-AT) into a Linux locale (de_AT.UTF-8).
-// Unknown forms result in "".
-func Locale(windows string) string {
-	m := bcp47Re.FindStringSubmatch(windows)
-	if m == nil {
-		return ""
-	}
-	return m[1] + "_" + m[2] + ".UTF-8"
-}
-
 // keyboards assigns Windows keyboard layouts (the lower 16 bits of the KLID, i.e. the language ID) to an
 // XKB layout (/etc/default/keyboard, XKBLAYOUT). Only common layouts, otherwise no default.
 var keyboards = map[uint16]string{
@@ -103,6 +90,6 @@ func Keymap(klid string) string {
 
 // Info builds the defaults for vr/stick.json. Missing values stay empty, the assistant then takes
 // its own default.
-func Info(locale, klid, windowsZone string) stick.Info {
-	return stick.Info{Schema: 1, Locale: Locale(locale), Keymap: Keymap(klid), Timezone: Timezone(windowsZone)}
+func Info(klid, windowsZone string) stick.Info {
+	return stick.Info{Schema: 1, Keymap: Keymap(klid), Timezone: Timezone(windowsZone)}
 }

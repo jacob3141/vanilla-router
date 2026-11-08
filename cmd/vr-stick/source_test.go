@@ -167,7 +167,7 @@ func (d *fakeDev) Close() error                             { d.closed = true; r
 
 func runJob(t *testing.T, src *source, im *image, d windisk.Disk, p platform) jobState {
 	t.Helper()
-	sj, _ := stick.Info{Schema: 1, Locale: "de_DE.UTF-8", Keymap: "de", Timezone: "Europe/Berlin"}.Encode()
+	sj, _ := stick.Info{Schema: 1, Keymap: "de", Timezone: "Europe/Berlin"}.Encode()
 	j := &job{}
 	run(context.Background(), j, src, im, d, p, sj)
 	return j.state()
@@ -250,13 +250,12 @@ func TestLocalFile(t *testing.T) {
 }
 
 func TestTexts(t *testing.T) {
-	for _, l := range []lang{langDE, langEN} {
-		uiLang = l
-		for k, v := range texts {
-			if v[0] == "" || v[1] == "" {
-				t.Errorf("%s: text is missing", k)
-			}
+	for k, v := range texts {
+		if v == "" {
+			t.Errorf("%s: text is missing", k)
 		}
+	}
+	{
 		for _, e := range []error{windisk.ErrWriteProtected, windisk.ErrRemoved, windisk.ErrBusy, windisk.ErrChanged,
 			windisk.ErrNotAdmin, stickwrite.ErrVerify, stickwrite.ErrNotBlank, errOffline, errDownload, errNoSource,
 			errNoKeys, manifest.ErrSignature, errLocalManifest, errLocalMismatch, errOnStick} {
@@ -268,11 +267,10 @@ func TestTexts(t *testing.T) {
 			t.Error("abort")
 		}
 	}
-	uiLang = langDE
-	if size(32_017_047_552) != "32 GB" || size(7_700_000_000) != "7,7 GB" || size(500_000_000) != "500 MB" {
+	if size(32_017_047_552) != "32 GB" || size(7_700_000_000) != "7.7 GB" || size(500_000_000) != "500 MB" {
 		t.Error(size(32_017_047_552), size(7_700_000_000))
 	}
-	if diskLabel(windisk.Disk{Vendor: "SanDisk", Product: "Ultra", Size: 32e9, Letters: []string{"E:"}}) != "SanDisk Ultra (32 GB), Laufwerk E:" {
+	if diskLabel(windisk.Disk{Vendor: "SanDisk", Product: "Ultra", Size: 32e9, Letters: []string{"E:"}}) != "SanDisk Ultra (32 GB), drive E:" {
 		t.Error(diskLabel(windisk.Disk{Vendor: "SanDisk", Product: "Ultra", Size: 32e9, Letters: []string{"E:"}}))
 	}
 }

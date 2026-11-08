@@ -215,7 +215,7 @@ come from Ubuntu *main* (checked by `test/check-main.sh`).
 
 | Step | Package | What happens |
 |---|---|---|
-| Language | `internal/stick` | read `vr/stick.json` from the stick (from the stick creator), otherwise one choice |
+| Language | `internal/stick` | English only. `vr/stick.json` from the stick creator brings keyboard layout and time zone |
 | Hardware | `internal/netdetect`, `internal/disk` | find ports and disks. Only visible when there is a problem (fewer than two ports, no disk ≥ 16 GB) |
 | Internet port | `internal/wandetect/live` | see [section 7](#7-detecting-the-internet-port) |
 | Disk | `internal/tui` | choice and confirmation, preselection "No, cancel" |
@@ -399,8 +399,7 @@ German can be chosen in the assistant (or comes from a German Windows through th
 - **The language follows `system.locale`** in `config.json`: `de*` means German, everything else English.
   `/api/state` reports it, `/api/i18n` delivers the catalog.
 - **Adding a text:** write English in the code and add the German to `de.json`.
-- The stick creator runs before there is any configuration. It keeps its own table for both languages in
-  [cmd/vr-stick/texts.go](../cmd/vr-stick/texts.go) and follows the Windows language.
+- The stick creator and the assistant are English only (2026-11-08). A language setting comes to the web interface later.
 
 ## 15. Status: what has been tested for real
 

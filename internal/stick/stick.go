@@ -24,9 +24,8 @@ const RelPath = "vr/stick.json"
 // Info holds the defaults from Windows. Empty fields: no default.
 type Info struct {
 	Schema   int    `json:"schema"`
-	Locale   string `json:"locale"`   // z. B. de_DE.UTF-8
 	Keymap   string `json:"keymap"`   // console keyboard, e.g. de
-	Timezone string `json:"timezone"` // IANA, z. B. Europe/Berlin
+	Timezone string `json:"timezone"` // IANA, e.g. Europe/Berlin
 }
 
 // Mounts are the places where the stick's EFI partition can be mounted
@@ -51,7 +50,7 @@ func Find(mounts []string) (Info, bool) {
 func Parse(b []byte) (Info, error) {
 	b = bytes.TrimRight(b, " \n\r\t\x00")
 	if len(bytes.TrimSpace(b)) == 0 {
-		return Info{}, errors.New("leer")
+		return Info{}, errors.New("empty")
 	}
 	var in Info
 	if err := json.Unmarshal(b, &in); err != nil {
@@ -97,29 +96,7 @@ func (in Info) Apply(c *config.Config) {
 			try(func(s *config.System) { s.Timezone = in.Timezone })
 		}
 	}
-	if in.Locale != "" {
-		try(func(s *config.System) { s.Locale = in.Locale })
-	}
 	if in.Keymap != "" {
 		try(func(s *config.System) { s.Keymap = in.Keymap })
 	}
-}
-
-// Language is a choice for S1 if there is no stick.json.
-type Language struct {
-	Label                    string
-	Locale, Keymap, Timezone string
-}
-
-// Languages for the choice in S1 (F-INST-10).
-var Languages = []Language{
-	{"English", "en_US.UTF-8", "us", "UTC"},
-	{"Deutsch (Deutschland)", "de_DE.UTF-8", "de", "Europe/Berlin"},
-	{"Deutsch (Österreich)", "de_AT.UTF-8", "de", "Europe/Vienna"},
-	{"Deutsch (Schweiz)", "de_CH.UTF-8", "ch", "Europe/Zurich"},
-}
-
-// Info returns the defaults of a language.
-func (l Language) Info() Info {
-	return Info{Schema: 1, Locale: l.Locale, Keymap: l.Keymap, Timezone: l.Timezone}
 }

@@ -2,7 +2,7 @@
 
 Pre-releases: **not ready for production use**. See [the status](docs/architecture.md#15-status-what-has-been-tested-for-real).
 
-## 0.0.4 (2026-11-08)
+## 0.0.5 (2026-11-08)
 
 **Untested pre-release.** It was published to get a working update path for bug fixes. Expect errors. The new access point feature has never run on a real radio.
 

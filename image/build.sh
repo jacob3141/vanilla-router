@@ -25,6 +25,10 @@ mkosi -C image/target --package="$(list image/packages.txt image/packages-image.
 	--output-directory="$PWD/dist" -f build
 mkdir -p dist/stick-extra/usr/share/vanilla-router
 mv dist/rootfs.tar.zst dist/stick-extra/usr/share/vanilla-router/rootfs.tar.zst
+# Place for the defaults of the stick creator (vr/stick.json, PLAN.md 3.9.1): 4096 spaces on the EFI partition,
+# which the creator overwrites in the image (internal/stickwrite).
+mkdir -p dist/stick-extra/efi/vr
+printf '%4096s' '' >dist/stick-extra/efi/vr/stick.json
 
 echo "== Stick"
 mkosi -C image/stick --package="$(list image/packages-stick.txt)" --output-directory="$PWD/dist" -f build

@@ -1,0 +1,34 @@
+-----BEGIN PGP SIGNED MESSAGE-----
+Hash: SHA512
+
+Architectures: amd64
+Codename: stable
+Components: main
+Date: Sun, 08 Nov 2026 19:13:47 +0000
+Description: vanilla-router updates
+Label: vanilla-router
+Origin: vanilla-router
+Suite: stable
+MD5Sum:
+ 21953f2b39569f69d1fa13f3d982f3fb              188 Release
+ 4a4be9aacd8880f09c62c4d319ebf5ba              970 main/binary-amd64/Packages
+ f2cfa9b6309047e76d5082ba93a296dc              649 main/binary-amd64/Packages.gz
+SHA1:
+ 6d777cf5b80d8e081d22b4d3b5437654a4ec3ab1              188 Release
+ c27ca05a4d7c26da543165f0fe884f7f2dae7bf4              970 main/binary-amd64/Packages
+ 50fc161e1084b8d00919a6efb83747b044736041              649 main/binary-amd64/Packages.gz
+SHA256:
+ 45cf9392c79a6b41c649ead8f1c5030e38ffae47e280a5b54364676ee364f6b2              188 Release
+ e0aea90b173e5265cf0118ecd0c5c0cd4a6e4bcd399aca76d0789f81f08c80eb              970 main/binary-amd64/Packages
+ ec3081cb355243631f75cad4050128c0e61885aab44be7c2b64d7951c2e615e6              649 main/binary-amd64/Packages.gz
+SHA512:
+ 07624ba0b46409d45ba305c1954a6f9f65deabb14de2b8c690374c5350d3abc1693a5bb9d2b4122205ff9c3da2c9ad0a4293c5f3590d735892d0a1dcb1dae7d4              188 Release
+ 399b6902b957f7d1d05de40353286f1b56a29e4b658756e4af8c762677534e99dd7ffdfbf1d8307645c4a8fca836f1145ec5e24cec21a54652b9b0679f3c9396              970 main/binary-amd64/Packages
+ d833a56e04a7c02fa4556f77eb1ed2758fa43a1cc68e8fed2a1c3b1c6ceeec29e7f89d2335806db2fc6f15b32a74c431acd12650ff0f4d8c5b557212cfa1648f              649 main/binary-amd64/Packages.gz
+-----BEGIN PGP SIGNATURE-----
+
+iHUEARYKAB0WIQRLUBUqZrx6msAlX1qY973iMEwKrgUCavDJ6wAKCRCY973iMEwK
+riyWAQCEDhHpGLfnZE5Dq1Fbwjmjp2n+OE4pbtvgED7PX2iycgEAs+Ung70dhFZV
+icwB9Z0xt1wH+sE3Z6Y9bK2zcsOp3wA=
+=Ij+B
+-----END PGP SIGNATURE-----

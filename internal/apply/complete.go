@@ -44,8 +44,9 @@ func (a *Applier) Complete() error {
 		}
 		return nil
 	}
-	// Error-Mode=any: by default apt-get update reports success even if no server could be reached.
-	if err := apt("update", "-o", "APT::Update::Error-Mode=any"); err != nil {
+	// Not Error-Mode=any: the step needs Ubuntu's archive, and an unreachable vanilla-router repository must not
+	// block it. Without internet the install below fails for lack of a candidate, and the timer tries again.
+	if err := apt("update"); err != nil {
 		return err
 	}
 	dpkg := []string{"-y", "-o", "DPkg::Lock::Timeout=600",

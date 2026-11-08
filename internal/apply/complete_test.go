@@ -58,8 +58,8 @@ func TestCompleteFetchesPackagesAndAllFirmware(t *testing.T) {
 			return true
 		})
 	}
-	if !has("apt-get update", "Error-Mode=any") {
-		t.Error("update must fail if no server is reachable:", r.calls)
+	if has("apt-get update", "Error-Mode=any") {
+		t.Error("an unreachable vanilla-router repository would block the step:", r.calls)
 	}
 	if !has("apt-get install", "ubuntu-server") {
 		t.Error("packages not installed:", r.calls)
@@ -78,7 +78,7 @@ func TestCompleteFetchesPackagesAndAllFirmware(t *testing.T) {
 
 func TestCompleteWithoutInternetTriesAgainLater(t *testing.T) {
 	a, r, stamp := completeSetup(t)
-	r.fail = "update"
+	r.fail = "install" // no candidate without internet
 	if err := a.Complete(); err == nil {
 		t.Fatal("expected an error so that the timer tries again")
 	}

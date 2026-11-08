@@ -20,6 +20,7 @@ func networkd(c *config.Config) []File {
 		fs = append(fs, File{Path: networkDir + name, Mode: 0o644, Group: group, Content: []byte(header("#") + w.String())})
 	}
 	ipv6 := c.WAN.IPv6.Mode == "auto"
+	segs := routedSegments(c)
 
 	// Fixed names: wan0, lanp1 … The order of the LAN ports follows config.json.
 	link := func(mac, name string) *ini {
@@ -44,6 +45,10 @@ func networkd(c *config.Config) []File {
 	br.kv("Kind", "bridge")
 	br.section("Bridge")
 	br.kv("STP", "no")
+	if len(segs) > 0 {
+		br.kv("VLANFiltering", "yes")
+		br.kv("DefaultPVID", "1")
+	}
 	f("20-vr-"+LANIf+".netdev", GroupNetworkd, br)
 
 	ports := &ini{}
@@ -53,6 +58,9 @@ func networkd(c *config.Config) []File {
 	ports.kv("RequiredForOnline", "no")
 	ports.section("Network")
 	ports.kv("Bridge", LANIf)
+	if len(segs) > 0 {
+		bridgeVLANs(ports, segs)
+	}
 	f("30-vr-"+LANPort+".network", GroupNetworkd, ports)
 
 	// Internet port
@@ -157,6 +165,9 @@ func networkd(c *config.Config) []File {
 	lan.kv("ConfigureWithoutCarrier", "yes")
 	lan.kv("IPv6AcceptRA", "no")
 	lan.kv("LinkLocalAddressing", "ipv6")
+	for _, s := range segs {
+		lan.kv("VLAN", SegmentIf(s.VLAN))
+	}
 	pd := ipv6 && c.LAN.IPv6.FromWANPrefix
 	sendRA := hasULA || pd
 	lan.kv("IPv6SendRA", yesno(sendRA))
@@ -181,6 +192,10 @@ func networkd(c *config.Config) []File {
 	if hasULA {
 		lan.section("IPv6Prefix")
 		lan.kv("Prefix", ula.String())
+	}
+	if len(segs) > 0 {
+		bridgeVLANs(lan, segs)
+		segmentNetworkd(f, segs)
 	}
 	f("30-vr-"+LANIf+".network", GroupNetworkd, lan)
 	return fs

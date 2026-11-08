@@ -71,7 +71,7 @@ if [ "$1" = configure ]; then
 	systemctl daemon-reload || true
 	# Update ($2 = old version): run the new programs. Sessions of the web interface end, the setup stays (F-UPD-08).
 	if [ -n "$2" ]; then
-		systemctl try-restart vr-webui-helper.service vr-webui.service vr-dnsmasq.service || true
+		systemctl try-restart vr-webui-helper.service vr-webui.service vr-apd.service vr-ap.service vr-dnsmasq.service || true
 	fi
 fi
 EOF

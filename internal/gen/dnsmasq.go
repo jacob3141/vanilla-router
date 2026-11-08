@@ -76,6 +76,9 @@ func DNSmasq(c *config.Config) string {
 	for _, r := range c.DHCP.Reservations {
 		w("dhcp-host=%s,%s,%s", r.MAC, r.IP, r.Name)
 	}
+	if segs := routedSegments(c); len(segs) > 0 {
+		segmentDNSmasq(w, segs, lease, dom)
+	}
 	return b.String()
 }
 

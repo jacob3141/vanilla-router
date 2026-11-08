@@ -265,7 +265,7 @@ export default {
 };
 
 // Country names in the language of the page, from the browser. The names from the router are the fallback.
-function countryList(list) {
+export function countryList(list) {
   let names = null;
   try { names = new Intl.DisplayNames([locale() || 'en'], { type: 'region' }); } catch { /* old browser */ }
   return (list || []).map((x) => ({ code: x.code, name: names?.of(x.code) || x.name }))

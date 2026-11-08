@@ -26,6 +26,7 @@ type Handler func(ctx context.Context, params json.RawMessage) (any, error)
 type Config struct {
 	Socket     string
 	AllowUID   int    // besides root only this user may connect
+	APDUID     int    // the user of vr-apd, which may call the actions ap.* and nothing else (-1 = none)
 	SocketGID  int    // group of the socket
 	DryRun     bool   // dry run: write files only under Root, apply nothing
 	FakeWiFi   bool   // only with DryRun: simulate a Wi-Fi adapter for the test instance
@@ -54,6 +55,10 @@ func NewServer(cfg Config) *Server {
 		s.wifi = fakeWiFi{mu: &installFlag{}}
 	}
 	s.registerAll()
+	if s.fakeAPs() {
+		s.seedFakePairing()
+		s.refreshFakeReports()
+	}
 	return s
 }
 
@@ -122,7 +127,7 @@ func peerUID(c *net.UnixConn) (int, error) {
 func (s *Server) serveConn(ctx context.Context, conn *net.UnixConn) {
 	defer conn.Close()
 	uid, err := peerUID(conn)
-	if err != nil || (uid != 0 && uid != s.cfg.AllowUID) {
+	if err != nil || (uid != 0 && uid != s.cfg.AllowUID && (s.cfg.APDUID <= 0 || uid != s.cfg.APDUID)) {
 		s.cfg.Log.Warn("connection rejected", "uid", uid, "err", err)
 		return
 	}
@@ -132,6 +137,11 @@ func (s *Server) serveConn(ctx context.Context, conn *net.UnixConn) {
 	dec := json.NewDecoder(bufio.NewReader(&limitedReader{conn, maxMessage}))
 	if err := dec.Decode(&req); err != nil {
 		writeResp(conn, Response{Error: "request unreadable"})
+		return
+	}
+	if !s.allowed(uid, req.Action) {
+		s.cfg.Log.Warn("action not allowed for this user", "action", req.Action, "uid", uid)
+		writeResp(conn, Response{Error: "Unknown action"})
 		return
 	}
 	h, ok := s.handlers[req.Action]
@@ -168,11 +178,23 @@ func (s *Server) serveConn(ctx context.Context, conn *net.UnixConn) {
 	writeResp(conn, resp)
 }
 
+// allowed decides per action. ap.* is only for vr-apd: it faces the network and may do nothing else, and the web
+// server has no business with the router's key.
+func (s *Server) allowed(uid int, action string) bool {
+	if uid == 0 {
+		return true
+	}
+	if strings.HasPrefix(action, "ap.") {
+		return s.cfg.APDUID > 0 && uid == s.cfg.APDUID
+	}
+	return uid == s.cfg.AllowUID
+}
+
 func writeResp(c net.Conn, r Response) { json.NewEncoder(c).Encode(r) }
 
 // isReadOnly: read-only actions are not logged individually, so as not to flood the journal.
 func isReadOnly(action string) bool {
-	return strings.HasSuffix(action, ".list") || strings.HasSuffix(action, ".get") ||
+	return strings.HasPrefix(action, "ap.") || strings.HasSuffix(action, ".list") || strings.HasSuffix(action, ".get") ||
 		strings.HasSuffix(action, ".status") || action == "health" || strings.HasPrefix(action, "tool.")
 }
 
@@ -230,5 +252,8 @@ func (s *Server) registerAll() {
 	s.registerExtras()
 	s.registerSettings()
 	s.registerWiFi()
+	s.registerWireless()
+	s.registerFakeWireless()
+	s.registerAPActions()
 	s.registerConsole()
 }

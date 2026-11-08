@@ -416,10 +416,18 @@ func (s *Server) pruneSecrets() {
 	if c.WiFi != nil {
 		keep[c.WiFi.PasswordRef] = true
 	}
+	if w := c.Wireless; w != nil {
+		for _, n := range w.Networks {
+			keep[n.PasswordRef] = true
+			if n.Roaming != nil {
+				keep[n.Roaming.KeyRef] = true
+			}
+		}
+	}
 	dir := s.secrets().Dir
 	ents, _ := os.ReadDir(dir)
 	for _, e := range ents {
-		if n := e.Name(); (n == "pppoe" || strings.HasPrefix(n, "pppoe-") || strings.HasPrefix(n, wifiRef)) && !keep[n] {
+		if n := e.Name(); (n == "pppoe" || strings.HasPrefix(n, "pppoe-") || strings.HasPrefix(n, wifiRef) || strings.HasPrefix(n, wnetRef) || strings.HasPrefix(n, ftRef)) && !keep[n] {
 			os.Remove(filepath.Join(dir, n))
 		}
 	}

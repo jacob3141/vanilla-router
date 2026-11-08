@@ -11,6 +11,7 @@
 # Usage: test/dev/webui.sh [port]          default 9443, then open http://127.0.0.1:9443
 #        VR_DETECTED=pppoe test/dev/webui.sh   pretend the assistant detected PPPoE over VLAN 7
 #        VR_WIFI=1 test/dev/webui.sh           simulate a Wi-Fi adapter, the page appears (F-WIFI-04)
+#        VR_APD=1 VR_WIFI=1 test/dev/webui.sh   additionally a real vr-apd on 127.0.0.1:7443 and a real agent in a dry run
 # Stop with Ctrl+C. Work folder: test/dev/work (recreated at every start).
 set -euo pipefail
 export CGO_ENABLED=0 # the project is pure Go, do not depend on a C toolchain
@@ -25,7 +26,7 @@ command -v go >/dev/null || { echo "go is missing, see docs/development.md" >&2;
 rm -rf "$WORK"
 mkdir -p "$WORK/bin" "$WORK/root/etc/vanilla-router" "$WORK/data" dev
 echo "building vr-webui and vrctl …"
-go build -o "$WORK/bin/" ./cmd/vr-webui ./cmd/vrctl
+go build -ldflags "-X main.version=dev" -o "$WORK/bin/" ./cmd/vr-webui ./cmd/vrctl
 
 CFG="$WORK/root/etc/vanilla-router/config.json"
 "$WORK/bin/vrctl" default --wan-mac 02:00:00:00:00:01 --lan-mac 02:00:00:00:00:02,02:00:00:00:00:03 >"$CFG"
@@ -52,13 +53,19 @@ cleanup() { kill $(jobs -p) 2>/dev/null || true; rm -rf "$SOCKS"; }
 trap cleanup EXIT INT TERM
 
 "$WORK/bin/vr-webui" helper --dry-run --root "$WORK/root" --allow-user "$(id -un)" \
-	--socket "$SOCKS/helper.sock" "${FAKE_WIFI[@]}" >"$WORK/helper.log" 2>&1 &
+	--apd-user "$(id -un)" --socket "$SOCKS/helper.sock" "${FAKE_WIFI[@]}" >"$WORK/helper.log" 2>&1 &
 for _ in $(seq 50); do [ -S "$SOCKS/helper.sock" ] && break; sleep 0.1; done
 [ -S "$SOCKS/helper.sock" ] || { cat "$WORK/helper.log"; exit 1; }
 
 "$WORK/bin/vr-webui" serve --dev --config "$CFG" --data "$WORK/data" --helper "$SOCKS/helper.sock" \
 	--files "$SOCKS/files.sock" --listen "127.0.0.1:$PORT" --redirect off \
 	--origins "http://127.0.0.1:$PORT,http://localhost:$PORT" "${FAKE_WIFI[@]}" >"$WORK/serve.log" 2>&1 &
+
+if [ -n "${VR_APD:-}" ]; then
+	"$WORK/bin/vr-webui" apd --helper "$SOCKS/helper.sock" --listen 127.0.0.1:7443 >"$WORK/apd.log" 2>&1 &
+	sleep 1
+	"$WORK/bin/vrctl" ap run --dry "$PWD/$WORK/ap-root" --router 127.0.0.1:7443 >"$WORK/agent.log" 2>&1 &
+fi
 
 for _ in $(seq 50); do
 	if (exec 3<>"/dev/tcp/127.0.0.1/$PORT") 2>/dev/null; then break; fi

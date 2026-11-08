@@ -20,6 +20,7 @@ import network from './views/network.js';
 import logs from './views/logs.js';
 import internet, { SETUP_LATER_KEY } from './views/internet.js';
 import wifi from './views/wifi.js';
+import wireless from './views/wireless.js';
 import { setupPalette } from './palette.js';
 
 // Navigation: section → views. Each view exports { title, subtitle, render(container) }
@@ -30,6 +31,7 @@ const NAV = [
     { path: 'internet', label: 'Internet & home network', icon: 'globe', view: internet },
     // Only with Wi-Fi hardware (F-WIFI-04). Opened directly without hardware, the page explains why.
     { path: 'wifi', label: 'Wi-Fi', icon: 'wifi', view: wifi, feature: 'wifi' },
+    { path: 'wireless', label: 'Access points', icon: 'router', view: wireless },
     { path: 'devices', label: 'Devices', icon: 'devices', view: devices },
     { path: 'monitor', label: 'Online-Monitor', icon: 'activity', view: monitor },
     { path: 'dns', label: 'DNS', icon: 'dns', view: dns },

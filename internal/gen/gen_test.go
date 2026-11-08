@@ -88,8 +88,16 @@ func cases(t *testing.T) map[string]*config.Config {
 	wifiOff := base(t)
 	wifiOff.WiFi = &config.WiFi{Interface: "wlp3s0", SSID: "Home", PasswordRef: "wifi", Country: "DE", Band: config.WiFiBand24, Channel: 1, Width: 20}
 
+	// Guest and older-devices segments: VLANs, DHCP and firewall rules on the router
+	segments := base(t)
+	segments.Wireless = &config.Wireless{Country: "DE", Segments: []config.Segment{
+		{ID: "home", Name: "Home network", VLAN: 1, Access: config.AccessLAN},
+		{ID: "guest", Name: "Guests", VLAN: 20, Access: config.AccessInternet, IPv4: "192.168.20.1/24"},
+		{ID: "older", Name: "Older devices", VLAN: 30, Access: config.AccessInternet, IPv4: "192.168.30.1/28", ReachableFrom: []string{"home"}},
+	}, Networks: []config.WNetwork{}, AccessPoints: []config.AccessPoint{}}
+
 	return map[string]*config.Config{"dhcp": dhcp, "pppoe-vlan7": pppoe, "static-full": full, "ipv6-pinhole": pin,
-		"wifi-24": wifi24, "wifi-5-80": wifi5, "wifi-5-40": wifi5ht, "wifi-off": wifiOff}
+		"wifi-24": wifi24, "wifi-5-80": wifi5, "wifi-5-40": wifi5ht, "wifi-off": wifiOff, "wireless-segments": segments}
 }
 
 func TestGolden(t *testing.T) {

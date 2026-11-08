@@ -84,6 +84,7 @@ func New(cfg Config) *Server {
 	s.registerAdmin()
 	s.registerSettings()
 	s.registerWiFi()
+	s.registerWireless()
 	return s
 }
 

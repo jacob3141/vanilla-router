@@ -1,0 +1,17 @@
+{
+  "access_point": "hall",
+  "radios": [
+    {
+      "id": "pci-0000-03-00-0",
+      "interface": "wlr0",
+      "power": "medium",
+      "idle": false
+    },
+    {
+      "id": "pci-0000-04-00-0",
+      "interface": "wlr1",
+      "power": "medium",
+      "idle": false
+    }
+  ]
+}

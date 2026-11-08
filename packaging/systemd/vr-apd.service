@@ -1,0 +1,42 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Connection to the access points (docs/sdn-concept.md 4.5). No root and no secrets on disk: everything goes through the
+# fixed actions ap.* of the helper. The firewall limits the port to the home network.
+[Unit]
+Description=vanilla-router access point service
+After=network.target vr-webui-helper.service
+Wants=vr-webui-helper.service
+ConditionPathExists=/etc/vanilla-router/config.json
+
+[Service]
+Type=simple
+User=vr-apd
+Group=vr-apd
+SupplementaryGroups=vr-webui
+ExecStart=/usr/sbin/vr-webui apd
+Restart=on-failure
+RestartSec=5
+
+CapabilityBoundingSet=
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

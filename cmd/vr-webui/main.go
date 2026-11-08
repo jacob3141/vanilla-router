@@ -8,12 +8,15 @@
 //	vr-webui setup-code     shows the setup code (until the password is set)
 //	vr-webui set-password   sets the password, reads it from stdin (emergency reset)
 //	vr-webui files          file service for a share (extension, F-ADD)
+//	vr-webui apd            connection to the access points, runs as user vr-apd
 package main
 
 import (
 	"bufio"
 	"context"
+	"crypto/ed25519"
 	"crypto/tls"
+	"encoding/hex"
 	"errors"
 	"flag"
 	"fmt"
@@ -31,6 +34,7 @@ import (
 	"syscall"
 	"time"
 
+	"vanilla-router/internal/apd"
 	"vanilla-router/internal/api"
 	"vanilla-router/internal/auth"
 	"vanilla-router/internal/conf"
@@ -48,6 +52,7 @@ const (
 	helperSock = "/run/vr-webui/helper.sock"
 	filesSock  = "/run/vr-webui-files/files.sock"
 	webUser    = "vr-webui"
+	apdUser    = "vr-apd"
 )
 
 // version and sourceURL are set by the build (-ldflags -X). sourceURL points to the source of exactly
@@ -75,6 +80,8 @@ func main() {
 		err = cmdSetPassword(os.Args[2:])
 	case "files":
 		err = cmdFiles(os.Args[2:])
+	case "apd":
+		err = cmdAPD(os.Args[2:])
 	default:
 		usage()
 	}
@@ -85,7 +92,7 @@ func main() {
 }
 
 func usage() {
-	fmt.Fprintln(os.Stderr, "Usage: vr-webui serve|helper|prepare|setup-code|set-password|files [options]")
+	fmt.Fprintln(os.Stderr, "Usage: vr-webui serve|helper|prepare|setup-code|set-password|files|apd [options]")
 	os.Exit(2)
 }
 
@@ -312,6 +319,7 @@ func cmdHelper(args []string) error {
 	dryRun := fl.Bool("dry-run", false, "dry run: write files under --root, apply nothing")
 	root := fl.String("root", "", "root for the dry run")
 	fakeWiFi := fl.Bool("fake-wifi", false, "dry run: simulate a Wi-Fi adapter")
+	apdName := fl.String("apd-user", apdUser, "user of vr-apd")
 	fl.Parse(args)
 
 	// In a dry run it works without root (development): the checks with nft and dnsmasq are then skipped.
@@ -327,11 +335,15 @@ func cmdHelper(args []string) error {
 	}
 	uid, _ := strconv.Atoi(u.Uid)
 	gid, _ := strconv.Atoi(u.Gid)
+	apdUID := -1
+	if a, err := user.Lookup(*apdName); err == nil {
+		apdUID, _ = strconv.Atoi(a.Uid)
+	}
 
 	ctx, cancel := signalContext()
 	defer cancel()
 	return helper.NewServer(helper.Config{
-		Socket: *sock, AllowUID: uid, SocketGID: gid,
+		Socket: *sock, AllowUID: uid, APDUID: apdUID, SocketGID: gid,
 		DryRun: *dryRun, Root: *root, Log: logger(), FakeWiFi: *fakeWiFi,
 	}).Run(ctx)
 }
@@ -466,4 +478,27 @@ func cmdSetPassword(args []string) error {
 	}
 	fmt.Fprintln(os.Stderr, "Password set. Running sessions end at the next restart of the service.")
 	return nil
+}
+
+// cmdAPD serves the access points on the home network (docs/sdn-concept.md 4.5). The firewall keeps the port to lan0.
+func cmdAPD(args []string) error {
+	fl := flag.NewFlagSet("apd", flag.ExitOnError)
+	sock := fl.String("helper", helperSock, "socket of the helper")
+	listen := fl.String("listen", fmt.Sprintf(":%d", apd.Port), "address")
+	fl.Parse(args)
+	ctx, cancel := signalContext()
+	defer cancel()
+	cl := &helper.Client{Socket: *sock}
+	var id struct {
+		Seed string `json:"seed"`
+	}
+	if err := cl.Call(ctx, "ap.identity", nil, &id); err != nil {
+		return fmt.Errorf("the router's key: %w", err)
+	}
+	seed, err := hex.DecodeString(id.Seed)
+	if err != nil || len(seed) != ed25519.SeedSize {
+		return fmt.Errorf("the router's key is damaged")
+	}
+	s := &apd.Server{Backend: cl, Key: ed25519.NewKeyFromSeed(seed), Version: version, Log: logger()}
+	return s.Serve(ctx, *listen)
 }

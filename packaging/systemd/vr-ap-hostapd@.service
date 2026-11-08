@@ -1,0 +1,33 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# hostapd for one Wi-Fi card of an access point, the agent (vrctl ap run) starts and stops the instances.
+[Unit]
+Description=vanilla-router access point radio %i (hostapd)
+After=systemd-networkd.service
+Wants=systemd-networkd.service
+ConditionPathExists=/etc/vanilla-router/ap/hostapd-%i.conf
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+ExecStartPre=-/usr/sbin/rfkill unblock wifi
+ExecStart=/usr/sbin/hostapd /etc/vanilla-router/ap/hostapd-%i.conf
+Restart=on-failure
+RestartSec=15
+RuntimeDirectory=hostapd
+RuntimeDirectoryPreserve=yes
+
+# As vr-hostapd.service. Check against real hardware (concept, stage 0).
+CapabilityBoundingSet=CAP_NET_ADMIN CAP_NET_RAW
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK AF_PACKET
+RestrictNamespaces=yes
+LockPersonality=yes
+SystemCallArchitectures=native
+
+[Install]
+WantedBy=multi-user.target

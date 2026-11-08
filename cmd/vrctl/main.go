@@ -15,6 +15,7 @@
 //	vrctl snapshot pre-update|list    snapshots (M5), the apt hook calls pre-update
 //	vrctl health [--mark-good] [--timeout 10m] [--reboot-on-fail]
 //	vrctl complete                    fetch the rest of the system once online (D-17)
+//	vrctl ap enable|run|rollback|status   role access point (docs/sdn-concept.md)
 package main
 
 import (
@@ -68,6 +69,8 @@ func main() {
 		err = cmdHealth(args)
 	case "complete":
 		err = applier().Complete()
+	case "ap":
+		err = cmdAP(args)
 	case "-h", "--help", "help":
 		usage()
 	default:
@@ -89,7 +92,7 @@ func main() {
 }
 
 func usage() {
-	fmt.Fprint(os.Stderr, `vrctl validate | render | apply | confirm | rollback | status | default | secret | firewall-load | setup | snapshot | health | complete
+	fmt.Fprint(os.Stderr, `vrctl validate | render | apply | confirm | rollback | status | default | secret | firewall-load | setup | snapshot | health | complete | ap
 Help for a command: vrctl <command> -h
 `)
 	os.Exit(2)

@@ -26,16 +26,18 @@ const FileMode = 0o644
 
 // Config is the desired state of the router.
 type Config struct {
-	Schema   int      `json:"schema"`
-	System   System   `json:"system"`
-	WAN      WAN      `json:"wan"`
-	LAN      LAN      `json:"lan"`
-	WiFi     *WiFi    `json:"wifi,omitempty"`
-	DHCP     DHCP     `json:"dhcp"`
-	DNS      DNS      `json:"dns"`
-	Firewall Firewall `json:"firewall"`
-	Services Services `json:"services"`
-	Updates  Updates  `json:"updates"`
+	Schema int    `json:"schema"`
+	System System `json:"system"`
+	WAN    WAN    `json:"wan"`
+	LAN    LAN    `json:"lan"`
+	WiFi   *WiFi  `json:"wifi,omitempty"`
+	// Wireless: several access points with the router as their center (docs/sdn-concept.md), optional.
+	Wireless *Wireless `json:"wireless,omitempty"`
+	DHCP     DHCP      `json:"dhcp"`
+	DNS      DNS       `json:"dns"`
+	Firewall Firewall  `json:"firewall"`
+	Services Services  `json:"services"`
+	Updates  Updates   `json:"updates"`
 }
 
 // System holds general settings.

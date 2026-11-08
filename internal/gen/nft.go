@@ -27,6 +27,7 @@ func Firewall(c *config.Config) string {
 	wan := UplinkIf(c)
 	q := func(s string) string { return `"` + s + `"` }
 	W, L := q(wan), q(LANIf)
+	segs := routedSegments(c)
 
 	table(&b, "inet vr_filter", func(t *strings.Builder) {
 		t.WriteString("\tset icmpv6_errors {\n\t\ttype icmpv6_type\n\t\telements = { destination-unreachable, packet-too-big, time-exceeded, parameter-problem }\n\t}\n\n")
@@ -35,7 +36,11 @@ func Firewall(c *config.Config) string {
 		t.WriteString("\t\tiif \"lo\" accept\n")
 		t.WriteString("\t\tct state established,related accept\n")
 		t.WriteString("\t\tct state invalid drop\n")
-		fmt.Fprintf(t, "\t\tiifname %s accept comment \"home network may do anything\"\n\n", L)
+		fmt.Fprintf(t, "\t\tiifname %s accept comment \"home network may do anything\"\n", L)
+		segmentInput(t, segs)
+		if len(segs) == 0 {
+			t.WriteString("\n")
+		}
 		t.WriteString("\t\t# ICMPv6 per RFC 4890: without ND, RA, MLD and PMTU, IPv6 does not work\n")
 		t.WriteString("\t\ticmpv6 type @icmpv6_errors accept\n")
 		t.WriteString("\t\ticmpv6 type { nd-router-advert, nd-neighbor-solicit, nd-neighbor-advert } ip6 hoplimit 255 accept\n")
@@ -59,6 +64,9 @@ func Firewall(c *config.Config) string {
 		t.WriteString("\t\tct state established,related accept\n")
 		t.WriteString("\t\tct state invalid drop\n")
 		fmt.Fprintf(t, "\t\tiifname %s oifname %s accept comment \"home network to internet\"\n", L, W)
+		if len(segs) > 0 {
+			segmentForward(t, segs, c.Wireless, wan)
+		}
 		fmt.Fprintf(t, "\t\tiifname %s oifname %s meta nfproto ipv4 ct status dnat accept comment \"port forwards (DNAT in vr_portfw)\"\n", W, L)
 		t.WriteString("\t\ticmpv6 type @icmpv6_errors accept\n")
 		fmt.Fprintf(t, "\t\ticmpv6 type echo-request iifname %s oifname %s limit rate 10/second accept\n", W, L)

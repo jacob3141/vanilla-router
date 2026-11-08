@@ -410,3 +410,8 @@ dialog::backdrop { background: rgba(5, 8, 14, .55); backdrop-filter: blur(2px); 
 .banner.warn { background: var(--warn-soft); }
 .banner.crit { background: var(--crit-soft); }
 .banner svg { width: 18px; height: 18px; flex: none; margin-top: 1px; }
+
+/* Access points: pairing request with the code to compare */
+.pair-request { padding: 12px 14px; border: 1px solid var(--accent); border-radius: var(--radius-s); background: var(--accent-soft); }
+.pair-code { font: 600 26px/1.2 var(--mono); letter-spacing: 2px; white-space: nowrap; }
+.btn.wrap { white-space: normal; height: auto; min-height: 36px; padding-block: 6px; text-align: left; }

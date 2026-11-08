@@ -1,0 +1,17 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Agent on an access point (docs/sdn-concept.md 3.1): pairs with the router and applies what it renders for this AP.
+# Runs only on a computer in the role access point (vrctl ap enable). Root, because it writes network files and starts hostapd.
+[Unit]
+Description=vanilla-router access point agent
+After=network-online.target
+Wants=network-online.target
+ConditionPathExists=/etc/vanilla-router/role-ap
+
+[Service]
+Type=simple
+ExecStart=/usr/sbin/vrctl ap run
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

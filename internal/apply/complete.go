@@ -46,7 +46,8 @@ func (a *Applier) Complete() error {
 	}
 	// Not Error-Mode=any: the step needs Ubuntu's archive, and an unreachable vanilla-router repository must not
 	// block it. Without internet the install below fails for lack of a candidate, and the timer tries again.
-	if err := apt("update"); err != nil {
+	// A missing Release file is an error even then, so only Ubuntu's archive is read here.
+	if err := apt("update", "-o", "Dir::Etc::sourcelist=sources.list.d/ubuntu.sources", "-o", "Dir::Etc::sourceparts=-"); err != nil {
 		return err
 	}
 	dpkg := []string{"-y", "-o", "DPkg::Lock::Timeout=600",

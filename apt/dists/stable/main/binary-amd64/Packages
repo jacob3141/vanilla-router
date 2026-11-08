@@ -54,17 +54,17 @@ Description: Router built from an unmodified Ubuntu Server
 
 Package: vanilla-router
 Architecture: amd64
-Version: 0.0.7
+Version: 0.0.8
 Priority: optional
 Section: net
 Maintainer: vanilla-router <vanilla-router@invalid>
-Depends: ubuntu-minimal, systemd-resolved, ca-certificates, nftables, dnsmasq-base, ppp, btrfs-progs, chrony, openssh-server, unattended-upgrades, apparmor, ethtool, iproute2, samba
-Filename: pool/main/v/vanilla-router/vr-0.0.7.deb
-Size: 5341724
-MD5sum: 8e4fd033b03daad0d2bc5dc7dffc2ec0
-SHA1: b548149f037dc5a9439f71d6e7fe52539739cea6
-SHA256: ffa3282cfbfd7181bae793ab443ae2728b279958c26e268a220bed4e62516ab6
-SHA512: 4b9a988f694fbeb1054b5cdf8bfe7b86c0e6930db1ee6dca6524b4b7e3cbd5fdbf7f7eb4f53ac2e696974563e755ff16c86b4856069bf0a7be9567e440922c33
+Depends: ubuntu-minimal, systemd-resolved, ca-certificates, nftables, dnsmasq-base, ppp, btrfs-progs, chrony, openssh-server, unattended-upgrades, apparmor, ethtool, iproute2, samba, docker.io, docker-compose-v2
+Filename: pool/main/v/vanilla-router/vanilla-router_0.0.8_amd64.deb
+Size: 5345208
+MD5sum: a424eaf5f38d0fac0118051423fad5fd
+SHA1: 3bbfbcb06005b0534891ea3f2609c84b2e71286a
+SHA256: 71a430b8014610486087135acd825c6133d7bf8fdc7ea768ae8f1c055ba313ac
+SHA512: 331158a43beabd8422dabe8b407beacd019a8205f80c6f5cd3fb6a1d327d370e120c107c57054cadc1c447867632c63d6a87c0d86872f1d4d4091b4fd00f1df5
 Homepage: https://github.com/jacob3141/vanilla-router
 Description: Router built from an unmodified Ubuntu Server
  Generates network, firewall, DNS and DHCP from a single configuration file

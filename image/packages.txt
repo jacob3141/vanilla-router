@@ -16,3 +16,5 @@ apparmor
 ethtool
 iproute2
 samba
+docker.io
+docker-compose-v2

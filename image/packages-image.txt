@@ -9,5 +9,3 @@ locales
 language-pack-de
 keyboard-configuration
 console-setup
-docker.io
-docker-compose-v2

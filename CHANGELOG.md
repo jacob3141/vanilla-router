@@ -2,6 +2,12 @@
 
 Pre-releases: **not ready for production use**. See [the status](docs/architecture.md#15-status-what-has-been-tested-for-real).
 
+## 0.0.8 (2026-11-09)
+
+### Changed
+
+- Docker is now a dependency of the package, so routers installed from an older image get it through an update. It needs 0.0.7 first, which brings the package source.
+
 ## 0.0.7 (2026-11-09)
 
 ### Added

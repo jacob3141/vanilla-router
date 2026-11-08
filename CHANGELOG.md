@@ -2,6 +2,12 @@
 
 Pre-releases: **not ready for production use**. See [the status](docs/architecture.md#15-status-what-has-been-tested-for-real).
 
+## 0.0.6 (2026-11-08)
+
+### Added
+
+- SSH access can be switched on in the web interface (Settings), with public keys for the user admin. Without it an installed router had no way to a shell.
+
 ## 0.0.5 (2026-11-08)
 
 **Untested pre-release.** It was published to get a working update path for bug fixes. Expect errors. The new access point feature has never run on a real radio.

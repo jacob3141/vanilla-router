@@ -251,6 +251,7 @@ func (s *Server) registerAll() {
 	s.registerSysinfo()
 	s.registerExtras()
 	s.registerSettings()
+	s.registerSSH()
 	s.registerWiFi()
 	s.registerWireless()
 	s.registerFakeWireless()

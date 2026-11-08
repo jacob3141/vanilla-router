@@ -19,6 +19,8 @@ func (s *Server) registerSettings() {
 		"Saved. Devices get the new values the next time they renew their address."))
 	s.route("POST /api/settings/confirm", s.forward("settings.confirm", "Change confirmed."))
 	s.route("POST /api/settings/revert", s.forward("settings.revert", "Change rolled back."))
+	s.route("GET /api/settings/ssh", s.get("ssh.get"))
+	s.route("POST /api/settings/ssh", s.forward("ssh.set", "Saved."))
 	s.route("GET /api/settings/check", s.handleInternetCheck)
 }
 

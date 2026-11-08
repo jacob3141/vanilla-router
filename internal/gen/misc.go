@@ -103,6 +103,10 @@ AllowAgentForwarding no
 		keys += k + "\n"
 	}
 	add("/etc/vanilla-router/ssh/admin.keys", GroupSSH, 0o644, keys)
+	// The account admin has no password (key login only), so sudo cannot ask for one. Only while SSH is on.
+	if c.Services.SSH.Enabled {
+		add("/etc/sudoers.d/vr-admin", GroupSSH, 0o440, header("#")+"admin ALL=(ALL:ALL) NOPASSWD: ALL\n")
+	}
 
 	auto := "0"
 	if c.Updates.SecurityAuto {

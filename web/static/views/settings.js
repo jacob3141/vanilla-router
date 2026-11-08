@@ -5,7 +5,7 @@ import { get, post } from '../api.js';
 
 export default {
   title: 'Settings',
-  subtitle: 'Access to the web interface',
+  subtitle: 'Access to the web interface and the router',
   render(root) {
     const err = h('div', { class: 'form-error hidden' });
     const cur = h('input', { class: 'input', type: 'password', autocomplete: 'current-password', required: true });
@@ -46,6 +46,33 @@ export default {
     }
     loadSessions();
 
+    const sshBox = h('section', { class: 'card span-2' });
+    async function loadSSH() {
+      let d;
+      try { d = await get('/api/settings/ssh'); } catch { return; }
+      const on = h('input', { type: 'checkbox', checked: d.enabled });
+      const keys = h('textarea', { class: 'input mono', rows: '4', spellcheck: 'false', autocomplete: 'off', placeholder: 'ssh-ed25519 AAAA… name' });
+      keys.value = d.keys.join('\n');
+      const sshErr = h('div', { class: 'form-error hidden' });
+      const sshForm = h('form', null, sshErr,
+        h('div', { class: 'field' }, h('label', { class: 'row' }, on, 'Allow SSH access from the home network')),
+        field('Public keys', keys, 'One key per line. The user is admin. There is no password login.'),
+        h('div', { class: 'row end' }, h('button', { class: 'btn primary', type: 'submit' }, icon('check'), 'Save')));
+      sshForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        sshErr.classList.add('hidden');
+        try {
+          toast((await post('/api/settings/ssh', { enabled: on.checked, keys: keys.value.split('\n') })).message);
+          loadSSH();
+        } catch (ex) { sshErr.textContent = t(ex.message); sshErr.classList.remove('hidden'); }
+      });
+      clear(sshBox).append(
+        h('div', { class: 'card-head' }, h('span', { class: 'icon-badge' }, icon('lock')), h('h2', null, 'SSH access')),
+        h('p', { class: 'muted small' }, 'For maintenance. Whoever holds one of these keys has full control of the router.'),
+        sshForm);
+    }
+    loadSSH();
+
     root.append(h('div', { class: 'grid cols-2' },
       h('section', { class: 'card' },
         h('div', { class: 'card-head' }, h('span', { class: 'icon-badge' }, icon('lock')), h('h2', null, 'Password')),
@@ -62,6 +89,7 @@ export default {
           h('a', { class: 'btn', href: '/api/config/export', download: '' }, icon('download'), 'Export'),
           h('button', { class: 'btn', onclick: () => importInput.click() }, icon('arrowRight', 'rot-up'), 'Import …'),
           importInput)),
+      sshBox,
       h('section', { class: 'card span-2' },
         h('div', { class: 'card-head' }, h('span', { class: 'icon-badge' }, icon('info')), h('h2', null, 'Forgot your password?')),
         h('p', { class: 'muted small' }, 'Set a new password on the router through SSH. The command reads it from the keyboard without displaying it:'),

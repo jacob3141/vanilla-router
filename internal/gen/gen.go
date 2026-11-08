@@ -47,6 +47,7 @@ var Managed = []struct{ Dir, Glob, Group string }{
 	{"/etc/vanilla-router/nft", "*.nft", GroupFirewall},
 	{"/etc/ppp/peers", "vr-*", GroupPPP},
 	{"/etc/vanilla-router/wifi", "*.conf", GroupWiFi},
+	{"/etc/sudoers.d", "vr-*", GroupSSH},
 }
 
 // Header is in every generated text file.

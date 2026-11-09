@@ -132,3 +132,21 @@ func TestSecurityHeaders(t *testing.T) {
 		}
 	}
 }
+
+func TestStaticIsRevalidated(t *testing.T) {
+	s, _ := newTestServer(t)
+	w := do(s, "GET", "/", "", nil)
+	if w.Code != http.StatusOK || w.Header().Get("Cache-Control") != "no-cache" {
+		t.Fatalf("status %d, Cache-Control %q", w.Code, w.Header().Get("Cache-Control"))
+	}
+	tag := w.Header().Get("ETag")
+	if tag == "" {
+		t.Fatal("no ETag")
+	}
+	if w := do(s, "GET", "/", "", map[string]string{"If-None-Match": tag}); w.Code != http.StatusNotModified {
+		t.Errorf("same version: status %d, want 304", w.Code)
+	}
+	if w := do(s, "GET", "/", "", map[string]string{"If-None-Match": `"old"`}); w.Code != http.StatusOK {
+		t.Errorf("other version: status %d, want 200", w.Code)
+	}
+}

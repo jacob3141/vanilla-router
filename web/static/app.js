@@ -86,6 +86,35 @@ function renderThemeButton() {
 }
 renderThemeButton();
 
+// --- New version after an update -------------------------------------------------------
+// A tab that stayed open keeps the old code until it is loaded again. It reloads by itself, unless that
+// could cost something: typed input, an open dialog, or the System page, which shows the update's log.
+const VERSION_CHECK_MS = 60000;
+let loadedVersion = '';
+let userEdited = false;
+let updateNotice = null;
+
+function showUpdateNotice() {
+  if (updateNotice) return;
+  updateNotice = h('div', { class: 'banner update-notice', role: 'status' }, icon('info'),
+    h('div', null, 'A new version was installed. Reload the page to use it.'),
+    h('button', { class: 'btn sm primary', onclick: () => location.reload() }, 'Reload'));
+  document.body.appendChild(updateNotice);
+}
+
+async function checkVersion() {
+  let s;
+  try { s = await get('/api/state'); } catch { return; } // normal while the update restarts the service
+  if (!s.version || s.version === loadedVersion) return;
+  const onSystemPage = location.hash.replace(/^#\/?/, '').startsWith('system');
+  if (userEdited || onSystemPage || document.querySelector('dialog[open]')) showUpdateNotice();
+  else location.reload();
+}
+
+document.addEventListener('input', () => { userEdited = true; }, true);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) checkVersion(); });
+setInterval(checkVersion, VERSION_CHECK_MS);
+
 // --- Start ---------------------------------------------------------------------------
 async function boot() {
   let state;
@@ -95,6 +124,7 @@ async function boot() {
     clear(app).append(h('div', { class: 'auth-page' }, h('div', { class: 'card auth-card' }, h('h1', null, 'Not reachable'), h('p', { class: 'lead' }, e.message))));
     return;
   }
+  loadedVersion = state.version;
   await setLang(state.lang);
   app.className = '';
   if (!state.configured) return renderSetup(app, boot);
@@ -170,6 +200,7 @@ function route() {
   const path = location.hash.replace(/^#\/?/, '').split('?')[0] || 'dashboard';
   const entry = HIDDEN[path] || ROUTES[path] || ROUTES.dashboard;
   if (cleanup) { cleanup(); cleanup = null; }
+  userEdited = false; // what was typed on the previous page is gone anyway
   for (const [p, a] of Object.entries(navLinks)) a.classList.toggle('active', p === entry.path);
   shell.classList.remove('nav-open');
   titleEl.textContent = t(entry.view.title);

@@ -60,7 +60,7 @@ type Server struct {
 func New(cfg Config) *Server {
 	s := &Server{cfg: cfg, mux: http.NewServeMux(), devices: NewDeviceStore(cfg.DataDir)}
 
-	s.mux.Handle("GET /", http.FileServerFS(cfg.Static))
+	s.mux.Handle("GET /", staticHandler(cfg.Static))
 
 	// without login
 	s.mux.HandleFunc("GET /api/state", s.handleState)

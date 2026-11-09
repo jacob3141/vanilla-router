@@ -2,6 +2,12 @@
 
 Pre-releases: **not ready for production use**. See [the status](docs/architecture.md#15-status-what-has-been-tested-for-real).
 
+## 0.0.12 (2026-11-09)
+
+### Fixed
+
+- After an update the browser could keep showing the old web interface until a hard reload. It now checks every file with the router, and an open tab notices a new version: it reloads by itself, or shows a notice if something could be lost.
+
 ## 0.0.11 (2026-11-09)
 
 ### Fixed

@@ -423,3 +423,4 @@ dialog::backdrop { background: rgba(5, 8, 14, .55); backdrop-filter: blur(2px); 
 .home-device.offline { opacity: .6; }
 .home-entities { display: grid; gap: 6px; margin-top: 8px; }
 .home-entity { gap: 8px; min-height: 24px; }
+.banner.update-notice { position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); z-index: 1000; margin: 0; align-items: center; width: max-content; max-width: calc(100vw - 32px); background: var(--surface-3); box-shadow: 0 8px 30px rgba(0, 0, 0, .35); }

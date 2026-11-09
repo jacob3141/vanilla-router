@@ -1,24 +1,24 @@
 Architectures: amd64
 Codename: stable
 Components: main
-Date: Mon, 09 Nov 2026 07:37:46 +0000
+Date: Mon, 09 Nov 2026 08:55:46 +0000
 Description: vanilla-router updates
 Label: vanilla-router
 Origin: vanilla-router
 Suite: stable
 MD5Sum:
- 3bb5b23e5ba54fe1038e6366e48cb2f3              188 Release
- 8c3b8f08fc653d26ed74f01931a5557b             4931 main/binary-amd64/Packages
- f50f25e7dfd4c618cde1029a1b8ae194             1452 main/binary-amd64/Packages.gz
+ 89c763b9ad4da8850d83607371322d71              188 Release
+ 75b5aca14c4af09f6f1e5cbd4b13a390             5940 main/binary-amd64/Packages
+ 855db1598e6c0f4c48b1e152a699e7fe             1643 main/binary-amd64/Packages.gz
 SHA1:
- 61ceee01384496d73ca3cf5cab28f839790ae848              188 Release
- 700972cb8497c8621d76e2bb0067d2af3016137a             4931 main/binary-amd64/Packages
- 9d69bb40c3107b3659bb73048c7ac9edad83a8e8             1452 main/binary-amd64/Packages.gz
+ 3d9cf62c97896fe16ae78ff6d1664399598687e0              188 Release
+ 2cd6c85e70bd9c25442846f505716d2ef4107d08             5940 main/binary-amd64/Packages
+ 5a1a0cf79f817809e86b20635c253ade8fe233b3             1643 main/binary-amd64/Packages.gz
 SHA256:
- f936c772e54db2fc433d4fdc7838e0c25cc133b9f32fad84df1e6d538d9ca7e0              188 Release
- 2c2095206a904e3b7fed4acb38591a999cef4181bdd0c9959d1624236378cf1f             4931 main/binary-amd64/Packages
- d8eabd316f869ec0484390679ade91a7b37b5985749d339524144c3359462241             1452 main/binary-amd64/Packages.gz
+ 293a6595d3e5eb8a8b2b984a0b64c9d78527050f726a6cec842ccd2e58c48a34              188 Release
+ 5d8812f7e1a563a24c60e8fdc789f4fa314eb125f539a79f9b3f10bb30f50e0f             5940 main/binary-amd64/Packages
+ c178c4e86fbc2e455eed58e17cd35063a29c08a624a21d8c916baa2878a13f23             1643 main/binary-amd64/Packages.gz
 SHA512:
- ba0f6d41f5a5c57144aa4eb361075a1ee061a142c6cef6414a56a213d0dc9d005f8605886d95bea00f08943c49e67a9ed9e5b81fbe781da4af42da9e9088acec              188 Release
- f1101beee6402bcdc084092b3238388299aa877a296eb211e9cb272e17e596aaafb814d728891d3e3c6afc20e1a38a6f9c59b94e3305a4289a8d2dbdff267811             4931 main/binary-amd64/Packages
- dc40bcc5fd52705ce8dc7bea55dd1b5eb859ee2a8f24fd5c057174df052ed4107dcf8c055310a83589c318fe4194a09372b3b2a09be600e34f388d597d511e39             1452 main/binary-amd64/Packages.gz
+ 56cf6fd2510f3158a3bf2f204dd7a18ca8120e277a218f7c27ed85a1b14a13c660cbc6cb28098697e8a19c790a520382f138794ac6433a177011fb9f35b0429e              188 Release
+ 4eaad1e713ea6b2bcbcb12f26bd3f40dcbafa9018a167ae61816fee4b32450197e34a3f12989c98adad719d019e3aa5d50874e7748a2548fcc64f5432c7ea238             5940 main/binary-amd64/Packages
+ 110ed549bd7c0d8499de50683bee60815863a02e647e15d6632e2524e699da61834581e68a240569d548e44c88106170851f1d46662cd7e3154a98f20a85891a             1643 main/binary-amd64/Packages.gz

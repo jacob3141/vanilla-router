@@ -85,11 +85,11 @@ export default {
         memSub.textContent = t(`${fmt.bytes(used)} of ${fmt.bytes(l.mem.total)}`);
         setMeter(memBar, pct);
       }
-      const t = Date.parse(l.time) / 1000;
+      const at = Date.parse(l.time) / 1000;
       for (const n of ['wan0', 'lan0']) {
         const r = l.net?.[n];
         if (!r) continue;
-        live[n].push([t, r.rx, r.tx]);
+        live[n].push([at, r.rx, r.tx]);
         if (live[n].length > LIVE_POINTS) live[n].shift();
       }
       if (range === 'live') draw();

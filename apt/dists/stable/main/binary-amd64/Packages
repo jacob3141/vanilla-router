@@ -18,6 +18,24 @@ Description: Router built from an unmodified Ubuntu Server
 
 Package: vanilla-router
 Architecture: amd64
+Version: 0.0.11
+Priority: optional
+Section: net
+Maintainer: vanilla-router <vanilla-router@invalid>
+Depends: ubuntu-minimal, systemd-resolved, ca-certificates, nftables, dnsmasq-base, ppp, btrfs-progs, chrony, openssh-server, unattended-upgrades, apparmor, ethtool, iproute2, samba, docker.io, docker-compose-v2
+Filename: pool/main/v/vanilla-router/vanilla-router_0.0.11_amd64.deb
+Size: 5431128
+MD5sum: d12964d5dfd6c46c7e1d6abdd29cd932
+SHA1: 2206a97d7b59365674dfd186d694af28792d8c46
+SHA256: 518cab13aad5809363b89a0c16bf51e05cd3cb031e22108b604d0200ec2798d0
+SHA512: 238dddabd68f647b822244a6f8e0c8cdafd87a4c38cbec5956718fe9cc837d40f8df821203c28ae4cd58090c243bdb0d37fd189b7826a3d5838c445d9286514b
+Homepage: https://github.com/jacob3141/vanilla-router
+Description: Router built from an unmodified Ubuntu Server
+ Generates network, firewall, DNS and DHCP from a single configuration file
+ (/etc/vanilla-router/config.json) and applies changes checked and with rollback.
+
+Package: vanilla-router
+Architecture: amd64
 Version: 0.0.5
 Priority: optional
 Section: net

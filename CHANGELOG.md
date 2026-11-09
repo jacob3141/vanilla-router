@@ -2,6 +2,16 @@
 
 Pre-releases: **not ready for production use**. See [the status](docs/architecture.md#15-status-what-has-been-tested-for-real).
 
+## 0.0.9 (2026-11-09)
+
+### Security
+
+- **Images up to 0.0.8 set the password of the root account to `!` by mistake**, which allowed a login at the router's own console. Remote login as root was never possible. The update locks the account, and new images no longer have a password. If other people have physical access to your router, please update.
+
+### Fixed
+
+- The Firewall page no longer shows a card for fail2ban, which vanilla-router does not use.
+
 ## 0.0.8 (2026-11-09)
 
 ### Changed

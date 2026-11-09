@@ -229,6 +229,10 @@ func (in *Installer) Install(p Plan) (err error) {
 	if err := chroot("passwd", "--lock", "admin"); err != nil {
 		return err
 	}
+	// No login at the console either, whatever the image brought along
+	if err := chroot("passwd", "--lock", "root"); err != nil {
+		return err
+	}
 
 	next() // Finish
 	run(nil, "sync")

@@ -19,6 +19,11 @@ export default {
     const f2b = h('div');
     const natHint = h('div');
 
+    // fail2ban is not part of vanilla-router (D-10), the card only stays where somebody installed it
+    const f2bCard = h('section', { class: 'card span-2' },
+      h('div', { class: 'card-head' }, h('span', { class: 'icon-badge' }, icon('lock')), h('h2', null, 'Blocked attackers (fail2ban)')),
+      h('p', { class: 'muted small' }, 'fail2ban blocks IP addresses after repeated failed attempts, e.g. with SSH or the login to this web interface.'),
+      f2b);
     root.append(banner, pendingBox,
       h('div', { class: 'grid cols-2' },
         h('section', { class: 'card span-2' },
@@ -37,18 +42,15 @@ export default {
             h('li', null, 'Responses to your own connections get through, everything else only through a port forward.'))),
         h('section', { class: 'card' },
           h('div', { class: 'card-head' }, h('span', { class: 'icon-badge' }, icon('globe')), h('h2', null, 'IPv6 pinholes')),
-          h('p', { class: 'muted small' }, 'Devices in the home network currently have no public IPv6 addresses, because the upstream router does not pass a prefix on to the LAN (prefix delegation). Pinholes for IPv6 are therefore neither possible nor needed at the moment.')),
-        h('section', { class: 'card span-2' },
-          h('div', { class: 'card-head' }, h('span', { class: 'icon-badge' }, icon('lock')), h('h2', null, 'Blocked attackers (fail2ban)')),
-          h('p', { class: 'muted small' }, 'fail2ban blocks IP addresses after repeated failed attempts, e.g. with SSH or the login to this web interface.'),
-          f2b),
+      h('p', { class: 'muted small' }, 'Devices in the home network currently have no public IPv6 addresses, because the upstream router does not pass a prefix on to the LAN (prefix delegation). Pinholes for IPv6 are therefore neither possible nor needed at the moment.')),
+        f2bCard,
         h('section', { class: 'card span-2' },
           h('div', { class: 'card-head' }, h('span', { class: 'icon-badge' }, icon('file')), h('h2', null, 'Loaded rules')),
           rules)));
 
     async function loadF2B() {
       let jails;
-      try { jails = await get('/api/fail2ban'); } catch (e) { clear(f2b).append(h('p', { class: 'muted' }, e.message)); return; }
+      try { jails = await get('/api/fail2ban'); } catch { f2bCard.remove(); return; }
       clear(f2b).append(h('div', { class: 'grid cols-2' }, jails.map((j) => h('div', { class: 'jail' },
         h('div', { class: 'row' }, h('strong', { class: 'mono' }, j.name), h('div', { class: 'spacer' }),
           badge(`${j.current_banned} blocked`, j.current_banned ? 'warn' : 'ok'), badge(`${j.total_failed} failed attempts`)),

@@ -73,6 +73,8 @@ if [ "$1" = configure ]; then
 	systemd-sysusers vanilla-router.conf || true
 	systemd-tmpfiles --create vanilla-router.conf || true
 	systemctl daemon-reload || true
+	# Images up to 0.0.8 set the root password to "!" by mistake. The router needs no root login
+	passwd --lock root >/dev/null 2>&1 || true
 	# vr-smbd.service replaces the services of the package samba
 	systemctl disable --now smbd.service nmbd.service samba-ad-dc.service 2>/dev/null || true
 	# Update ($2 = old version): run the new programs. Sessions of the web interface end, the setup stays (F-UPD-08).

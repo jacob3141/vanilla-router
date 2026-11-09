@@ -69,7 +69,7 @@ type Result struct {
 	Changes      []Change
 	Generation   string // ID of the backup, empty if nothing changed
 	Reloaded     []string
-	RebootNeeded bool // .link files changed: port names only take effect after a restart
+	RebootNeeded bool // .link files changed: a first setup takes the names at the next start
 	Pending      bool // waiting for confirmation
 	Deadline     time.Time
 }
@@ -176,8 +176,12 @@ func (a *Applier) Apply(c *config.Config, sec gen.Secrets, opt Options) (*Result
 		return nil, errors.Join(err, a.restore(genID))
 	}
 	groups := changedGroups(changes)
-	res.RebootNeeded = groups[gen.GroupLink]
+	res.RebootNeeded = groups[gen.GroupLink] && old == nil
 	sysErr := a.system(old, c, groups)
+	// old == nil is a first setup, for example from the installer: there the system is not this router yet
+	if old != nil && portsDiffer(old, c) {
+		sysErr = errors.Join(sysErr, a.relink(c))
+	}
 	res.Reloaded, err = a.reload(groups, c)
 	err = errors.Join(err, sysErr)
 	if err == nil && !a.SkipHealth {
@@ -187,7 +191,7 @@ func (a *Applier) Apply(c *config.Config, sec gen.Secrets, opt Options) (*Result
 		a.logf("error after applying: %v. Rolling back …", err)
 		return nil, errors.Join(err, a.restore(genID))
 	}
-	if opt.Confirm > 0 && (groups[gen.GroupNetworkd] || groups[gen.GroupFirewall] || groups[gen.GroupPPP] || groups[gen.GroupWiFi]) {
+	if opt.Confirm > 0 && (groups[gen.GroupNetworkd] || groups[gen.GroupLink] || groups[gen.GroupFirewall] || groups[gen.GroupPPP] || groups[gen.GroupWiFi]) {
 		if err := a.schedule(genID, opt); err != nil {
 			a.logf("rollback timer not started (%v), rolling back immediately …", err)
 			return nil, errors.Join(err, a.restore(genID))
@@ -349,6 +353,11 @@ func (a *Applier) restore(id string) error {
 		if err := a.system(before, c, groups); err != nil {
 			errs = append(errs, err)
 		}
+		if before != nil && portsDiffer(before, c) {
+			if err := a.relink(c); err != nil {
+				errs = append(errs, err)
+			}
+		}
 	}
 	if _, err := a.reload(groups, c); err != nil {
 		errs = append(errs, err)
@@ -390,7 +399,7 @@ func (a *Applier) reload(groups map[string]bool, c *config.Config) ([]string, er
 	if groups[gen.GroupNetworkd] {
 		run("networkd", nil, "networkctl", "reload")
 	}
-	if groups[gen.GroupPPP] || groups[gen.GroupNetworkd] && pppoe {
+	if groups[gen.GroupPPP] || (groups[gen.GroupNetworkd] || groups[gen.GroupLink]) && pppoe {
 		if pppoe {
 			run("pppoe", nil, "systemctl", "enable", "--now", "vr-pppoe.service")
 			run("pppoe", nil, "systemctl", "restart", "vr-pppoe.service")
@@ -493,7 +502,7 @@ func (a *Applier) health(groups map[string]bool, c *config.Config) error {
 			return err
 		})
 	}
-	if groups[gen.GroupDNSmasq] || groups[gen.GroupNetworkd] {
+	if groups[gen.GroupDNSmasq] || groups[gen.GroupNetworkd] || groups[gen.GroupLink] {
 		checks = append(checks, func() error {
 			_, err := a.Run.Run(nil, "systemctl", "is-active", "--quiet", "vr-dnsmasq.service")
 			if err != nil {
@@ -502,7 +511,7 @@ func (a *Applier) health(groups map[string]bool, c *config.Config) error {
 			return nil
 		})
 	}
-	if groups[gen.GroupNetworkd] {
+	if groups[gen.GroupNetworkd] || groups[gen.GroupLink] {
 		checks = append(checks, func() error {
 			out, err := a.Run.Run(nil, "ip", "-4", "-o", "addr", "show", "dev", gen.LANIf)
 			if err != nil || !strings.Contains(string(out), c.LAN.IPv4) {

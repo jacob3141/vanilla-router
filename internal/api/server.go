@@ -113,7 +113,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	h.Set("Cross-Origin-Opener-Policy", "same-origin")
 	if strings.HasPrefix(r.URL.Path, "/api/") {
 		h.Set("Cache-Control", "no-store")
-		if r.Method != http.MethodGet && r.Method != http.MethodHead && !s.sameOrigin(r) {
+		if r.Method != http.MethodGet && r.Method != http.MethodHead && !strings.HasPrefix(r.URL.Path, "/api/webhook/") && !s.sameOrigin(r) {
 			s.cfg.Log.Warn("csrf: request rejected", "ip", clientIP(r), "origin", r.Header.Get("Origin"), "path", r.URL.Path)
 			writeError(w, http.StatusForbidden, "Request from a foreign site rejected.")
 			return

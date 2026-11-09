@@ -2,6 +2,22 @@
 
 Pre-releases: **not ready for production use**. See [the status](docs/architecture.md#15-status-what-has-been-tested-for-real).
 
+## 0.0.13 (2026-11-09)
+
+### Added
+
+- Network ports: a list of the physical ports with a role each (WAN, LAN, not used). A role can be changed while the router runs, with confirmation and automatic rollback. A port can make its LED blink.
+- Routes and open ports have their own pages.
+- Smart Home: devices can be switched, dimmed and moved to a position from the page, and rooms are arranged in a separate mode.
+- Containers can be created, edited and updated with all their options, with a terminal, statistics and webhooks.
+- Stacks from Compose files or Git with automatic updates, custom and application templates.
+- Images, volumes including NFS and CIFS, Docker networks on any interface of the router, registries and events.
+
+### Changed
+
+- The Smart Home page is much more compact.
+- `git` is now installed, for stacks from Git.
+
 ## 0.0.12 (2026-11-09)
 
 ### Fixed

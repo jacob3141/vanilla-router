@@ -432,3 +432,102 @@ func TestWiFiPackagesMatchList(t *testing.T) {
 		t.Error(cmd)
 	}
 }
+
+// ipLinks makes the fake system report ports, and records what relink does with them.
+type linkRunner struct {
+	fakeRunner
+	links string
+}
+
+func (f *linkRunner) Run(env []string, name string, args ...string) ([]byte, error) {
+	if name == "ip" && len(args) == 3 && args[0] == "-j" {
+		f.calls = append(f.calls, "ip -j link show")
+		return []byte(f.links), nil
+	}
+	return f.fakeRunner.Run(env, name, args...)
+}
+
+func indexOf(calls []string, want string) int {
+	for i, c := range calls {
+		if c == want {
+			return i
+		}
+	}
+	return -1
+}
+
+func TestSwapPortsLiveAndRollBack(t *testing.T) {
+	a, fr, c := setup(t)
+	r := &linkRunner{fakeRunner: *fr, links: `[{"ifname":"wan0","address":"02:00:00:00:00:01","link_type":"ether"},
+		{"ifname":"lanp1","address":"02:00:00:00:00:02","link_type":"ether"},
+		{"ifname":"wan0.7","address":"02:00:00:00:00:01","link_type":"ether","link":"wan0"},
+		{"ifname":"lan0","address":"02:00:00:00:00:02","link_type":"ether"},
+		{"ifname":"docker0","address":"02:00:00:00:00:09","link_type":"ether"}]`}
+	a.Run = r
+	if _, err := a.Apply(c, nil, Options{}); err != nil {
+		t.Fatal(err)
+	}
+	if r.called("ip link set") {
+		t.Fatalf("a first setup must not rename anything: %v", r.calls)
+	}
+	nc := *c
+	nc.WAN.MatchMAC, nc.LAN.Members = "02:00:00:00:00:02", []string{"02:00:00:00:00:01"}
+	r.calls = nil
+	res, err := a.Apply(&nc, nil, Options{Confirm: 5 * time.Minute, Self: "/usr/sbin/vrctl"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !res.Pending {
+		t.Error("swapping ports must wait for confirmation")
+	}
+	if !strings.Contains(read(t, a, "/etc/systemd/network/10-vr-wan0.link"), "02:00:00:00:00:02") {
+		t.Error(".link file not rewritten")
+	}
+	for _, want := range []string{"ip link set dev wan0 nomaster", "ip addr flush dev wan0", "ip link set dev wan0 name vrtmp0",
+		"ip link set dev lanp1 name vrtmp1", "ip link set dev vrtmp0 name lanp1", "ip link set dev vrtmp1 name wan0", "networkctl reconfigure lanp1 wan0"} {
+		if indexOf(r.calls, want) < 0 {
+			t.Errorf("%q not called: %v", want, r.calls)
+		}
+	}
+	if indexOf(r.calls, "ip link set dev vrtmp0 name lanp1") < indexOf(r.calls, "ip link set dev lanp1 name vrtmp1") {
+		t.Error("a name was used before it was free")
+	}
+	for _, c := range r.calls {
+		if strings.Contains(c, "docker0") || strings.Contains(c, "wan0.7") || strings.HasPrefix(c, "ip link set dev lan0 ") {
+			t.Errorf("touched a port that is not ours: %s", c)
+		}
+	}
+	// the system now has the new names
+	r.links = `[{"ifname":"wan0","address":"02:00:00:00:00:02","link_type":"ether"},{"ifname":"lanp1","address":"02:00:00:00:00:01","link_type":"ether"}]`
+	r.calls = nil
+	if err := a.RollbackPending(res.Generation); err != nil {
+		t.Fatal(err)
+	}
+	if !r.called("ip link set dev lanp1 name vrtmp") || !strings.Contains(read(t, a, "/etc/systemd/network/10-vr-wan0.link"), "02:00:00:00:00:01") {
+		t.Errorf("rollback did not restore the ports: %v", r.calls)
+	}
+}
+
+func TestUnusedPortLeavesTheBridgeNames(t *testing.T) {
+	a, fr, c := setup(t)
+	c.LAN.Members = []string{"02:00:00:00:00:02", "02:00:00:00:00:03"}
+	r := &linkRunner{fakeRunner: *fr, links: `[{"ifname":"wan0","address":"02:00:00:00:00:01","link_type":"ether"},
+		{"ifname":"lanp1","address":"02:00:00:00:00:02","link_type":"ether"},
+		{"ifname":"lanp2","address":"02:00:00:00:00:03","link_type":"ether"}]`}
+	a.Run = r
+	if _, err := a.Apply(c, nil, Options{}); err != nil {
+		t.Fatal(err)
+	}
+	nc := *c
+	nc.LAN.Members = []string{"02:00:00:00:00:02"}
+	r.calls = nil
+	if _, err := a.Apply(&nc, nil, Options{}); err != nil {
+		t.Fatal(err)
+	}
+	if indexOf(r.calls, "ip link set dev vrtmp0 name vroff-000003") < 0 {
+		t.Errorf("a port without a use must not keep a name the .network files match: %v", r.calls)
+	}
+	if read(t, a, "/etc/systemd/network/10-vr-lanp2.link") != "" {
+		t.Error(".link file of the removed port is still there")
+	}
+}

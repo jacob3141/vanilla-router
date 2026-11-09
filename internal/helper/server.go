@@ -194,7 +194,7 @@ func writeResp(c net.Conn, r Response) { json.NewEncoder(c).Encode(r) }
 
 // isReadOnly: read-only actions are not logged individually, so as not to flood the journal.
 func isReadOnly(action string) bool {
-	return strings.HasPrefix(action, "ap.") || strings.HasSuffix(action, ".list") || strings.HasSuffix(action, ".get") ||
+	return strings.HasPrefix(action, "ap.") || strings.HasPrefix(action, "docker.term.") || strings.HasSuffix(action, ".list") || strings.HasSuffix(action, ".get") ||
 		strings.HasSuffix(action, ".status") || action == "health" || strings.HasPrefix(action, "tool.")
 }
 
@@ -246,8 +246,10 @@ func (s *Server) registerAll() {
 	s.registerNetconf()
 	s.registerFirewall()
 	s.registerServices()
+	s.registerDocker()
 	s.registerSystem()
 	s.registerNetstat()
+	s.registerInterfaces()
 	s.registerSysinfo()
 	s.registerExtras()
 	s.registerSettings()

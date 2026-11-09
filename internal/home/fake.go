@@ -11,6 +11,7 @@ func FakeDevices() []Device {
 		mk("sim-1", "kitchen-spots", adapterShelly2, "Plus1PM", "192.0.2.1", Entity{ID: "switch:0", Kind: KindSwitch, On: boolp(true), Power: floatp(14.5)}),
 		mk("sim-2", "kitchen-blind", adapterShelly2, "Plus2PM", "192.0.2.2", Entity{ID: "cover:0", Kind: KindCover, State: "stopped", Position: intp(60), Power: floatp(0)}),
 		mk("sim-3", "dining-light", adapterShelly1, "SHRGBW2", "192.0.2.3", Entity{ID: "light:0", Kind: KindLight, On: boolp(true), Level: intp(40), Power: floatp(6)}),
+		mk("sim-5", "living-light", adapterShelly2, "Plus2PM", "192.0.2.5", Entity{ID: "switch:0", Kind: KindSwitch, On: boolp(false), Power: floatp(0)}, Entity{ID: "switch:1", Kind: KindSwitch, On: boolp(true), Power: floatp(12)}),
 		mk("sim-4", "house-meter", adapterShelly2, "Pro3EM", "192.0.2.4", Entity{ID: "em:0", Kind: KindPower, Power: floatp(4264)}),
 	}
 }

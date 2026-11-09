@@ -91,15 +91,17 @@ func clampLines(n int) string {
 }
 
 type Container struct {
-	Name         string `json:"name"`
-	Image        string `json:"image"`
-	State        string `json:"state"`
-	Status       string `json:"status"`
-	Health       string `json:"health,omitempty"`
-	IP           string `json:"ip,omitempty"`
-	ImageCreated string `json:"image_created,omitempty"`
-	Restart      string `json:"restart_policy"`
-	DockerSock   bool   `json:"docker_sock"`
+	Name         string   `json:"name"`
+	Image        string   `json:"image"`
+	State        string   `json:"state"`
+	Status       string   `json:"status"`
+	Health       string   `json:"health,omitempty"`
+	IP           string   `json:"ip,omitempty"`
+	ImageCreated string   `json:"image_created,omitempty"`
+	Restart      string   `json:"restart_policy"`
+	DockerSock   bool     `json:"docker_sock"`
+	Network      string   `json:"network,omitempty"`
+	Volumes      []string `json:"-"` // names of the volumes it uses
 }
 
 func listContainers(ctx context.Context) ([]Container, error) {
@@ -126,7 +128,7 @@ func listContainers(ctx context.Context) ([]Container, error) {
 		HostConfig struct {
 			RestartPolicy struct{ Name string }
 		}
-		Mounts          []struct{ Source string }
+		Mounts          []struct{ Type, Name, Source string }
 		NetworkSettings struct {
 			Networks map[string]struct{ IPAddress string }
 		}
@@ -141,12 +143,16 @@ func listContainers(ctx context.Context) ([]Container, error) {
 		if r.State.Health != nil {
 			c.Health = r.State.Health.Status
 		}
-		for _, n := range r.NetworkSettings.Networks {
+		for name, n := range r.NetworkSettings.Networks {
+			c.Network = name
 			if n.IPAddress != "" {
 				c.IP = n.IPAddress
 			}
 		}
 		for _, m := range r.Mounts {
+			if m.Type == "volume" {
+				c.Volumes = append(c.Volumes, m.Name)
+			}
 			if m.Source == "/var/run/docker.sock" || m.Source == "/run/docker.sock" {
 				c.DockerSock = true
 			}
@@ -206,6 +212,9 @@ func (s *Server) registerServices() {
 	})
 
 	s.handle("docker.list", func(ctx context.Context, _ json.RawMessage) (any, error) {
+		if s.cfg.DryRun {
+			return []Container{}, nil
+		}
 		return listContainers(ctx)
 	})
 
@@ -232,14 +241,14 @@ func (s *Server) registerServices() {
 		if err := decode(raw, &p); err != nil {
 			return nil, err
 		}
-		if p.Action != "start" && p.Action != "stop" && p.Action != "restart" {
+		if !slices.Contains([]string{"start", "stop", "restart", "kill", "pause", "unpause"}, p.Action) {
 			return nil, Userf("Unknown action %q.", p.Action)
 		}
 		if err := knownContainer(ctx, p.Name); err != nil {
 			return nil, err
 		}
 		if err := s.apply(ctx, "docker", p.Action, "--", p.Name); err != nil {
-			return nil, Userf("docker %s %s failed: %s", p.Action, p.Name, lastLines(err.Error(), 1))
+			return nil, Userf("docker %s %s failed: %s", p.Action, p.Name, dockerErr(err))
 		}
 		return nil, nil
 	})

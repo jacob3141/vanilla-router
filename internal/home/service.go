@@ -233,7 +233,7 @@ func (s *Service) Overview() Overview {
 		c := s.Store.Device(d.ID)
 		d.Room = c.Room
 		if c.Name != "" {
-			d.Name = c.Name
+			d.Name, d.Renamed = c.Name, true
 		}
 	}
 	slices.SortFunc(out.Devices, func(a, b Device) int { return strings.Compare(strings.ToLower(a.Name), strings.ToLower(b.Name)) })
@@ -297,6 +297,18 @@ func (s *Service) Handler() http.Handler {
 		_, err := s.Store.SetRoom(p.ID, p.Name)
 		writeResult(w, err)
 		s.bump()
+	})
+	m.HandleFunc("POST /command", func(w http.ResponseWriter, r *http.Request) {
+		var p struct {
+			Device string `json:"device"`
+			Entity string `json:"entity"`
+			Action string `json:"action"`
+			Value  *int   `json:"value"`
+		}
+		if !readJSON(w, r, &p) {
+			return
+		}
+		writeResult(w, s.Command(r.Context(), p.Device, p.Entity, p.Action, p.Value))
 	})
 	m.HandleFunc("POST /room/delete", func(w http.ResponseWriter, r *http.Request) {
 		var p struct {

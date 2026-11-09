@@ -19,7 +19,7 @@ import (
 // Groups determine what is reloaded after a change.
 const (
 	GroupNetworkd = "networkd"
-	GroupLink     = "link" // renaming the ports, only takes effect after a restart
+	GroupLink     = "link" // the names of the ports, see apply.relink
 	GroupFirewall = "firewall"
 	GroupDNSmasq  = "dnsmasq"
 	GroupPPP      = "ppp"

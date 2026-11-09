@@ -46,7 +46,7 @@ to reach installed routers. Get the latest one from the
 | Web interface, DHCP, DNS, firewall, IPv6 | in daily use on one real router |
 | Updates of vanilla-router itself | work from its own signed package source: one real router went from 0.0.5 to 0.0.8 without reinstalling, its settings stayed |
 | Automatic rollback after a failed update | only tested with a simulated system |
-| File share (Samba) and Docker | part of the image. The file share is off until you switch it on in Settings |
+| File share (Samba) and Docker | part of the image, with container management in the web interface. The file share is off until you switch it on in Settings |
 | SSH | off until you switch it on in Settings, with keys only |
 | Several access points, guest networks | **never run on a real radio**, see [docs/webui-sdn-log.md](docs/webui-sdn-log.md) |
 

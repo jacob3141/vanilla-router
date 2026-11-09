@@ -46,7 +46,7 @@ func (s *Server) registerHome() {
 		rc.SetWriteDeadline(time.Time{}) // the live stream stays open
 		proxy.ServeHTTP(w, r)
 	}
-	for _, p := range []string{"GET /api/home/overview", "GET /api/home/events", "POST /api/home/device", "POST /api/home/room", "POST /api/home/room/delete"} {
+	for _, p := range []string{"GET /api/home/overview", "GET /api/home/events", "POST /api/home/device", "POST /api/home/room", "POST /api/home/room/delete", "POST /api/home/command"} {
 		s.route(p, handler)
 	}
 }

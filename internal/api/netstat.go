@@ -21,6 +21,9 @@ import (
 func (s *Server) registerNetstat() {
 	s.route("GET /api/network", s.handleNetwork)
 	s.route("GET /api/ports", s.get("ports.list"))
+	s.route("GET /api/interfaces", s.get("interfaces.get"))
+	s.route("POST /api/interfaces", s.forward("interfaces.set", "Saved. Move the cables if needed, then confirm the change."))
+	s.route("POST /api/interfaces/identify", s.forward("interfaces.identify", "The LED of this port is blinking for 10 seconds."))
 	s.route("GET /api/connections", s.handleConnections)
 	s.route("GET /api/dns/stats", s.handleDNSStats)
 }

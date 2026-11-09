@@ -4,6 +4,7 @@ package home
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -164,5 +165,154 @@ func TestRound(t *testing.T) {
 	o = s.Overview()
 	if o.Devices[0].Online || len(o.Devices[0].Entities) != 1 {
 		t.Errorf("%+v", o.Devices[0])
+	}
+}
+
+// commandDevice answers like a Shelly and records the paths it was asked for.
+func commandDevice(t *testing.T, identity, status string) (*httptest.Server, *[]string) {
+	t.Helper()
+	var got []string
+	dev := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/shelly":
+			fmt.Fprint(w, identity)
+		case "/rpc/Shelly.GetStatus", "/status":
+			fmt.Fprint(w, status)
+		default:
+			got = append(got, r.URL.RequestURI())
+			fmt.Fprint(w, "{}")
+		}
+	}))
+	t.Cleanup(dev.Close)
+	return dev, &got
+}
+
+func serviceWith(t *testing.T, devs ...*httptest.Server) *Service {
+	t.Helper()
+	st, _ := OpenStore(filepath.Join(t.TempDir(), "home.json"))
+	s := &Service{Store: st}
+	s.init()
+	var targets []Target
+	for _, d := range devs {
+		targets = append(targets, Target{Host: strings.TrimPrefix(d.URL, "http://"), Name: "d"})
+	}
+	s.round(context.Background(), targets)
+	return s
+}
+
+func TestCommandsGen2(t *testing.T) {
+	dev, got := commandDevice(t, gen2Identity, `{"switch:1":{"id":1,"output":false},"cover:0":{"id":0,"state":"open","current_pos":100},"input:0":{"id":0,"state":true},"pm1:0":{"id":0,"apower":1}}`)
+	s := serviceWith(t, dev)
+	id := s.Overview().Devices[0].ID
+	ctx := context.Background()
+	for _, c := range [][3]string{{"switch:1", ActionOn, "/rpc/Switch.Set?id=1&on=true"}, {"switch:1", ActionOff, "/rpc/Switch.Set?id=1&on=false"},
+		{"cover:0", ActionOpen, "/rpc/Cover.Open?id=0"}, {"cover:0", ActionClose, "/rpc/Cover.Close?id=0"}, {"cover:0", ActionStop, "/rpc/Cover.Stop?id=0"}} {
+		*got = nil
+		if err := s.Command(ctx, id, c[0], c[1], nil); err != nil {
+			t.Fatalf("%v: %v", c, err)
+		}
+		if len(*got) != 1 || (*got)[0] != c[2] {
+			t.Errorf("%v: %v", c, *got)
+		}
+	}
+	*got = nil
+	for _, c := range [][3]string{{id, "switch:1", "open"}, {id, "switch:1", "reboot"}, {id, "cover:0", ActionOn}, {id, "input:0", ActionOn}, {id, "pm1:0", ActionOff},
+		{id, "switch:9", ActionOn}, {"nobody", "switch:1", ActionOn}, {id, "switch:1&on=true", ActionOn}} {
+		if err := s.Command(ctx, c[0], c[1], c[2], nil); err == nil || !errors.Is(err, ErrInvalid) {
+			t.Errorf("%v accepted: %v", c, err)
+		}
+	}
+	if len(*got) != 0 {
+		t.Errorf("a refused command reached the device: %v", *got)
+	}
+}
+
+func TestCommandsGen1(t *testing.T) {
+	relay, gr := commandDevice(t, `{"type":"SHSW-1","mac":"020000000030","auth":false,"fw":"x/v1"}`, `{"relays":[{"ison":false}]}`)
+	roller, gc := commandDevice(t, gen1Identity, `{"relays":[{"ison":false}],"rollers":[{"state":"stop","current_pos":40}]}`)
+	color, gl := commandDevice(t, `{"type":"SHRGBW2","mac":"020000000040","auth":false,"fw":"x/v1"}`, `{"mode":"color","lights":[{"ison":true,"gain":50}]}`)
+	white, gw := commandDevice(t, `{"type":"SHRGBW2","mac":"020000000050","auth":false,"fw":"x/v1"}`, `{"mode":"white","lights":[{"ison":true},{"ison":false}]}`)
+	s := serviceWith(t, relay, roller, color, white)
+	ctx := context.Background()
+	for _, c := range []struct {
+		id, entity, action, want string
+		got                      *[]string
+	}{
+		{"shelly-020000000030", "relay:0", ActionOn, "/relay/0?turn=on", gr},
+		{"shelly-020000000020", "roller:0", ActionOpen, "/roller/0?go=open", gc},
+		{"shelly-020000000040", "light:0", ActionOff, "/color/0?turn=off", gl},
+		{"shelly-020000000050", "light:1", ActionOn, "/white/1?turn=on", gw},
+	} {
+		if err := s.Command(ctx, c.id, c.entity, c.action, nil); err != nil {
+			t.Fatalf("%v: %v", c.id, err)
+		}
+		if len(*c.got) != 1 || (*c.got)[0] != c.want {
+			t.Errorf("%s: %v", c.id, *c.got)
+		}
+	}
+}
+
+func TestCommandProtectedDevice(t *testing.T) {
+	id := strings.Replace(gen2Identity, `"auth_en":false`, `"auth_en":true`, 1)
+	dev, got := commandDevice(t, id, `{"switch:0":{"id":0,"output":false}}`)
+	s := serviceWith(t, dev)
+	if err := s.Command(context.Background(), s.Overview().Devices[0].ID, "switch:0", ActionOn, nil); err == nil || !strings.Contains(err.Error(), "password") {
+		t.Errorf("%v", err)
+	}
+	if len(*got) != 0 {
+		t.Errorf("%v", *got)
+	}
+}
+
+func TestCommandsWithValue(t *testing.T) {
+	n := func(v int) *int { return &v }
+	gen2, g2 := commandDevice(t, gen2Identity, `{"light:0":{"id":0,"output":true,"brightness":40},"rgb:1":{"id":1,"output":true,"brightness":10},"cover:0":{"id":0,"state":"open","current_pos":100},"cover:1":{"id":1,"state":"stopped"},"switch:0":{"id":0,"output":true}}`)
+	roller, gr := commandDevice(t, gen1Identity, `{"rollers":[{"state":"stop","current_pos":40}]}`)
+	color, gc := commandDevice(t, `{"type":"SHRGBW2","mac":"020000000040","auth":false,"fw":"x/v1"}`, `{"mode":"color","lights":[{"ison":true,"gain":50}]}`)
+	white, gw := commandDevice(t, `{"type":"SHRGBW2","mac":"020000000050","auth":false,"fw":"x/v1"}`, `{"mode":"white","lights":[{"ison":true,"brightness":30}]}`)
+	s := serviceWith(t, gen2, roller, color, white)
+	ctx := context.Background()
+	const g = "shelly-020000000010"
+	for _, c := range []struct {
+		id, entity, action string
+		value              int
+		want               string
+		got                *[]string
+	}{
+		{g, "light:0", ActionLevel, 55, "/rpc/Light.Set?id=0&on=true&brightness=55", g2},
+		{g, "rgb:1", ActionLevel, 100, "/rpc/RGB.Set?id=1&on=true&brightness=100", g2},
+		{g, "cover:0", ActionPos, 0, "/rpc/Cover.GoToPosition?id=0&pos=0", g2},
+		{"shelly-020000000020", "roller:0", ActionPos, 70, "/roller/0?go=to_pos&roller_pos=70", gr},
+		{"shelly-020000000040", "light:0", ActionLevel, 20, "/color/0?turn=on&gain=20", gc},
+		{"shelly-020000000050", "light:0", ActionLevel, 80, "/white/0?turn=on&brightness=80", gw},
+	} {
+		*c.got = nil
+		if err := s.Command(ctx, c.id, c.entity, c.action, n(c.value)); err != nil {
+			t.Fatalf("%v: %v", c, err)
+		}
+		if len(*c.got) != 1 || (*c.got)[0] != c.want {
+			t.Errorf("%s %s: %v", c.id, c.entity, *c.got)
+		}
+	}
+	*g2 = nil
+	for _, c := range []struct {
+		entity, action string
+		value          *int
+	}{
+		{"light:0", ActionLevel, n(0)}, {"light:0", ActionLevel, n(101)}, {"light:0", ActionLevel, nil}, {"cover:0", ActionPos, n(-1)},
+		{"cover:0", ActionPos, n(101)}, {"cover:0", ActionPos, nil}, {"switch:0", ActionLevel, n(50)}, {"light:0", ActionPos, n(50)},
+		{"cover:1", ActionPos, n(50)}, {"switch:0", ActionOn, n(1)},
+	} {
+		if err := s.Command(ctx, g, c.entity, c.action, c.value); err == nil || !errors.Is(err, ErrInvalid) {
+			t.Errorf("%v accepted: %v", c, err)
+		}
+	}
+	if len(*g2) != 0 {
+		t.Errorf("a refused command reached the device: %v", *g2)
+	}
+	for _, d := range s.Overview().Devices {
+		if d.Model == "SHRGBW2" && d.Entities[0].Level == nil {
+			t.Errorf("no level from %s", d.ID)
+		}
 	}
 }

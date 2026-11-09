@@ -149,6 +149,7 @@ func parseGen2(b []byte) ([]Entity, error) {
 }
 
 type gen1Status struct {
+	Mode   string `json:"mode"` // RGBW2: color or white
 	Relays []struct {
 		IsOn bool `json:"ison"`
 	} `json:"relays"`
@@ -160,6 +161,7 @@ type gen1Status struct {
 	Lights []struct {
 		IsOn       bool     `json:"ison"`
 		Brightness *int     `json:"brightness"`
+		Gain       *int     `json:"gain"` // RGBW2 in color mode
 		Power      *float64 `json:"power"`
 	} `json:"lights"`
 	Meters []struct {
@@ -192,7 +194,15 @@ func parseGen1(b []byte) ([]Entity, error) {
 		}
 	}
 	for i, l := range s.Lights {
-		out = append(out, Entity{ID: fmt.Sprintf("light:%d", i), Kind: KindLight, On: boolp(l.IsOn), Level: l.Brightness, Power: l.Power})
+		base := "/light/"
+		if s.Mode == "color" || s.Mode == "white" {
+			base = "/" + s.Mode + "/"
+		}
+		level := l.Brightness
+		if level == nil {
+			level = l.Gain
+		}
+		out = append(out, Entity{ID: fmt.Sprintf("light:%d", i), Kind: KindLight, On: boolp(l.IsOn), Level: level, Power: l.Power, endpoint: base + strconv.Itoa(i)})
 	}
 	return out, nil
 }

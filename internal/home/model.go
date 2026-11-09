@@ -27,12 +27,15 @@ type Entity struct {
 	State    string   `json:"state,omitempty"`    // cover: open, closed, opening, closing, stopped
 	Power    *float64 `json:"power,omitempty"`    // W
 	Energy   *float64 `json:"energy,omitempty"`   // Wh, counter of the device
+
+	endpoint string // generation 1: URL path for commands, depends on the mode of the device
 }
 
 // Device is a found device with its latest values.
 type Device struct {
 	ID       string    `json:"id"`
 	Name     string    `json:"name"`      // chosen by the owner, otherwise from the reservation or the device
+	Renamed  bool      `json:"renamed"`   // the name was chosen by the owner
 	Room     string    `json:"room"`      // room ID, empty = not sorted yet
 	Host     string    `json:"host"`      // address
 	Adapter  string    `json:"adapter"`   // shelly1, shelly2

@@ -17,6 +17,11 @@ import monitor from './views/monitor.js';
 import device from './views/device.js';
 import connections from './views/connections.js';
 import network from './views/network.js';
+import stacks from './views/stacks.js';
+import { images as dockerImages, volumes as dockerVolumes } from './views/dockerstore.js';
+import { networks as dockerNetworks, host as dockerHost } from './views/dockerhost.js';
+import routes from './views/routes.js';
+import openPorts from './views/openports.js';
 import logs from './views/logs.js';
 import internet, { SETUP_LATER_KEY } from './views/internet.js';
 import wifi from './views/wifi.js';
@@ -41,12 +46,19 @@ const NAV = [
     { path: 'dns', label: 'DNS', icon: 'dns', view: dns },
     { path: 'firewall', label: 'Firewall', icon: 'shield', view: firewall },
     { path: 'connections', label: 'Connections', icon: 'arrowRight', view: connections },
-    { path: 'network', label: 'Network status', icon: 'globe', view: network },
+    { path: 'network', label: 'Network ports', icon: 'globe', view: network },
+    { path: 'routes', label: 'Routes', icon: 'arrowRight', view: routes },
+    { path: 'open-ports', label: 'Open ports', icon: 'shield', view: openPorts },
   ] },
   { section: 'Services', items: [
     { path: 'services', label: 'Services', icon: 'services', view: services },
     // Extensions: only visible when installed (PLAN.md 3.8, /api/state → features)
     { path: 'containers', label: 'Containers', icon: 'container', view: containers, feature: 'containers' },
+    { path: 'stacks', label: 'Stacks', icon: 'services', view: stacks, feature: 'containers' },
+    { path: 'images', label: 'Images', icon: 'file', view: dockerImages, feature: 'containers' },
+    { path: 'volumes', label: 'Volumes', icon: 'drive', view: dockerVolumes, feature: 'containers' },
+    { path: 'docker-networks', label: 'Docker networks', icon: 'globe', view: dockerNetworks, feature: 'containers' },
+    { path: 'docker-host', label: 'Docker host', icon: 'system', view: dockerHost, feature: 'containers' },
     { path: 'files', label: 'File share', icon: 'drive', view: files, feature: 'files' },
   ] },
   { section: 'System', items: [

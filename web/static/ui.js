@@ -163,14 +163,18 @@ export function confirmDialog({ title, text, confirm = 'Confirm', danger = false
 
 // Form dialog: fields = [{name, label, value, hint, placeholder, type, options, required}]
 // onSubmit(values) throws on errors; the message appears in the dialog.
-export function formDialog({ title, text, fields, submit = 'Save', onSubmit }) {
+export function formDialog({ title, text, fields, submit = 'Save', onSubmit, wide }) {
   return new Promise((resolve) => {
     const err = h('div', { class: 'form-error hidden' });
     const inputs = {};
     const body = fields.map((f) => {
+      if (f.type === 'section') return h('h3', { class: 'sub form-section' }, f.label);
+      if (f.type === 'custom') return h('div', { class: 'field' }, h('label', null, f.label), f.element);
       let input;
       if (f.type === 'select') {
         input = h('select', { class: 'input', name: f.name }, f.options.map((o) => h('option', { value: o.value, selected: o.value === f.value }, o.label)));
+      } else if (f.type === 'textarea') {
+        input = h('textarea', { class: 'input', name: f.name, rows: f.rows || 3, placeholder: f.placeholder, spellcheck: 'false' }, f.value ?? '');
       } else if (f.type === 'checkbox') {
         input = h('input', { type: 'checkbox', name: f.name, checked: f.value });
       } else {
@@ -183,7 +187,7 @@ export function formDialog({ title, text, fields, submit = 'Save', onSubmit }) {
     const form = h('form', { method: 'dialog' },
       h('div', { class: 'dialog-body' }, h('h2', null, title), text && h('p', null, text), h('div', { class: 'form-fields' }, err, body)),
       h('div', { class: 'dialog-foot' }, h('button', { class: 'btn', type: 'button', onclick: () => dlg.close() }, 'Cancel'), save));
-    const dlg = h('dialog', null, form);
+    const dlg = h('dialog', { class: wide ? 'wide' : null }, form);
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
       const values = {};

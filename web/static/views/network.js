@@ -1,105 +1,118 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-import { h, every, clear, icon, fmt, badge } from '../ui.js';
-import { get } from '../api.js';
+import { t } from '../i18n.js';
+import { h, every, clear, icon, fmt, badge, toast, confirmDialog } from '../ui.js';
+import { get, post } from '../api.js';
 
-const SCOPE = { all: ['all addresses', 'warn'], lan: ['Home network', 'info'], local: ['local only', ''] };
-const NEIGH = { REACHABLE: 'ok', STALE: '', DELAY: 'warn', PROBE: 'warn', FAILED: 'crit', INCOMPLETE: 'warn', PERMANENT: 'info', NOARP: '' };
+// The roles a port can have. Another use, for example a second internet connection, is one more line here.
+const ROLES = [['wan', 'Internet (WAN)'], ['lan', 'Home network (LAN)'], ['unused', 'Not used']];
+const SWITCH_WAIT_MS = 8000;
 
 export default {
-  title: 'Network status',
-  subtitle: 'Interfaces, routes, neighbors, IPv6 and open ports',
+  title: 'Network ports',
+  subtitle: 'The physical ports of the router and what they are used for',
   render(root) {
-    const ifaces = h('div', { class: 'grid cols-2' });
-    const routes = h('div');
-    const ipv6 = h('div');
-    const ports = h('tbody');
-    const neigh = h('tbody');
-    const dhcp = h('dl', { class: 'kv' });
-    get('/api/dhcp/settings').then((d) => {
-      const s = d.settings;
-      const lease = (v) => (v ? fmt.duration(+v) : '–');
-      const rows = [
-        ['Network', s.subnet || '–'],
-        ['Gateway', s['option routers'] || '–'],
-        ['DNS-Server', s['option domain-name-servers'] || '–'],
-        ['Search domain', s['option domain-name'] || '–'],
-        ['Dynamic range', `${d.pool.start} – ${d.pool.end}`],
-        ['Fixed addresses', String(d.reservations)],
-        ['Lease duration', `${lease(s['default-lease-time'])} (at most ${lease(s['max-lease-time'])})`],
-        ['Authoritative', s.authoritative !== undefined ? 'yes' : 'no'],
-      ];
-      clear(dhcp).append(...rows.flatMap(([k, v]) => [h('dt', null, k), h('dd', null, v)]));
-    }).catch(() => {});
+    const pendingBox = h('div');
+    const tbody = h('tbody');
+    const apply = h('button', { class: 'btn primary', disabled: true, onclick: save }, icon('check'), 'Apply');
+    const hint = h('p', { class: 'muted small' }, 'Use "Identify" to find a port: its LED blinks for 10 seconds, if the hardware supports it.');
+    root.append(pendingBox, h('section', { class: 'card' },
+      h('div', { class: 'card-head' }, h('span', { class: 'icon-badge' }, icon('globe')), h('h2', null, 'Ports'), h('div', { class: 'spacer' }), apply),
+      hint,
+      h('div', { class: 'table-wrap' }, h('table', null,
+        h('thead', null, h('tr', null, ['', 'Port', 'Use', 'Speed', 'MAC address', 'Received', 'Sent', ''].map((x) => h('th', null, x)))),
+        tbody))));
 
-    root.append(
-      ifaces,
-      h('div', { class: 'grid cols-2 mt' },
-        card('home', 'DHCP settings', dhcp),
-        card('globe', 'IPv6', ipv6),
-        card('shield', 'Open ports of the router', h('p', { class: 'muted small' }, 'Services on the router waiting for connections. None of them can be reached from the internet, the firewall drops incoming connections on wan0 for IPv4 and IPv6.'),
-          h('div', { class: 'table-wrap' }, h('table', null, h('thead', null, h('tr', null, ['Port', 'Protocol', 'Address', 'Service', 'Reachable from'].map((t) => h('th', null, t)))), ports))),
-        h('section', { class: 'card span-2' }, head('arrowRight', 'Routes'), routes),
-        h('section', { class: 'card span-2' }, head('devices', 'Neighbor table (ARP/NDP)'),
-          h('div', { class: 'table-wrap' }, h('table', null, h('thead', null, h('tr', null, ['Address', 'MAC', 'Interface', 'State'].map((t) => h('th', null, t)))), neigh)))));
+    let ports = [];
+    let draft = {};
+    let countdown = null;
+    let shownPending = '';
+
+    const changed = () => ports.some((p) => (draft[p.mac] || p.role) !== p.role);
+
+    function draw() {
+      clear(tbody);
+      for (const p of ports) {
+        const role = draft[p.mac] || p.role;
+        tbody.append(h('tr', null,
+          h('td', null, h('span', { class: `dot ${p.carrier ? 'ok' : ''}`, title: p.carrier ? 'connected' : 'no cable' })),
+          h('td', null, h('div', { class: 'cell-main' }, p.label || 'Free port'), !p.present && badge('missing', 'warn')),
+          h('td', null, h('select', { class: 'input auto', 'aria-label': 'Use', onchange: (e) => { draft[p.mac] = e.target.value; apply.disabled = !changed(); } },
+            ROLES.map(([v, label]) => h('option', { value: v, selected: v === role }, label)))),
+          h('td', null, p.carrier && p.speed_mbit ? `${fmt.num(p.speed_mbit, 0)} Mbit/s` : '–'),
+          h('td', { class: 'mono small' }, p.mac),
+          h('td', { class: 'muted' }, fmt.bytes(p.rx_bytes)),
+          h('td', { class: 'muted' }, fmt.bytes(p.tx_bytes)),
+          h('td', { class: 'actions' }, p.present && h('button', { class: 'btn sm', onclick: (e) => identify(p, e.currentTarget) }, 'Identify'))));
+      }
+      apply.disabled = !changed();
+    }
 
     async function load() {
-      const [n, p] = await Promise.all([get('/api/network').catch(() => null), get('/api/ports').catch(() => [])]);
-      if (!n) return;
-      const addrs = Object.fromEntries(n.addrs.map((a) => [a.ifname, a]));
-      clear(ifaces);
-      for (const l of n.links.filter((x) => ['wan0', 'lan0'].includes(x.ifname) || (x.ifname !== 'lo' && x.operstate === 'UP' && !x.ifname.startsWith('veth')))) {
-        const a = addrs[l.ifname]?.addr_info || [];
-        const st = l.stats64 || {};
-        const rows = [
-          ['State', badge(l.operstate === 'UP' ? 'connected' : l.operstate, l.operstate === 'UP' ? 'ok' : 'crit')],
-          ['MAC', h('span', { class: 'mono' }, l.address || '–')],
-          ['MTU', String(l.mtu)],
-          ['Addresses', a.length ? a.map((x) => h('div', { class: 'mono small' }, `${x.local}/${x.prefixlen}`, x.scope === 'link' ? h('span', { class: 'muted' }, ' (link-local)') : '', x.dynamic ? h('span', { class: 'muted' }, ' (dynamic)') : '')) : '–'],
-          ['Received', `${fmt.bytes(st.rx?.bytes || 0)} · ${fmt.num(st.rx?.packets || 0, 0)} packets`],
-          ['Sent', `${fmt.bytes(st.tx?.bytes || 0)} · ${fmt.num(st.tx?.packets || 0, 0)} packets`],
-          ['Errors', errCell(st)],
-        ];
-        ifaces.append(h('section', { class: 'card' }, head(l.ifname === 'wan0' ? 'globe' : l.ifname === 'lan0' ? 'home' : 'devices', l.ifname === 'wan0' ? 'wan0 · Internet' : l.ifname === 'lan0' ? 'lan0 · home network' : l.ifname),
-          h('dl', { class: 'kv' }, rows.flatMap(([k, v]) => [h('dt', null, k), h('dd', null, v)]))));
+      let d;
+      try { d = await get('/api/interfaces'); } catch { return; }
+      const pendKey = d.pending ? d.pending.deadline : '';
+      if (pendKey !== shownPending) { shownPending = pendKey; drawPending(d.pending); }
+      ports = d.ports;
+      // Do not pull a list away from under the pointer or overwrite a choice that is not applied yet
+      if (!changed() && document.activeElement?.tagName !== 'SELECT') { draft = {}; draw(); }
+    }
+
+    function drawPending(p) {
+      clearInterval(countdown);
+      clear(pendingBox);
+      if (!p) return;
+      const left = h('strong', { class: 'num' });
+      pendingBox.append(h('div', { class: 'banner warn pending' }, icon('alert'),
+        h('div', { class: 'spacer' }, 'The new assignment is active. Move the cables to the new ports. Without confirmation it is rolled back automatically in ', left, '.'),
+        h('button', { class: 'btn', onclick: revert }, 'Roll back'),
+        h('button', { class: 'btn primary', onclick: confirmChange }, icon('check'), 'Confirm')));
+      const tick = () => {
+        const s = Math.max(0, Math.round((new Date(p.deadline) - Date.now()) / 1000));
+        left.textContent = t(s >= 60 ? `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')} min` : `${s} s`);
+        if (s <= 0) { clearInterval(countdown); setTimeout(load, 2000); }
+      };
+      tick();
+      countdown = setInterval(tick, 1000);
+    }
+
+    async function save() {
+      if (!(await confirmDialog({ title: 'Change the use of the ports?', danger: true, confirm: 'Switch',
+        text: 'The ports change their use right away and the connection can drop. Move the cables to the new ports, open this page again and confirm within 5 minutes. Otherwise the router restores the old assignment by itself.' }))) return;
+      const body = { ports: ports.map((p) => ({ mac: p.mac, role: draft[p.mac] || p.role })) };
+      // The answer may never arrive, the cable it would travel on can be the one that just changed its use
+      const result = await Promise.race([
+        post('/api/interfaces', body).then((r) => ({ r }), (e) => ({ e })),
+        new Promise((r) => setTimeout(() => r({ lost: true }), SWITCH_WAIT_MS)),
+      ]);
+      if (result.lost || result.e?.status === 0) {
+        toast('The router is switching the ports. Move the cables, then open this page and confirm within 5 minutes.', 'warn');
+        return;
       }
+      if (result.e) { toast(result.e.message, 'crit'); return; }
+      toast(result.r.data?.pending ? result.r.message : 'Saved, nothing has changed.', result.r.data?.pending ? 'warn' : 'ok');
+      draft = {};
+      load();
+    }
 
-      clear(routes).append(h('div', { class: 'grid cols-2' },
-        routeTable('IPv4', n.routes4), routeTable('IPv6', n.routes6.filter((r) => !r.dst?.startsWith('fe80') && !r.dst?.startsWith('ff00')))));
+    async function identify(p, btn) {
+      btn.disabled = true;
+      try { toast((await post('/api/interfaces/identify', { mac: p.mac })).message); } catch (e) { toast(e.message, 'crit'); }
+      setTimeout(() => { btn.disabled = false; }, 3000);
+    }
 
-      const wanV6 = (addrs.wan0?.addr_info || []).filter((x) => x.family === 'inet6' && x.scope === 'global');
-      const lanV6 = (addrs.lan0?.addr_info || []).filter((x) => x.family === 'inet6' && x.scope === 'global');
-      const def6 = n.routes6.find((r) => r.dst === 'default');
-      clear(ipv6).append(h('dl', { class: 'kv' },
-        h('dt', null, 'WAN addresses'), h('dd', null, wanV6.length ? wanV6.map((x) => h('div', { class: 'mono small' }, `${x.local}/${x.prefixlen}`)) : '–'),
-        h('dt', null, 'Standard-Route'), h('dd', null, def6 ? h('span', { class: 'mono small' }, `via ${def6.gateway} (${def6.dev})`) : badge('none', 'warn')),
-        h('dt', null, 'Forwarding'), h('dd', null, n.sysctl['net.ipv6.conf.all.forwarding'] === '1' ? badge('an', 'ok') : badge('aus')),
-        h('dt', null, 'LAN prefix'), h('dd', null, lanV6.length ? lanV6.map((x) => h('div', { class: 'mono small' }, `${x.local}/${x.prefixlen}`)) : [badge('none', 'warn'), h('div', { class: 'muted small' }, 'Devices in the home network get no public IPv6 addresses. For that the upstream router would have to pass a prefix to this router through prefix delegation.')])));
+    async function confirmChange() {
+      try { toast((await post('/api/settings/confirm')).message); } catch (e) { toast(e.message, 'crit'); }
+      load();
+    }
 
-      clear(ports).append(...p.map((x) => h('tr', null,
-        h('td', { class: 'mono' }, String(x.port)), h('td', null, x.proto.toUpperCase()), h('td', { class: 'mono small' }, x.addr),
-        h('td', null, x.process || '–'), h('td', null, badge(...SCOPE[x.scope])))));
-
-      clear(neigh).append(...n.neighbors.filter((x) => x.lladdr).sort((a, b) => (a.dev + a.dst).localeCompare(b.dev + b.dst, 'de', { numeric: true })).map((x) => h('tr', null,
-        h('td', { class: 'mono small' }, x.dst), h('td', { class: 'mono small' }, x.lladdr), h('td', null, x.dev),
-        h('td', null, badge((x.state || []).join(' ') || '–', NEIGH[(x.state || [])[0]] || '')))));
+    async function revert() {
+      try { toast((await post('/api/settings/revert')).message, 'warn'); } catch (e) { toast(e.message, 'crit'); }
+      draft = {};
+      load();
     }
 
     load();
-    return every(30000, load);
+    const stop = every(10000, load);
+    return () => { stop(); clearInterval(countdown); };
   },
 };
-
-function head(ic, title) { return h('div', { class: 'card-head' }, h('span', { class: 'icon-badge' }, icon(ic)), h('h2', null, title)); }
-function card(ic, title, ...body) { return h('section', { class: 'card' }, head(ic, title), ...body); }
-function errCell(st) {
-  const e = (st.rx?.errors || 0) + (st.tx?.errors || 0);
-  const d = (st.rx?.dropped || 0) + (st.tx?.dropped || 0);
-  return [badge(`${fmt.num(e, 0)} errors`, e ? 'warn' : 'ok'), ' ', badge(`${fmt.num(d, 0)} dropped`, d ? '' : 'ok')];
-}
-function routeTable(title, list) {
-  return h('div', null, h('h3', { class: 'sub' }, title), h('div', { class: 'table-wrap flat' }, h('table', null,
-    h('thead', null, h('tr', null, ['Target', 'via', 'Interface', 'Source'].map((t) => h('th', null, t)))),
-    h('tbody', null, list.map((r) => h('tr', null,
-      h('td', { class: 'mono small' }, r.dst === 'default' ? 'Standard' : r.dst), h('td', { class: 'mono small' }, r.gateway || '–'),
-      h('td', null, r.dev || '–'), h('td', { class: 'muted small' }, r.protocol || '–')))))));
-}

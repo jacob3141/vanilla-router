@@ -1,3 +1,5 @@
+[![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/jacob3141)
+
 <p align="center"><img src="docs/logo/logo.svg" alt="Logo: a scoop of vanilla ice cream in a cone" width="160"></p>
 
 # vanilla-router

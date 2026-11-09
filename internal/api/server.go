@@ -33,6 +33,7 @@ type Config struct {
 	Limiter  *auth.Limiter
 	Helper   *helper.Client
 	Files    string // socket of the file service, empty = off
+	Home     string // socket of the Smart Home service, empty = off
 	Sampler  *sys.Sampler
 	History  *sys.History
 	Monitor  *sys.Monitor
@@ -78,6 +79,7 @@ func New(cfg Config) *Server {
 	s.registerFirewall()
 	s.registerSystem()
 	s.registerFiles()
+	s.registerHome()
 	s.registerMonitor()
 	s.registerDeviceExtras()
 	s.registerNetstat()

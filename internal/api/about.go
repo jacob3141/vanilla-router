@@ -20,6 +20,7 @@ func (s *Server) features() map[string]bool {
 	return map[string]bool{
 		"containers": exists("/usr/bin/docker"),
 		"files":      exists(s.cfg.Files),
+		"home":       exists(s.cfg.Home),
 		"audit":      exists(AuditScript),
 		// An access point that is set up stays visible even if its adapter is gone, so the page can explain that.
 		"wifi": s.cfg.FakeWiFi || sys.WiFiPresent("/") || exists(gen.WiFiConf),

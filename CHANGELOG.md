@@ -2,6 +2,12 @@
 
 Pre-releases: **not ready for production use**. See [the status](docs/architecture.md#15-status-what-has-been-tested-for-real).
 
+## 0.0.10 (2026-11-09)
+
+### Added
+
+- Smart Home: a new area that finds Shelly devices among the addresses the router knows, shows their state live and sorts them into rooms. Reading only so far.
+
 ## 0.0.9 (2026-11-09)
 
 ### Security

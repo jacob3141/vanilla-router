@@ -58,8 +58,10 @@ for _ in $(seq 50); do [ -S "$SOCKS/helper.sock" ] && break; sleep 0.1; done
 [ -S "$SOCKS/helper.sock" ] || { cat "$WORK/helper.log"; exit 1; }
 
 "$WORK/bin/vr-webui" serve --dev --config "$CFG" --data "$WORK/data" --helper "$SOCKS/helper.sock" \
-	--files "$SOCKS/files.sock" --listen "127.0.0.1:$PORT" --redirect off \
+	--files "$SOCKS/files.sock" --home "$SOCKS/home.sock" --listen "127.0.0.1:$PORT" --redirect off \
 	--origins "http://127.0.0.1:$PORT,http://localhost:$PORT" "${FAKE_WIFI[@]}" >"$WORK/serve.log" 2>&1 &
+
+"$WORK/bin/vr-webui" home --fake --socket "$SOCKS/home.sock" --data "$WORK/data/home.json" --allow-user "$(id -un)" >"$WORK/home.log" 2>&1 &
 
 if [ -n "${VR_APD:-}" ]; then
 	"$WORK/bin/vr-webui" apd --helper "$SOCKS/helper.sock" --listen 127.0.0.1:7443 >"$WORK/apd.log" 2>&1 &

@@ -77,11 +77,12 @@ if [ "$1" = configure ]; then
 	sysctl -q -p /usr/lib/sysctl.d/90-vr-ping.conf || true
 	# Images up to 0.0.8 set the root password to "!" by mistake. The router needs no root login
 	passwd --lock root >/dev/null 2>&1 || true
+	[ ! -e /etc/vanilla-router/config.json ] || systemctl enable --now vr-home.service || true
 	# vr-smbd.service replaces the services of the package samba
 	systemctl disable --now smbd.service nmbd.service samba-ad-dc.service 2>/dev/null || true
 	# Update ($2 = old version): run the new programs. Sessions of the web interface end, the setup stays (F-UPD-08).
 	if [ -n "$2" ]; then
-		systemctl try-restart vr-webui-helper.service vr-webui.service vr-apd.service vr-ap.service vr-dnsmasq.service || true
+		systemctl try-restart vr-webui-helper.service vr-webui.service vr-apd.service vr-ap.service vr-home.service vr-dnsmasq.service || true
 	fi
 fi
 EOF

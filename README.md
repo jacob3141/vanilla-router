@@ -21,8 +21,9 @@ it into a router without requiring any Linux knowledge.
 2. **Install:** boot the future router from the stick. The assistant asks only two things: which cable
    goes to the modem (just plug it in, it detects it) and which disk it may use.
 3. **Set up:** open `https://router.home.arpa` in a browser, enter the code shown on the router's screen
-   and choose a password. Everything else, such as your provider's credentials, devices, port forwarding
-   and parental controls, is done there.
+   and choose a password. Everything else, such as your provider's credentials, devices, port forwarding,
+   parental controls, the file share and containers, is done there.
+4. **Stay up to date:** new versions arrive as updates. You never have to install again, and your settings stay.
 
 ## Principles
 
@@ -31,19 +32,27 @@ it into a router without requiring any Linux knowledge.
 - **Secure by default**: firewall for IPv4 and IPv6, no open services, automatic security updates
 - **One configuration file** as the single source of truth; everything else is generated from it and validated before it is applied
 - **Rollback**: changes that break the network and updates after which the router no longer works are rolled back automatically
-- **No dependencies**: Go with the standard library only, frontend without frameworks, packages only from Ubuntu *main*
+- **No dependencies**: Go with the standard library only, frontend without frameworks, packages from Ubuntu *main*. Only Docker and `hostapd` come from *universe*, limited by an apt pin to exactly those packages
 
 ## Status
 
-In development, **not ready for production use**. The code for all parts is written and covered by unit
-tests: configuration, generators, applying with rollback, web interface, setup assistant, WAN detection,
-rollback after updates and the stick creator. A complete installation works in a virtual machine with Secure
-Boot; on real hardware only port detection and the stick creator have been tested so far. An installed router
-does not update vanilla-router itself yet, only Ubuntu's security updates. The exact status is in
-[docs/architecture.md, section 15](docs/architecture.md#15-status-what-has-been-tested-for-real),
-the plan in [PLAN.md](PLAN.md).
+Early pre-release, **not ready for production use**. Releases are published untested, so that bug fixes have a way
+to reach installed routers. Get the latest one from the
+[releases page](https://github.com/jacob3141/vanilla-router/releases): the stick creator (`.exe`) is all you need.
 
-The web interface comes from a hand-built prototype that serves a real household as router and NAS.
+| Part | State |
+|---|---|
+| Installation from the boot stick | works on real hardware, behind another router. PPPoE has not been tried with a real line |
+| Web interface, DHCP, DNS, firewall, IPv6 | in daily use on one real router |
+| Updates of vanilla-router itself | work from its own signed package source: one real router went from 0.0.5 to 0.0.8 without reinstalling, its settings stayed |
+| Automatic rollback after a failed update | only tested with a simulated system |
+| File share (Samba) and Docker | part of the image. The file share is off until you switch it on in Settings |
+| SSH | off until you switch it on in Settings, with keys only |
+| Several access points, guest networks | **never run on a real radio**, see [docs/webui-sdn-log.md](docs/webui-sdn-log.md) |
+
+The interface and the assistant are in English for now, a language setting will come to the web interface. The exact
+status is in [docs/architecture.md, section 15](docs/architecture.md#15-status-what-has-been-tested-for-real), the
+plan in [PLAN.md](PLAN.md).
 
 ## Documentation
 

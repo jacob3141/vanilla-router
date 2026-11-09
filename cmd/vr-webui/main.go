@@ -9,6 +9,7 @@
 //	vr-webui set-password   sets the password, reads it from stdin (emergency reset)
 //	vr-webui files          file service for a share (extension, F-ADD)
 //	vr-webui apd            connection to the access points, runs as user vr-apd
+//	vr-webui home           Smart Home service, runs as user vr-home
 package main
 
 import (
@@ -42,6 +43,7 @@ import (
 	"vanilla-router/internal/files"
 	"vanilla-router/internal/gen"
 	"vanilla-router/internal/helper"
+	"vanilla-router/internal/home"
 	"vanilla-router/internal/sys"
 	"vanilla-router/web"
 )
@@ -51,6 +53,8 @@ const (
 	tlsDir     = "/etc/vanilla-router/tls"
 	helperSock = "/run/vr-webui/helper.sock"
 	filesSock  = "/run/vr-webui-files/files.sock"
+	homeSock   = "/run/vr-home/home.sock"
+	homeData   = "/var/lib/vanilla-router/home/home.json"
 	webUser    = "vr-webui"
 	apdUser    = "vr-apd"
 )
@@ -80,6 +84,8 @@ func main() {
 		err = cmdSetPassword(os.Args[2:])
 	case "files":
 		err = cmdFiles(os.Args[2:])
+	case "home":
+		err = cmdHome(os.Args[2:])
 	case "apd":
 		err = cmdAPD(os.Args[2:])
 	default:
@@ -92,7 +98,7 @@ func main() {
 }
 
 func usage() {
-	fmt.Fprintln(os.Stderr, "Usage: vr-webui serve|helper|prepare|setup-code|set-password|files|apd [options]")
+	fmt.Fprintln(os.Stderr, "Usage: vr-webui serve|helper|prepare|setup-code|set-password|files|apd|home [options]")
 	os.Exit(2)
 }
 
@@ -142,6 +148,7 @@ func cmdServe(args []string) error {
 	data := fl.String("data", dataDir, "data folder")
 	sock := fl.String("helper", helperSock, "socket of the helper")
 	fsock := fl.String("files", filesSock, "socket of the file service")
+	hsock := fl.String("home", homeSock, "socket of the Smart Home service")
 	origins := fl.String("origins", "", "allowed origins, comma-separated (default from the configuration)")
 	dev := fl.Bool("dev", false, "test instance: HTTP instead of HTTPS, only for 127.0.0.1 through an SSH tunnel")
 	fakeWiFi := fl.Bool("fake-wifi", false, "test instance: show the Wi-Fi page without hardware")
@@ -218,6 +225,7 @@ func cmdServe(args []string) error {
 		Limiter:   auth.NewLimiter(),
 		Helper:    &helper.Client{Socket: *sock},
 		Files:     *fsock,
+		Home:      *hsock,
 		Sampler:   sampler,
 		History:   history,
 		Monitor:   monitor,
@@ -501,4 +509,91 @@ func cmdAPD(args []string) error {
 	}
 	s := &apd.Server{Backend: cl, Key: ed25519.NewKeyFromSeed(seed), Version: version, Log: logger()}
 	return s.Serve(ctx, *listen)
+}
+
+// cmdHome is the Smart Home service (docs/smarthome-concept.md). It reads what the router knows about the home network
+// and talks to devices there. It only offers a socket for the web server.
+func cmdHome(args []string) error {
+	fl := flag.NewFlagSet("home", flag.ExitOnError)
+	cfgPath := fl.String("config", config.Path, "configuration")
+	sock := fl.String("socket", homeSock, "socket")
+	data := fl.String("data", homeData, "file with rooms and names")
+	allow := fl.String("allow-user", webUser, "user allowed to connect")
+	hosts := fl.String("hosts", "", "test: addresses to read, comma-separated, instead of those the router knows")
+	fake := fl.Bool("fake", false, "test instance: simulated devices, nothing is contacted")
+	fl.Parse(args)
+
+	log := logger()
+	u, err := user.Lookup(*allow)
+	if err != nil {
+		return err
+	}
+	uid, _ := strconv.Atoi(u.Uid)
+	gid, _ := strconv.Atoi(u.Gid)
+	store, err := home.OpenStore(*data)
+	if err != nil {
+		return err
+	}
+	svc := &home.Service{Store: store, Log: log, Targets: func() []home.Target { return homeTargets(*cfgPath, *hosts) }}
+	if *fake {
+		svc.Fake = home.FakeDevices()
+	}
+	os.Remove(*sock)
+	ln, err := net.ListenUnix("unix", &net.UnixAddr{Name: *sock, Net: "unix"})
+	if err != nil {
+		return err
+	}
+	if err := os.Chown(*sock, -1, gid); err != nil {
+		return fmt.Errorf("group of the socket: %w", err)
+	}
+	if err := os.Chmod(*sock, 0o660); err != nil {
+		return err
+	}
+	ctx, cancel := signalContext()
+	defer cancel()
+	go svc.Run(ctx)
+	hs := &http.Server{Handler: svc.Handler(), ReadHeaderTimeout: 10 * time.Second}
+	go func() { <-ctx.Done(); hs.Close() }()
+	log.Info("smart home service ready", "socket", *sock)
+	if err := hs.Serve(&files.PeerListener{UnixListener: ln, AllowUID: uid, Log: log}); err != http.ErrServerClosed {
+		return err
+	}
+	return nil
+}
+
+// homeTargets lists the addresses that may be devices: reservations with their names, then the current leases.
+func homeTargets(cfgPath, hosts string) []home.Target {
+	if hosts != "" {
+		var out []home.Target
+		for _, h := range strings.Split(hosts, ",") {
+			out = append(out, home.Target{Host: h, Name: h})
+		}
+		return out
+	}
+	seen := map[string]bool{}
+	out := []home.Target{}
+	if c, err := config.Load(cfgPath); err == nil {
+		for _, r := range c.DHCP.Reservations {
+			if !seen[r.IP] {
+				seen[r.IP] = true
+				out = append(out, home.Target{Host: r.IP, Name: r.Name})
+			}
+		}
+	}
+	if leases, err := sys.ReadLeases(); err == nil {
+		for _, l := range leases {
+			if !seen[l.IP] {
+				seen[l.IP] = true
+				out = append(out, home.Target{Host: l.IP, Name: firstNonEmpty(l.Hostname, l.IP)})
+			}
+		}
+	}
+	return out
+}
+
+func firstNonEmpty(a, b string) string {
+	if a != "" {
+		return a
+	}
+	return b
 }

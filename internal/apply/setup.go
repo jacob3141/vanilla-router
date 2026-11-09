@@ -93,7 +93,7 @@ func (a *Applier) Setup(dryRun bool, offline string) ([]string, error) {
 		"ModemManager.service", "open-vm-tools.service", "lxd-installer.socket"))
 	step("turn on network services: systemd-networkd, vr-firewall, vr-dnsmasq, health check", hard("enable",
 		"systemd-networkd.service", "vr-firewall.service", "vr-firewall-reload.timer", "vr-dnsmasq.service",
-		"vr-health.service", "vr-webui-helper.service", "vr-webui.service", "vr-apd.service", "vr-complete.timer"))
+		"vr-health.service", "vr-webui-helper.service", "vr-webui.service", "vr-apd.service", "vr-home.service", "vr-complete.timer"))
 	step("SSH off by default (F-SEC-04)", soft("disable", "--now", "ssh.socket", "ssh.service"))
 	step("file share off by default", soft("disable", "--now", "smbd.service", "nmbd.service", "samba-ad-dc.service", "vr-smbd.service", "vr-webui-files.service"))
 	return steps, errors.Join(errs...)

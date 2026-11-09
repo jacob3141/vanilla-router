@@ -415,3 +415,11 @@ dialog::backdrop { background: rgba(5, 8, 14, .55); backdrop-filter: blur(2px); 
 .pair-request { padding: 12px 14px; border: 1px solid var(--accent); border-radius: var(--radius-s); background: var(--accent-soft); }
 .pair-code { font: 600 26px/1.2 var(--mono); letter-spacing: 2px; white-space: nowrap; }
 .btn.wrap { white-space: normal; height: auto; min-height: 36px; padding-block: 6px; text-align: left; }
+
+/* Smart Home */
+.home-rooms { display: grid; gap: 16px; }
+.home-devices { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); }
+.home-device { padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius-s); background: var(--surface-2); }
+.home-device.offline { opacity: .6; }
+.home-entities { display: grid; gap: 6px; margin-top: 8px; }
+.home-entity { gap: 8px; min-height: 24px; }

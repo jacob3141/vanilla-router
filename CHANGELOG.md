@@ -11,6 +11,7 @@ Pre-releases: **not ready for production use**. See [the status](docs/architectu
 ### Fixed
 
 - The Firewall page no longer shows a card for fail2ban, which vanilla-router does not use.
+- The online monitor showed every target as unreachable, because the system did not allow ping without privileges.
 
 ## 0.0.8 (2026-11-09)
 

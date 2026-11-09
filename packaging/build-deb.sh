@@ -26,6 +26,7 @@ done
 
 install -Dm644 -t "$STAGE/usr/lib/systemd/system" packaging/systemd/*
 install -Dm644 packaging/sysusers.d/vanilla-router.conf "$STAGE/usr/lib/sysusers.d/vanilla-router.conf"
+install -Dm644 packaging/sysctl.d/90-vr-ping.conf "$STAGE/usr/lib/sysctl.d/90-vr-ping.conf"
 install -Dm644 packaging/tmpfiles.d/vanilla-router.conf "$STAGE/usr/lib/tmpfiles.d/vanilla-router.conf"
 install -Dm644 LICENSE "$STAGE/usr/share/doc/vanilla-router/copyright"
 # Docker comes from universe (D-20), limited to its own packages. Its configuration keeps the firewall ours.
@@ -73,6 +74,7 @@ if [ "$1" = configure ]; then
 	systemd-sysusers vanilla-router.conf || true
 	systemd-tmpfiles --create vanilla-router.conf || true
 	systemctl daemon-reload || true
+	sysctl -q -p /usr/lib/sysctl.d/90-vr-ping.conf || true
 	# Images up to 0.0.8 set the root password to "!" by mistake. The router needs no root login
 	passwd --lock root >/dev/null 2>&1 || true
 	# vr-smbd.service replaces the services of the package samba

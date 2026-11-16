@@ -3,7 +3,11 @@
 # socket for the web server. If it fails, the router does not notice.
 [Unit]
 Description=vanilla-router Smart Home
-After=network.target
+# RestrictNetworkInterfaces resolves lan0 to its index when the service starts. If lan0 does not exist yet (at boot vr-home can
+# start before systemd-networkd creates the bridge), systemd drops it from the allow list and the service has no network at
+# all. So start only once lan0 exists, stop with it, and start again when it comes back (new index).
+After=network.target sys-subsystem-net-devices-lan0.device
+BindsTo=sys-subsystem-net-devices-lan0.device
 ConditionPathExists=/etc/vanilla-router/config.json
 
 [Service]
@@ -44,4 +48,4 @@ SystemCallFilter=@system-service
 UMask=0077
 
 [Install]
-WantedBy=multi-user.target
+WantedBy=multi-user.target sys-subsystem-net-devices-lan0.device

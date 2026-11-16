@@ -64,7 +64,7 @@ iPad / browser ──HTTPS──▶ vr-webui ──Unix socket──▶ vr-home 
 |---|---|---|
 | Process | `vr-home serve`, own user `vr-home`, no capabilities | Same pattern as `vr-webui files` |
 | Exposure | Unix socket only, `/api/home/*` and `/k/<token>` proxied by `vr-webui` | No new port, no second certificate, existing login and CSRF checks |
-| Network limits | `RestrictNetworkInterfaces=lan0`, `IPAddressAllow` for the home network | A compromised adapter cannot reach the internet or the router's other services |
+| Network limits | `RestrictNetworkInterfaces=lan0` (starts only once `lan0` exists, bound to it), `IPAddressAllow` for the home network | A compromised adapter cannot reach the internet or the router's other services |
 | Secrets | Device passwords in `secrets/`, handed over by the helper through a fixed action | Never in `home.json`, never in an export without encryption |
 | Data | `/var/lib/vanilla-router/home/`: `home.json`, device state cache, history | Survives updates, part of the configuration export |
 | Failure | `vr-home` can crash or be switched off, the router does not notice | Routing must never depend on a light switch |

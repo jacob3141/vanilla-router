@@ -80,7 +80,7 @@ func (a *Applier) Setup(dryRun bool, offline string) ([]string, error) {
 	})
 	step("point /etc/resolv.conf at /run/systemd/resolve/resolv.conf until apply writes it (stub is off)", func() error {
 		// apply writes a regular file that points at dnsmasq (gen.misc), keep it. Until then the link to
-		// resolved's file: 127.0.0.1 would be a loop before resolved has ReadEtcResolvConf=no.
+		// resolved's file, because dnsmasq may not run yet.
 		p := a.p("/etc/resolv.conf")
 		if fi, err := os.Lstat(p); err == nil && fi.Mode().IsRegular() {
 			return nil

@@ -83,11 +83,12 @@ net.netfilter.nf_conntrack_max = 262144
 `)
 
 	// resolved stays active (Ubuntu default, D-12), but frees port 53 for dnsmasq. dnsmasq reads its
-	// upstreams from /run/systemd/resolve/resolv.conf, so 127.0.0.1 must never get there: no DNS=127.0.0.1,
-	// and ReadEtcResolvConf=no, otherwise resolved would take the server from /etc/resolv.conf below.
+	// upstreams from /run/systemd/resolve/resolv.conf. resolved also copies the servers of the regular
+	// /etc/resolv.conf below into that file (there is no option against it), so 127.0.0.1 appears there.
+	// That is no loop: dnsmasq drops servers on its own addresses ("ignoring nameserver 127.0.0.1 - local
+	// interface"), and nothing on the router asks resolved (nsswitch: files dns).
 	add("/etc/systemd/resolved.conf.d/10-vr.conf", GroupResolved, 0o644, header("#")+`[Resolve]
 DNSStubListener=no
-ReadEtcResolvConf=no
 `)
 
 	// The router itself asks dnsmasq, like every device in the home network, so names under the home

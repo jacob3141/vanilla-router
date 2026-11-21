@@ -2,6 +2,13 @@
 
 Pre-releases: **not ready for production use**. See [the status](docs/architecture.md#15-status-what-has-been-tested-for-real).
 
+## 0.0.14 (2026-11-21)
+
+### Fixed
+
+- Containers could not resolve names of the home network (such as `printer.home.arpa`), only names on the internet. The router now asks its own DNS server too (`/etc/resolv.conf` points to dnsmasq), and Docker forwards the questions of the containers there. Existing routers get this with the next `vrctl apply` or the next change in the web interface; running containers need a restart.
+- After a restart the Smart Home service could start before the home network port existed and then had no network: all devices stayed offline until it was restarted by hand.
+
 ## 0.0.13 (2026-11-09)
 
 ### Added

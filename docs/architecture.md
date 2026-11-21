@@ -122,7 +122,8 @@ be tested with golden files: for each example configuration under
 | `dnsmasq` | `/etc/vanilla-router/dnsmasq.conf` (DNS, DHCPv4, reservations, local names) | restart `vr-dnsmasq` |
 | `ppp` | `/etc/ppp/peers/vr-wan`, `chap-secrets`, `pap-secrets` | restart `vr-pppoe` |
 | `wifi` | `/etc/vanilla-router/wifi/hostapd.conf` (0600, only while the access point is on, section 16) | enable and restart or disable `vr-hostapd` |
-| `sysctl`, `resolved`, `ssh`, `apt` | forwarding, resolved without stub listener, sshd, unattended-upgrades | selectively per group |
+| `sysctl`, `resolved`, `ssh`, `apt` | forwarding, resolved without stub listener and without reading `/etc/resolv.conf`, sshd, unattended-upgrades | selectively per group |
+| `resolvconf` | `/etc/resolv.conf` (a regular file, `nameserver 127.0.0.1`: the router and Docker's DNS for containers ask dnsmasq) | nothing, read for each lookup |
 
 Fixed names (PLAN.md 3.4): `wan0` is the internet port, `lan0` a bridge over all other ports (even if there
 is only one), with PPPoE there is also `ppp0`, with VLAN `wan0.7`.

@@ -82,12 +82,22 @@ net.ipv4.tcp_syncookies = 1
 net.netfilter.nf_conntrack_max = 262144
 `)
 
-	// resolved stays active (Ubuntu default, D-12), but frees port 53 for dnsmasq. Deliberately without
-	// DNS=127.0.0.1: dnsmasq reads its upstreams from /run/systemd/resolve/resolv.conf, that would be a
-	// loop. /etc/resolv.conf therefore points to this file instead of the stub (apply.EnsureSystem).
+	// resolved stays active (Ubuntu default, D-12), but frees port 53 for dnsmasq. dnsmasq reads its
+	// upstreams from /run/systemd/resolve/resolv.conf, so 127.0.0.1 must never get there: no DNS=127.0.0.1,
+	// and ReadEtcResolvConf=no, otherwise resolved would take the server from /etc/resolv.conf below.
 	add("/etc/systemd/resolved.conf.d/10-vr.conf", GroupResolved, 0o644, header("#")+`[Resolve]
 DNSStubListener=no
+ReadEtcResolvConf=no
 `)
+
+	// The router itself asks dnsmasq, like every device in the home network, so names under the home
+	// domain resolve on the router too. Docker needs this: its DNS server for containers forwards to the
+	// servers in this file, and to a loopback address from the router's own network namespace. Containers
+	// on ipvlan cannot reach the router's LAN address, so this is their only way to dnsmasq. With a link
+	// to resolved's file (the provider's servers), home names did not resolve in containers.
+	add("/etc/resolv.conf", GroupResolvConf, 0o644, header("#")+fmt.Sprintf(`nameserver 127.0.0.1
+search %s
+`, c.DNS.Domain))
 
 	// SSH: always generate the configuration, apply decides whether the service runs (F-SEC-04).
 	add("/etc/ssh/sshd_config.d/10-vr.conf", GroupSSH, 0o644, header("#")+`PasswordAuthentication no

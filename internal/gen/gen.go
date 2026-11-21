@@ -25,10 +25,13 @@ const (
 	GroupPPP      = "ppp"
 	GroupSysctl   = "sysctl"
 	GroupResolved = "resolved"
-	GroupSSH      = "ssh"
-	GroupAPT      = "apt"
-	GroupWiFi     = "wifi"
-	GroupFiles    = "files"
+	// GroupResolvConf needs no reload: programs read /etc/resolv.conf for each lookup. Running
+	// containers keep the old servers until they are restarted.
+	GroupResolvConf = "resolvconf"
+	GroupSSH        = "ssh"
+	GroupAPT        = "apt"
+	GroupWiFi       = "wifi"
+	GroupFiles      = "files"
 )
 
 // File is a generated file.

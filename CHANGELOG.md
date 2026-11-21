@@ -2,6 +2,12 @@
 
 Pre-releases: **not ready for production use**. See [the status](docs/architecture.md#15-status-what-has-been-tested-for-real).
 
+## 0.0.15 (2026-11-21)
+
+### Fixed
+
+- 0.0.14 wrote an option that systemd-resolved does not know (`ReadEtcResolvConf`), which logged a warning at every start. It is gone after the next `vrctl apply` or change in the web interface.
+
 ## 0.0.14 (2026-11-21)
 
 ### Fixed
